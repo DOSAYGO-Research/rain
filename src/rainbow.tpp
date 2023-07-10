@@ -26,9 +26,8 @@
 #include <cstdio>
 #include "endian.h"
 
-// P to W are primes chosen for their excellent avalanche properties
-
 namespace rainbow {
+  // P to W are primes chosen for their excellent avalanche properties
   static const uint64_t P        = UINT64_C(   0xFFFFFFFFFFFFFFFF) - 58;
   static const uint64_t Q        = UINT64_C( 13166748625691186689);
   static const uint64_t R        = UINT64_C(  1573836600196043749);
@@ -37,8 +36,6 @@ namespace rainbow {
   static const uint64_t U        = UINT64_C(  1358537349836140151);
   static const uint64_t V        = UINT64_C(  2849285319520710901);
   static const uint64_t W        = UINT64_C(  2366157163652459183);
-
-  #define ROTR64(value, rotate_bits) (((value) >> (rotate_bits)) | ((value) << ((64) - (rotate_bits))))
 
   static inline void mixA(uint64_t* s) {
     uint64_t a = s[0], b = s[1], c = s[2], d = s[3];
@@ -84,7 +81,7 @@ namespace rainbow {
 
   template <uint32_t hashsize, bool bswap>
   //void newhash(const void* in, const size_t olen, const seed_t seed, void* out) {
-  void rainbow(const void* in, const size_t olen, const seed_t seed, void* out) {
+  static void rainbow(const void* in, const size_t olen, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[4] = {seed + olen + 1, seed + olen + 3, seed + olen + 5, seed + olen + 7};
     size_t len = olen;

@@ -1,5 +1,16 @@
 #pragma once
 
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+constexpr bool bswap = true;
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+constexpr bool bswap = false;
+#else
+#error "Endianness not supported!"
+#endif
+
+#define ROTR64(x, n) (((x) >> (n)) | ((x) << (64 - (n))))
+typedef uint64_t seed_t;
+
 template <bool bswap>
 static inline uint64_t GET_U64(const uint8_t* data, size_t index) {
   uint64_t result;

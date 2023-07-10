@@ -48,10 +48,8 @@ namespace rainstorm {
   constexpr uint64_t CTR_LEFT  = UINT64_C(    0xefcdab8967452301);
   constexpr uint64_t CTR_RIGHT = UINT64_C(    0x1032547698badcfe);
 
-  #define ROTR64(value, rotate_bits) (((value) >> (rotate_bits)) | ((value) << ((64) - (rotate_bits))))
-
   // Weak function that works with 512-bit (8x64-bit) blocks
-  void weakfunc(uint64_t* h, const uint64_t* data, bool left) {
+  static inline void weakfunc(uint64_t* h, const uint64_t* data, bool left) {
     uint64_t ctr;
     if ( left ) {
       ctr = CTR_LEFT;
@@ -84,7 +82,7 @@ namespace rainstorm {
 
   template <uint32_t hashsize, bool bswap>
   //void newnewhash(const void* in, const size_t len, const seed_t seed, void* out) {
-  void rainstorm(const void* in, const size_t len, const seed_t seed, void* out) {
+  static void rainstorm(const void* in, const size_t len, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[16] = {
         seed + len + 1,
@@ -125,7 +123,7 @@ namespace rainstorm {
     // Pad and process any remaining data less than 64 bytes (512 bits)
     memset(temp, (0x80+lenRemaining) & 255, sizeof(temp));
     memcpy(temp, data, lenRemaining);
-    temp[lenRemaining / 8 + 1] = lenRemaining;
+    temp[lenRemaining >> 3] |= lenRemaining >> (lenRemaining - 56)*8;
 
     for( int i = 0; i < ROUNDS; i++) {
       weakfunc(h, temp, i&1);
@@ -136,10 +134,13 @@ namespace rainstorm {
       h[i] -= h[j];
     }
 
+    if ( hashsize > 64 ) {
+      weakfunc(h, temp, true);
+    }
+
     // Output the hash
-    for (uint32_t i = 0, j = 0; i < hashsize / 64; i++, j+= 8) {
+    for (uint32_t i = 0, j = 0; i < std::min(8, (int)hashsize / 64); i++, j+= 8) {
       PUT_U64<bswap>(h[i], (uint8_t *)out, j);
     }
   }
 }
-
