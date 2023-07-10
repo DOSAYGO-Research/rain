@@ -1,3 +1,5 @@
+#define VERSION "1.0.1"
+
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -49,6 +51,7 @@ int main(int argc, char** argv) {
 
     options.add_options()
         ("m,mode", "Mode: digest or stream", cxxopts::value<Mode>()->default_value("digest"))
+        ("v,version", "Print version")
         ("a,algorithm", "Specify the hash algorithm to use", cxxopts::value<std::string>()->default_value("storm"))
         ("s,size", "Specify the size of the hash", cxxopts::value<uint32_t>()->default_value("256"))
         ("o,outfile", "Output file for the hash", cxxopts::value<std::string>()->default_value("/dev/stdout"))
@@ -59,9 +62,21 @@ int main(int argc, char** argv) {
 
     auto result = options.parse(argc, argv);
 
+    if (result.count("version")) {
+        std::cout << "rainsum version: " << VERSION << '\n';
+    }
+
     if (result.count("help")) {
         usage();
         return 0;
+    }
+
+    Mode mode = result["mode"].as<Mode>();
+
+    // Check for output-length in Digest mode after parsing all options
+    if (mode == Mode::Digest && result.count("output-length")) {
+        std::cerr << "Error: --output-length is not allowed in digest mode.\n";
+        return 1;
     }
 
     std::string inpath;
@@ -74,7 +89,6 @@ int main(int argc, char** argv) {
         inpath = "/dev/stdin";
     }
 
-    Mode mode = result["mode"].as<Mode>();
     std::string algorithm = result["algorithm"].as<std::string>();
     uint32_t size = result["size"].as<uint32_t>();
     std::string outpath = result["outfile"].as<std::string>();
@@ -102,7 +116,8 @@ void usage() {
               << "  -o, --outfile FILE            Output file for the hash\n"
               << "  -t, --test-vectors            Calculate the hash of the standard test vectors\n"
               << "  -l, --output-length BYTES     Output length in bytes\n"
-              << "  --seed                        Seed value\n";
+              << "  -v, --version                 Print out the version\n"
+              << "  --seed                        Seed value (64-bit number or string)\n";
 }
 
 template<bool bswap>
