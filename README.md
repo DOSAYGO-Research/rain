@@ -7,15 +7,15 @@ This repository includes the rainbow and rainstorm hash functions. They were dev
 | Rainbow | 13.2 GiB/sec | 64 to 256 bits | General purpose non-cryptographic hashing | Multiplication, subtraction/addition, rotation, XOR | None mentioned |
 | Rainstorm | 4.7 GiB/sec (at 4 rounds) | 64 to 512 bits | Secure cryptographic hashing (use at your own risk) | Addition/subtraction, rotation, XOR | Not analyzed, no guarantees |
 
-## Rainbow
+## Rainbow 
 
 Fast hash (13.2 GiB/sec, 4.61 bytes/cycle on long messages, 24.8 cycles/hash for short messages), meant for general purpose non-cryptographic hashing. The core mixing function uses multiplication, subtraction/addition, rotation and XOR. 
 
-## Rainstorm
+## Rainstorm - **no security guarantees**
 
 Slow hash with a tuneable-round function (with 4 rounds runs at 4.7 GiB/sec), meant for secure cryptographic hashing but it has not be analyzed so it has no security gurauntees at this time, use at your own risk. The core mixing function uses addition/subtraction, rotation and XOR.
 
-Unoptimized rainstorm running at 4.7 GiB/sec is pretty fast for a cryptohash. If you want more security you can apply more rounds. It doesn't have to be some special number, such as a power of two or even. You can apply any number of rounds. 
+Unoptimized rainstorm running at 4.7 GiB/sec is pretty fast for a cryptohash. If you want more "hypothetical security" you can apply more rounds. It doesn't have to be some special number, such as a power of two or even. You can apply any number of rounds. 
 
 ## Stability
 
