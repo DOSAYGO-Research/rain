@@ -15,7 +15,7 @@ Fast hash (13.2 GiB/sec, 4.61 bytes/cycle on long messages, 24.8 cycles/hash for
 
 Slow hash with a tuneable-round function (with 4 rounds runs at 4.7 GiB/sec), meant for secure cryptographic hashing but it has not be analyzed so it has no security gurauntees at this time, use at your own risk. The core mixing function uses addition/subtraction, rotation and XOR.
 
-Unoptimized rainstorm running at 4.7 GiB/sec is pretty fast for a cryptohash. If you want more "hypothetical security" you can apply more rounds. It doesn't have to be some special number, such as a power of two or even. You can apply any number of rounds. 
+Unoptimized rainstorm running at 4.7 GiB/sec is pretty fast for a cryptohash. If you want more "hypothetical security" (hypothetical right now as it's not analysed so we don't actually know if it's 'secure' or not!) you can apply more rounds. It doesn't have to be some special number, such as a power of two or even. You can apply any number of rounds. 
 
 ## Stability
 
