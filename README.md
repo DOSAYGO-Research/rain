@@ -15,5 +15,18 @@ Fast hash (13.2 GiB/sec, 4.61 bytes/cycle on long messages, 24.8 cycles/hash for
 
 Slow hash with a tuneable-round function (with 4 rounds runs at 4.7 GiB/sec), meant for secure cryptographic hashing but it has not be analyzed so it has no security gurauntees at this time, use at your own risk. The core mixing function uses addition/subtraction, rotation and XOR.
 
+Unoptimized rainstorm running at 4.7 GiB/sec is pretty fast for a cryptohash. If you want more security you can apply more rounds. It doesn't have to be some special number, such as a power of two or even. You can apply any number of rounds. 
+
+## Stability
+
+The stability of these hashes is subject to change. We may update constants, mixing specifics and so on as more information becomes available. However if changes are made that result in different hashes, we will version the changes. Currently rainstorm is a v0, and rainbow is at v1.
+
+## Contributions
+
+Analysis is particularly welcome, as are faster implementations! Ideas for changes are also welcome, we're happy to collaborate. 
+
+## Genesis
+
+The core idea for mixing functions came from Discohash, but has been developed and extended. The overall architecture and processing flow of the hash was inspired by other hash functions.
 
 
