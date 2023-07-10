@@ -29,6 +29,7 @@
 namespace rainstorm {
   // more efficient implementations are welcome! 
   constexpr int ROUNDS = 4;
+  constexpr int FINAL_ROUNDS = 2;
 
   // P to W are primes chosen to have excellent avalanche qualities
   // Z are prime bit rotation amounts 
@@ -135,7 +136,7 @@ namespace rainstorm {
     }
 
     if ( hashsize > 64 ) {
-      weakfunc(h, temp, true);
+      for( int i = 0; i < FINAL_ROUNDS; i++ ) weakfunc(h, temp, true);
     }
 
     // Output the hash
