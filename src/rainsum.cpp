@@ -129,7 +129,8 @@ void usage() {
             << "  -t, --test-vectors            Calculate the hash of the standard test vectors\n"
             << "  -l, --output-length BYTES     Set the output length in hash iterations (stream only)\n"
             << "  -v, --version                 Print out the version\n"
-            << "  --seed                        Seed value (64-bit number or string)\n";
+            << "  --seed                        Seed value (64-bit number or string). If string is used,\n"
+            << "                                  it is hashed with Rainstorm to a 64-bit number\n";
 }
 
 template<bool bswap>
