@@ -147,6 +147,20 @@ namespace rainbow {
       g -= h[3];
       g -= h[2];
       PUT_U64<bswap>(g, (uint8_t *)out, 8);
+    } else if ( hashsize == 256) {
+      mixA(h);
+      g = 0;
+      g -= h[3];
+      g -= h[2];
+      PUT_U64<bswap>(g, (uint8_t *)out, 8);
+      mixA(h);
+      mixB(h, seed);
+      mixA(h);
+      PUT_U64<bswap>(h[0] ^ h[1], (uint8_t *)out, 16);
+      g = 0;
+      g -= h[3];
+      g -= h[2];
+      PUT_U64<bswap>(g, (uint8_t *)out, 24);
     }
   }
 }
