@@ -25,6 +25,14 @@ While Rainstorm's design reflects cryptographic hashing principles, it has not b
 
 The hashes' stability may change over time, as we might modify constants, mixing specifics, and more as we gather insights. Should such changes alter the hashes' output, we will denote the changes with new version numbers. As of now, Rainstorm is at v0, and Rainbow is at v1.
 
+## Building
+
+```sh
+git clone https://github.com/dosyago/rain
+cd rain/src
+make
+```
+
 ## Contributions
 
 We warmly welcome any analysis, along with faster implementations or suggested modifications. Collaboration is highly encouraged!
