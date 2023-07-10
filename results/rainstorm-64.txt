@@ -1,9 +1,5 @@
-[  0%] Built target SMHasher3Version
-[ 31%] Built target SMHasher3Tests
-[ 99%] Built target SMHasher3Hashlib
-[100%] Built target SMHasher3
 -------------------------------------------------------------------------------
---- Testing NewNewhash "New Newhash (aka TradHash)"
+--- Testing rainstorm "Rainstorm v0"
 
 [[[ Sanity Tests ]]]
 
@@ -18,74 +14,73 @@ Running thread-safety test 2 .......... PASS
 [[[ Speed Tests ]]]
 
 Small key speed test - [1, 31]-byte keys
-   1-byte keys -    96.54 cycles/hash (0.015059 stdv  0.0156%)
-   2-byte keys -    96.79 cycles/hash (0.113946 stdv  0.1177%)
-   3-byte keys -    97.31 cycles/hash (0.026250 stdv  0.0270%)
-   4-byte keys -    97.52 cycles/hash (0.257598 stdv  0.2641%)
-   5-byte keys -    97.71 cycles/hash (0.018112 stdv  0.0185%)
-   6-byte keys -    97.68 cycles/hash (0.177166 stdv  0.1814%)
-   7-byte keys -    97.89 cycles/hash (0.013737 stdv  0.0140%)
-   8-byte keys -    88.58 cycles/hash (0.015972 stdv  0.0180%)
-   9-byte keys -    93.91 cycles/hash (0.068698 stdv  0.0732%)
-  10-byte keys -    93.95 cycles/hash (0.052921 stdv  0.0563%)
-  11-byte keys -    94.38 cycles/hash (0.273725 stdv  0.2900%)
-  12-byte keys -    94.45 cycles/hash (0.129538 stdv  0.1372%)
-  13-byte keys -    94.67 cycles/hash (0.147929 stdv  0.1563%)
-  14-byte keys -    94.86 cycles/hash (0.025101 stdv  0.0265%)
-  15-byte keys -    95.04 cycles/hash (0.071581 stdv  0.0753%)
-  16-byte keys -    88.81 cycles/hash (0.013421 stdv  0.0151%)
-  17-byte keys -    90.70 cycles/hash (0.013201 stdv  0.0146%)
-  18-byte keys -    90.70 cycles/hash (0.368668 stdv  0.4065%)
-  19-byte keys -    91.18 cycles/hash (0.012665 stdv  0.0139%)
-  20-byte keys -    91.26 cycles/hash (0.142473 stdv  0.1561%)
-  21-byte keys -    91.50 cycles/hash (0.015297 stdv  0.0167%)
-  22-byte keys -    91.61 cycles/hash (0.056449 stdv  0.0616%)
-  23-byte keys -    91.50 cycles/hash (0.806345 stdv  0.8812%)
-  24-byte keys -    88.99 cycles/hash (0.019276 stdv  0.0217%)
-  25-byte keys -    88.89 cycles/hash (0.026049 stdv  0.0293%)
-  26-byte keys -    88.67 cycles/hash (0.023473 stdv  0.0265%)
-  27-byte keys -    88.89 cycles/hash (0.020466 stdv  0.0230%)
-  28-byte keys -    88.88 cycles/hash (0.014481 stdv  0.0163%)
-  29-byte keys -    88.94 cycles/hash (0.061168 stdv  0.0688%)
-  30-byte keys -    88.99 cycles/hash (0.116482 stdv  0.1309%)
-  31-byte keys -    89.09 cycles/hash (0.229115 stdv  0.2572%)
-Average        -    92.58 cycles/hash
- rnd-byte keys -    92.59 cycles/hash (0.151243 stdv  0.1633%)
+   1-byte keys -    58.93 cycles/hash (0.018731 stdv  0.0318%)
+   2-byte keys -    59.86 cycles/hash (0.422734 stdv  0.7062%)
+   3-byte keys -    59.41 cycles/hash (0.017112 stdv  0.0288%)
+   4-byte keys -    60.50 cycles/hash (0.352619 stdv  0.5828%)
+   5-byte keys -    60.76 cycles/hash (0.166618 stdv  0.2742%)
+   6-byte keys -    60.89 cycles/hash (0.076744 stdv  0.1260%)
+   7-byte keys -    61.06 cycles/hash (0.131364 stdv  0.2151%)
+   8-byte keys -    55.75 cycles/hash (0.008616 stdv  0.0155%)
+   9-byte keys -    57.60 cycles/hash (0.590487 stdv  1.0252%)
+  10-byte keys -    58.44 cycles/hash (0.341735 stdv  0.5848%)
+  11-byte keys -    57.72 cycles/hash (0.197170 stdv  0.3416%)
+  12-byte keys -    57.67 cycles/hash (0.025394 stdv  0.0440%)
+  13-byte keys -    58.88 cycles/hash (0.191706 stdv  0.3256%)
+  14-byte keys -    59.16 cycles/hash (0.091050 stdv  0.1539%)
+  15-byte keys -    58.95 cycles/hash (0.491852 stdv  0.8344%)
+  16-byte keys -    54.21 cycles/hash (0.008451 stdv  0.0156%)
+  17-byte keys -    55.37 cycles/hash (0.007827 stdv  0.0141%)
+  18-byte keys -    55.37 cycles/hash (0.233656 stdv  0.4220%)
+  19-byte keys -    55.66 cycles/hash (0.007885 stdv  0.0142%)
+  20-byte keys -    55.71 cycles/hash (0.021747 stdv  0.0390%)
+  21-byte keys -    55.86 cycles/hash (0.010084 stdv  0.0181%)
+  22-byte keys -    55.95 cycles/hash (0.029963 stdv  0.0536%)
+  23-byte keys -    55.79 cycles/hash (0.470058 stdv  0.8425%)
+  24-byte keys -    54.32 cycles/hash (0.009485 stdv  0.0175%)
+  25-byte keys -    54.27 cycles/hash (0.012929 stdv  0.0238%)
+  26-byte keys -    55.11 cycles/hash (0.207078 stdv  0.3758%)
+  27-byte keys -    56.00 cycles/hash (0.009467 stdv  0.0169%)
+  28-byte keys -    55.94 cycles/hash (0.191308 stdv  0.3420%)
+  29-byte keys -    55.34 cycles/hash (0.027595 stdv  0.0499%)
+  30-byte keys -    55.34 cycles/hash (0.165951 stdv  0.2999%)
+  31-byte keys -    56.01 cycles/hash (0.019424 stdv  0.0347%)
+Average        -    57.16 cycles/hash
+ rnd-byte keys -    57.90 cycles/hash (0.045720 stdv  0.0790%)
 
 Bulk speed test - 262144-byte keys
-Alignment   7 -  1.025 bytes/cycle - 2933.90 MiB/sec @ 3 ghz (115.397192 stdv  0.0451%)
-Alignment   6 -  1.025 bytes/cycle - 2933.90 MiB/sec @ 3 ghz (114.005595 stdv  0.0446%)
-Alignment   5 -  1.025 bytes/cycle - 2933.74 MiB/sec @ 3 ghz (122.054157 stdv  0.0477%)
-Alignment   4 -  1.026 bytes/cycle - 2934.12 MiB/sec @ 3 ghz (128.574111 stdv  0.0503%)
-Alignment   3 -  1.025 bytes/cycle - 2933.55 MiB/sec @ 3 ghz (120.319632 stdv  0.0471%)
-Alignment   2 -  1.025 bytes/cycle - 2933.64 MiB/sec @ 3 ghz (119.839828 stdv  0.0469%)
-Alignment   1 -  1.025 bytes/cycle - 2933.52 MiB/sec @ 3 ghz (113.688750 stdv  0.0445%)
-Alignment   0 -  1.027 bytes/cycle - 2937.01 MiB/sec @ 3 ghz ( 99.002159 stdv  0.0388%)
-Average       -  1.026 bytes/cycle - 2934.17 MiB/sec @ 3 ghz
-Alignment rnd -  1.026 bytes/cycle - 2934.12 MiB/sec @ 3 ghz (110.255928 stdv  0.0431%)
+Alignment   7 -  1.650 bytes/cycle - 4721.49 MiB/sec @ 3 ghz (1374.405471 stdv  0.8652%)
+Alignment   6 -  1.680 bytes/cycle - 4806.52 MiB/sec @ 3 ghz ( 69.871723 stdv  0.0448%)
+Alignment   5 -  1.649 bytes/cycle - 4716.67 MiB/sec @ 3 ghz ( 75.080259 stdv  0.0472%)
+Alignment   4 -  1.648 bytes/cycle - 4715.73 MiB/sec @ 3 ghz ( 74.355664 stdv  0.0468%)
+Alignment   3 -  1.672 bytes/cycle - 4782.88 MiB/sec @ 3 ghz (192.972685 stdv  0.1231%)
+Alignment   2 -  1.675 bytes/cycle - 4792.49 MiB/sec @ 3 ghz (1254.603636 stdv  0.8017%)
+Alignment   1 -  1.649 bytes/cycle - 4717.01 MiB/sec @ 3 ghz ( 73.839034 stdv  0.0464%)
+Alignment   0 -  1.650 bytes/cycle - 4721.56 MiB/sec @ 3 ghz ( 63.741977 stdv  0.0401%)
+Average       -  1.659 bytes/cycle - 4746.79 MiB/sec @ 3 ghz
+Alignment rnd -  1.667 bytes/cycle - 4768.44 MiB/sec @ 3 ghz (1609.701806 stdv  1.0234%)
 
 Bulk speed test - [262017, 262144]-byte keys
-Alignment   7 -  1.025 bytes/cycle - 2932.35 MiB/sec @ 3 ghz (150.803532 stdv  0.0590%)
-Alignment   6 -  1.025 bytes/cycle - 2932.90 MiB/sec @ 3 ghz (141.900163 stdv  0.0555%)
-Alignment   5 -  1.025 bytes/cycle - 2932.58 MiB/sec @ 3 ghz (149.653544 stdv  0.0585%)
-Alignment   4 -  1.025 bytes/cycle - 2932.74 MiB/sec @ 3 ghz (157.563084 stdv  0.0616%)
-Alignment   3 -  1.025 bytes/cycle - 2932.69 MiB/sec @ 3 ghz (145.224988 stdv  0.0568%)
-Alignment   2 -  1.025 bytes/cycle - 2932.92 MiB/sec @ 3 ghz (189.318986 stdv  0.0741%)
-Alignment   1 -  1.025 bytes/cycle - 2932.85 MiB/sec @ 3 ghz (166.472766 stdv  0.0651%)
-Alignment   0 -  1.026 bytes/cycle - 2935.68 MiB/sec @ 3 ghz (370.037201 stdv  0.1449%)
-Average       -  1.025 bytes/cycle - 2933.09 MiB/sec @ 3 ghz
-Alignment rnd -  1.024 bytes/cycle - 2930.76 MiB/sec @ 3 ghz ( 95.821611 stdv  0.0375%)
+Alignment   7 -  1.650 bytes/cycle - 4721.03 MiB/sec @ 3 ghz (1331.834467 stdv  0.8386%)
+Alignment   6 -  1.671 bytes/cycle - 4781.44 MiB/sec @ 3 ghz (1839.977211 stdv  1.1733%)
+Alignment   5 -  1.668 bytes/cycle - 4771.70 MiB/sec @ 3 ghz (622.835514 stdv  0.3964%)
+Alignment   4 -  1.648 bytes/cycle - 4715.64 MiB/sec @ 3 ghz (396.034623 stdv  0.2491%)
+Alignment   3 -  1.679 bytes/cycle - 4803.89 MiB/sec @ 3 ghz (275.049911 stdv  0.1762%)
+Alignment   2 -  1.662 bytes/cycle - 4754.90 MiB/sec @ 3 ghz (509.668283 stdv  0.3232%)
+Alignment   1 -  1.670 bytes/cycle - 4778.43 MiB/sec @ 3 ghz (1552.126857 stdv  0.9891%)
+Alignment   0 -  1.673 bytes/cycle - 4786.35 MiB/sec @ 3 ghz (1644.315204 stdv  1.0496%)
+Average       -  1.665 bytes/cycle - 4764.17 MiB/sec @ 3 ghz
+Alignment rnd -  1.650 bytes/cycle - 4719.35 MiB/sec @ 3 ghz (426.459417 stdv  0.2684%)
 
 [[[ 'Hashmap' Speed Tests ]]]
 
 std::unordered_map
-Init std HashMapTest:     313.055 cycles/op (792291 inserts, 1% deletions)
-Running std HashMapTest:  234.979 cycles/op (6.7 stdv)
+Init std HashMapTest:     223.992 cycles/op (792291 inserts, 1% deletions)
+Running std HashMapTest:  161.154 cycles/op (4.0 stdv)
 
 greg7mdp/parallel-hashmap
-Init fast HashMapTest:    390.082 cycles/op (792291 inserts, 1% deletions)
-Running fast HashMapTest: 341.122 cycles/op (32.8 stdv)  ....... PASS
-
+Init fast HashMapTest:    188.750 cycles/op (792291 inserts, 1% deletions)
+Running fast HashMapTest: 163.184 cycles/op (2.9 stdv)  ....... PASS
 
 [[[ Avalanche Tests ]]]
 
