@@ -17,6 +17,10 @@ Slow hash with a tuneable-round function (with 4 rounds runs at 4.7 GiB/sec), me
 
 Unoptimized rainstorm running at 4.7 GiB/sec is pretty fast for a cryptohash. If you want more "hypothetical security" (hypothetical right now as it's not analysed so we don't actually know if it's 'secure' or not!) you can apply more rounds. It doesn't have to be some special number, such as a power of two or even. You can apply any number of rounds. 
 
+**Why say crypto if it's not analyzed?** 
+
+It's intention is to be a cryptohash so it should be analyzed to verify and understand if it's secure and how secure. The inclusion of these words is to indicate the intention and invite people to analyze, break, or improve it. 
+
 ## Stability
 
 The stability of these hashes is subject to change. We may update constants, mixing specifics and so on as more information becomes available. However if changes are made that result in different hashes, we will version the changes. Currently rainstorm is a v0, and rainbow is at v1.
