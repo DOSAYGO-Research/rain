@@ -79,8 +79,7 @@ int main(int argc, char** argv) {
   if (!(std::istringstream(seed_str) >> seed)) {
       seed = hash_string_to_64_bit(seed_str);
   }
-  std::cout << "Seed : " << seed << std::endl;
-
+  //std::cout << "Seed : " << seed << std::endl;
 
   Mode mode = result["mode"].as<Mode>();
 
