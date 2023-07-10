@@ -24,8 +24,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
-#include "Platform.h"
-#include "Hashlib.h"
 
 // more efficient implementations are welcome! 
 constexpr int ROUNDS = 4;
@@ -139,37 +137,4 @@ void rainstorm(const void* in, const size_t len, const seed_t seed, void* out) {
     PUT_U64<bswap>(h[i], (uint8_t *)out, j);
   }
 }
-
-REGISTER_FAMILY(rainstorm,
-   $.src_url  = "https://github.com/dosyago/rain",
-   $.src_status = HashFamilyInfo::SRC_STABLEISH
- );
-
-REGISTER_HASH(NewNewhash,
-   $.desc     = "Rainstorm v0",
-   $.impl_flags =
-     FLAG_IMPL_MULTIPLY_64_64   |
-     FLAG_IMPL_ROTATE       |
-     FLAG_IMPL_SLOW       |
-     FLAG_IMPL_LICENSE_MIT,
-   $.bits = 64,
-   $.verification_LE = 0x5FFAE4EB,
-   $.verification_BE = 0x71F9E59B, 
-   $.hashfn_native   = rainstorm<64, false>,
-   $.hashfn_bswap  = rainstorm<64, true>
- );
-
-REGISTER_HASH(NewNewhash_128,
-   $.desc     = "Rainstorm 128-bit v0",
-   $.impl_flags =
-     FLAG_IMPL_MULTIPLY_64_64   |
-     FLAG_IMPL_ROTATE       |
-     FLAG_IMPL_SLOW       |
-     FLAG_IMPL_LICENSE_MIT,
-   $.bits = 128,
-   $.verification_LE = 0x4A0E8336,
-   $.verification_BE = 0xA0A05101,
-   $.hashfn_native   = rainstorm<128, false>,
-   $.hashfn_bswap  = rainstorm<128, true>
- );
 

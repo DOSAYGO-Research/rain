@@ -24,8 +24,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
-#include "Platform.h"
-#include "Hashlib.h"
 
 // P to W are primes chosen for their excellent avalanche properties
 
@@ -150,36 +148,3 @@ void rainbow(const void* in, const size_t olen, const seed_t seed, void* out) {
     PUT_U64<bswap>(g, (uint8_t *)out, 8);
   }
 }
-
-REGISTER_FAMILY(rainbow,
-   $.src_url  = "https://github.com/dosyago/rain",
-   $.src_status = HashFamilyInfo::SRC_STABLEISH
- );
-
-REGISTER_HASH(rainbow,
-   $.desc     = "Rainbow v1 (aka Newhash)",
-   $.impl_flags =
-     FLAG_IMPL_MULTIPLY_64_64   |
-     FLAG_IMPL_ROTATE       |
-     FLAG_IMPL_SLOW       |
-     FLAG_IMPL_LICENSE_MIT,
-   $.bits = 64,
-   $.verification_LE = 0x2972C52E,
-   $.verification_BE = 0x217A79E2,
-   $.hashfn_native   = rainbow<64, false>,
-   $.hashfn_bswap  = rainbow<64, true>
- );
-
-REGISTER_HASH(rainbow_128,
-   $.desc     = "Rainbow 128-bit v1 (aka Newhash 128-bit)",
-   $.impl_flags =
-     FLAG_IMPL_MULTIPLY_64_64   |
-     FLAG_IMPL_ROTATE       |
-     FLAG_IMPL_SLOW       |
-     FLAG_IMPL_LICENSE_MIT,
-   $.bits = 128,
-   $.verification_LE = 0xFD9BCADD,
-   $.verification_BE = 0xAF215EDF,
-   $.hashfn_native   = rainbow<128, false>,
-   $.hashfn_bswap  = rainbow<128, true>
- );
