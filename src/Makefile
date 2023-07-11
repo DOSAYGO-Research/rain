@@ -1,5 +1,5 @@
 CXX = clang++
-CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O2
+CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O3
 DEPFLAGS = -MMD -MF $(@:.o=.d)
 
 OBJDIR = obj
