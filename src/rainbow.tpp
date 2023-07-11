@@ -20,7 +20,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 **/
-#define __RAINBNOWVERSION__ "1.0.1"
+#define __RAINBNOWVERSION__ "1.0.3"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
