@@ -1,10 +1,12 @@
 CXX = clang++
 CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O2
+DEPFLAGS = -MMD -MF $(@:.o=.d)
 
 OBJDIR = obj
 BUILDDIR = bin
 SRCS = rainsum.cpp
 OBJS = $(addprefix $(OBJDIR)/,$(SRCS:.cpp=.o))
+DEPS = $(OBJS:.o=.d)
 
 all: directories rainsum
 
@@ -20,7 +22,9 @@ rainsum: $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(BUILDDIR)/$@ $^
 
 $(OBJDIR)/%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c $< -o $@
+
+-include $(DEPS)
 
 .PHONY: clean
 
