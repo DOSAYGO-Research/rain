@@ -1,4 +1,4 @@
-#define VERSION "1.0.2"
+#define VERSION "1.0.3"
 
 #include <iostream>
 #include <fstream>
@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     ("v,version", "Print version")
     ("a,algorithm", "Specify the hash algorithm to use", cxxopts::value<std::string>()->default_value("storm"))
     ("s,size", "Specify the size of the hash", cxxopts::value<uint32_t>()->default_value("256"))
-    ("o,outfile", "Output file for the hash", cxxopts::value<std::string>()->default_value("/dev/stdout"))
+    ("o,output-file", "Output file for the hash", cxxopts::value<std::string>()->default_value("/dev/stdout"))
     ("t,test-vectors", "Calculate the hash of the standard test vectors", cxxopts::value<bool>()->default_value("false"))
     ("l,output-length", "Output length in hashes", cxxopts::value<int>()->default_value("1000000"))
     ("seed", "Seed value", seed_option)
@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
 
   std::string algorithm = result["algorithm"].as<std::string>();
   uint32_t size = result["size"].as<uint32_t>();
-  std::string outpath = result["outfile"].as<std::string>();
+  std::string outpath = result["output-file"].as<std::string>();
   bool use_test_vectors = result["test-vectors"].as<bool>();
   int output_length = result["output-length"].as<int>();
 
@@ -125,7 +125,7 @@ void usage() {
             << "                                    stream mode gives a variable length binary feedback output\n"
             << "  -a, --algorithm [bow|storm]       Specify the hash algorithm to use. Default: storm\n"
             << "  -s, --size [64-256|64-512]        Specify the bit size of the hash. Default: 256\n"
-            << "  -o, --outfile FILE                Output file for the hash or stream\n"
+            << "  -o, --output-file FILE            Output file for the hash or stream\n"
             << "  -t, --test-vectors                Calculate the hash of the standard test vectors\n"
             << "  -l, --output-length HASHES        Set the output length in hash iterations (stream only)\n"
             << "  -v, --version                     Print out the version\n"

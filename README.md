@@ -29,28 +29,32 @@ The hashes' stability may change over time, as we might modify constants, mixing
 
 The current test vectors for Rainstorm (v0.0.1) and Rainbow (v1.0.3) are:
 
-**Rainbow v1.0.3 Test Vectors**
+**Rainbow v1.0.4 Test Vectors**
+
+`./rainsum -a bow --test-vectors`:
 
 ```test
-f14c475b16f335b7087d8ca13ba624a8d18bd3b678e75373d980697c027b6fc2 ""
-408e76ac2d5fcd5005ccfd759ace5251fc2eda0378891863910f49c68d559cc6 "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-72545293e6099750aa66b317722e72afc92a5b3e4ec5fd27812ebed3082327c7 "The quick brown fox jumps over the lazy dog"
-da179c1578f4f5ad46e26f0c2b34061b54fa21b98a40cf9166a2806ace8b8631 "The quick brown fox jumps over the lazy cog"
-0ab0b1e49a18724d995d70b2f449a8caa3f1a4240438ab83ad2277b0bb419065 "The quick brown fox jumps over the lazy dog."
-297158e4ec29b1bdbad5b438679e74c9ad282dac08191c3a54b172ef2c6e51fd "After the rainstorm comes the rainbow."
-d30e40ba5c9e6aa47e66b02f85ecdee1f3f01cb7febccb8a196eaeaa961390a1 "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+b735f3165b474cf1a824a63ba18c7d087353e778b6d38bd1c26f7b027c6980d9 ""
+c7343ac7ee1e4990b55227b0182c41e9a6bbc295a17e2194d4e0081124657c3c "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+53efdb8f046dba30523e9004fce7d194fdf6c79a59d6e3687907652e38e53123 "The quick brown fox jumps over the lazy dog"
+95a3515641473aa3726bcc5f454c658bfc9b714736f3ffa8b347807775c2078e "The quick brown fox jumps over the lazy cog"
+f27c10f32ae243afea08dfb15e0c86c0b601792d1cd195ca651fe5394c56f200 "The quick brown fox jumps over the lazy dog."
+e21780122142956ff99d560069a123b75d014f0b110d307d9b23d79f58ebeb29 "After the rainstorm comes the rainbow."
+a46a9e5cba400ed3e1deec852fb0667e8acbbcfeb71cf0f3a1901396aaae6e19 "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 ```
 
-**Rainstorm v0.0.1 Test Vectors**
+**Rainstorm v0.0.2 Test Vectors**
+
+`./rainsum --test-vectors`:
 
 ```text
-16bbf785885feae3cce7f078c5088d463a327ec231bdfe151ece5657c387ef79 ""
-6b11035936ce079e781633a0c03aac623d443f317430855350deee25022f375b "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-a91152b6f40086f8c20f0e84d017685c290f31df3d8822d4262696dabf4c8dfa "The quick brown fox jumps over the lazy dog"
-7bf4fbd18d2005ec123672af61a739957ba7b72a7610a8ea4af044bfb3cf5f71 "The quick brown fox jumps over the lazy cog"
-4a18460df878258294456b4869604a673c34df8dde903405c8be27e5186470c1 "The quick brown fox jumps over the lazy dog."
-efa6ef81b927044180c812d8f3d14c88d60d45c7ab377abcf1d0288f09a40328 "After the rainstorm comes the rainbow."
-1ed8f81dcbd8b547a7da2e6d938936d2003646bcf5485cbdb980ac4263a5d7a4 "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+e3ea5f8885f7bb16468d08c578f0e7cc15febd31c27e323a79ef87c35756ce1e ""
+9e07ce365903116b62ac3ac0a033167853853074313f443d5b372f0225eede50 "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+f88600f4b65211a95c6817d0840e0fc2d422883ddf310f29fa8d4cbfda962626 "The quick brown fox jumps over the lazy dog"
+ec05208dd1fbf47b9539a761af723612eaa810762ab7a77b715fcfb3bf44f04a "The quick brown fox jumps over the lazy cog"
+822578f80d46184a674a6069486b4594053490de8ddf343cc1706418e527bec8 "The quick brown fox jumps over the lazy dog."
+410427b981efa6ef884cd1f3d812c880bc7a37abc7450dd62803a4098f28d0f1 "After the rainstorm comes the rainbow."
+47b5d8cb1df8d81ed23689936d2edaa7bd5c48f5bc463600a4d7a56342ac80b9 "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 ```
 
 ## Building
