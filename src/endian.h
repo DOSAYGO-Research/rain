@@ -1,9 +1,11 @@
 #pragma once
 
+#define __ENDIAN_H_VERSION__ "1.0.1"
+
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-constexpr bool bswap = true;
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 constexpr bool bswap = false;
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+constexpr bool bswap = true;
 #else
 #error "Endianness not supported!"
 #endif
