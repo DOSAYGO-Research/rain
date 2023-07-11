@@ -69,5 +69,4 @@ We warmly welcome any analysis, along with faster implementations or suggested m
 
 The fundamental concept for the mixing functions derived from Discohash, but has been significantly developed and extended. The overall architecture and processing flow of the hash were inspired by existing hash functions.
 
----
 
