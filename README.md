@@ -23,11 +23,11 @@ While Rainstorm's design reflects cryptographic hashing principles, it has not b
 
 ## Stability
 
-The hashes' stability may change over time, as we might modify constants, mixing specifics, and more as we gather insights. Should such changes alter the hashes' output, we will denote the changes with new version numbers. As of now, Rainstorm is at v0.0.1, and Rainbow is at v1.0.3.
+The hashes' stability may change over time, as we might modify constants, mixing specifics, and more as we gather insights. Should such changes alter the hashes' output, we will denote the changes with new version numbers. 
 
 ## Test vectors
 
-The current test vectors for Rainstorm (v0.0.1) and Rainbow (v1.0.3) are:
+The current test vectors for Rainstorm and Rainbow are:
 
 **Rainbow v1.0.4 Test Vectors**
 
