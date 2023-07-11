@@ -32,13 +32,13 @@ The current test vectors for Rainstorm (v0.0.1) and Rainbow (v1.0.1) are:
 **Rainbow v1.0.1 Test Vectors**
 
 ```test
-f14c475b16f335b7087d8ca13ba624a8de8a10d87af2603cd18bd3b678e75373 ""
-408e76ac2d5fcd5005ccfd759ace525178b4230029b1c3d2fc2eda0378891863 "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-72545293e6099750aa66b317722e72afe6fcf7c671364bbdc92a5b3e4ec5fd27 "The quick brown fox jumps over the lazy dog"
-da179c1578f4f5ad46e26f0c2b34061be6fcf7c671364bbd54fa21b98a40cf91 "The quick brown fox jumps over the lazy cog"
-0ab0b1e49a18724d995d70b2f449a8cacc32f440b6ce85c4a3f1a4240438ab83 "The quick brown fox jumps over the lazy dog."
-297158e4ec29b1bdbad5b438679e74c98229806daf132fbfad282dac08191c3a "After the rainstorm comes the rainbow."
-d30e40ba5c9e6aa47e66b02f85ecdee173d2b497f9d57447f3f01cb7febccb8a "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+f14c475b16f335b7087d8ca13ba624a8d18bd3b678e75373d980697c027b6fc2 ""
+408e76ac2d5fcd5005ccfd759ace5251fc2eda0378891863910f49c68d559cc6 "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+72545293e6099750aa66b317722e72afc92a5b3e4ec5fd27812ebed3082327c7 "The quick brown fox jumps over the lazy dog"
+da179c1578f4f5ad46e26f0c2b34061b54fa21b98a40cf9166a2806ace8b8631 "The quick brown fox jumps over the lazy cog"
+0ab0b1e49a18724d995d70b2f449a8caa3f1a4240438ab83ad2277b0bb419065 "The quick brown fox jumps over the lazy dog."
+297158e4ec29b1bdbad5b438679e74c9ad282dac08191c3a54b172ef2c6e51fd "After the rainstorm comes the rainbow."
+d30e40ba5c9e6aa47e66b02f85ecdee1f3f01cb7febccb8a196eaeaa961390a1 "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 ```
 
 **Rainstorm v0.0.1 Test Vectors**
