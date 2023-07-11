@@ -20,6 +20,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 **/
+#define __STORMVERSION__ "0.0.1"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
