@@ -120,17 +120,17 @@ void usage() {
   std::cout << "Usage: rainsum [OPTIONS] [INFILE]\n"
             << "Calculate a Rainbow or Rainstorm hash.\n\n"
             << "Options:\n"
-            << "  -m, --mode [digest|stream]    Specifies the mode, where:\n"
-            << "                                  digest mode (the default) gives a fixed length hash in hex, or\n"
-            << "                                  stream mode gives a variable length binary feedback output\n"
-            << "  -a, --algorithm [bow|storm]   Specify the hash algorithm to use. Default: storm\n"
-            << "  -s, --size [64-256|64-512]    Specify the bit size of the hash. Default: 256\n"
-            << "  -o, --outfile FILE            Output file for the hash or stream\n"
-            << "  -t, --test-vectors            Calculate the hash of the standard test vectors\n"
-            << "  -l, --output-length BYTES     Set the output length in hash iterations (stream only)\n"
-            << "  -v, --version                 Print out the version\n"
-            << "  --seed                        Seed value (64-bit number or string). If string is used,\n"
-            << "                                  it is hashed with Rainstorm to a 64-bit number\n";
+            << "  -m, --mode [digest|stream]        Specifies the mode, where:\n"
+            << "                                    digest mode (the default) gives a fixed length hash in hex, or\n"
+            << "                                    stream mode gives a variable length binary feedback output\n"
+            << "  -a, --algorithm [bow|storm]       Specify the hash algorithm to use. Default: storm\n"
+            << "  -s, --size [64-256|64-512]        Specify the bit size of the hash. Default: 256\n"
+            << "  -o, --outfile FILE                Output file for the hash or stream\n"
+            << "  -t, --test-vectors                Calculate the hash of the standard test vectors\n"
+            << "  -l, --output-length HASHES        Set the output length in hash iterations (stream only)\n"
+            << "  -v, --version                     Print out the version\n"
+            << "  --seed                            Seed value (64-bit number or string). If string is used,\n"
+            << "                                    it is hashed with Rainstorm to a 64-bit number\n";
 }
 
 template<bool bswap>
