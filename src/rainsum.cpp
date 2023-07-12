@@ -42,9 +42,9 @@ std::vector<std::string> test_vectors = {"",
 
 // Prototype of functions
 void usage();
-void performHash(Mode mode, const std::string& algorithm, const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, int output_length);
+void performHash(Mode mode, const std::string& algorithm, const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, uint64_t output_length);
 std::string generate_filename(const std::string& filename);
-void generate_hash(Mode mode, const std::string& algorithm, std::vector<char>& buffer, uint64_t seed, int output_length, std::ostream& outstream, uint32_t hash_size);
+void generate_hash(Mode mode, const std::string& algorithm, std::vector<char>& buffer, uint64_t seed, uint64_t output_length, std::ostream& outstream, uint32_t hash_size);
 uint64_t hash_string_to_64_bit(const std::string& seed_str);
 
 int main(int argc, char** argv) {
@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
     ("s,size", "Specify the size of the hash", cxxopts::value<uint32_t>()->default_value("256"))
     ("o,output-file", "Output file for the hash", cxxopts::value<std::string>()->default_value("/dev/stdout"))
     ("t,test-vectors", "Calculate the hash of the standard test vectors", cxxopts::value<bool>()->default_value("false"))
-    ("l,output-length", "Output length in hashes", cxxopts::value<int>()->default_value("1000000"))
+    ("l,output-length", "Output length in hashes", cxxopts::value<uint64_t>()->default_value("1000000"))
     ("seed", "Seed value", seed_option)
     ("h,help", "Print usage");
 
@@ -103,7 +103,7 @@ int main(int argc, char** argv) {
   uint32_t size = result["size"].as<uint32_t>();
   std::string outpath = result["output-file"].as<std::string>();
   bool use_test_vectors = result["test-vectors"].as<bool>();
-  int output_length = result["output-length"].as<int>();
+  uint64_t output_length = result["output-length"].as<uint64_t>();
 
   if ( mode == Mode::Digest ) {
     output_length = size / 8;
@@ -179,7 +179,7 @@ uint64_t hash_string_to_64_bit(const std::string& seed_str) {
     return seed;
 }
 
-void performHash(Mode mode, const std::string& algorithm, const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, int output_length) {
+void performHash(Mode mode, const std::string& algorithm, const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, uint64_t output_length) {
   std::vector<char> buffer;
   std::ofstream outfile(outpath, std::ios::binary);
 
@@ -223,7 +223,7 @@ std::string generate_filename(const std::string& filename) {
   return new_filename;
 }
 
-void generate_hash(Mode mode, const std::string& algorithm, std::vector<char>& buffer, uint64_t seed, int output_length, std::ostream& outstream, uint32_t hash_size) {
+void generate_hash(Mode mode, const std::string& algorithm, std::vector<char>& buffer, uint64_t seed, uint64_t output_length, std::ostream& outstream, uint32_t hash_size) {
   int byte_size = hash_size / 8;
   std::vector<uint8_t> temp_out(byte_size);
   
@@ -238,7 +238,7 @@ void generate_hash(Mode mode, const std::string& algorithm, std::vector<char>& b
     while(output_length > 0) {
       invokeHash<bswap>(algorithm, seed, buffer, temp_out, hash_size);
 
-      int chunk_size = std::min(output_length, byte_size);
+      uint64_t chunk_size = std::min(output_length, (uint64_t)byte_size);
       outstream.write(reinterpret_cast<const char*>(temp_out.data()), chunk_size);
 
       output_length -= chunk_size;
