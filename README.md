@@ -21,6 +21,94 @@ Rainstorm's round number is adjustable, potentially offering additional security
 
 While Rainstorm's design reflects cryptographic hashing principles, it has not been formally analyzed and thus, cannot be considered 'secure.' We strongly encourage those interested to conduct an analysis and offer feedback.
 
+Great! I see that the program `rainsum.cpp` is for calculating a Rainbow or Rainstorm hash. The software can operate in two modes, "digest" or "stream", which affects how it outputs the hash. It also allows the user to select different hash algorithms and sizes, specify the input and output files, use predefined test vectors, and set the output length in hashes.
+
+## Genesis
+
+The fundamental concept for the mixing functions derived from Discohash, but has been significantly developed and extended. The overall architecture and processing flow of the hash were inspired by existing hash functions.
+
+## License
+
+This repository and content is licensed under Apache-2.0 unless otherwise noted. It's copyright &copy; Cris Stringfellow and The Dosyago Corporation 2023. All rights reserved. 
+
+# Rainsum Field Manual
+
+## 1. Introduction
+Rainsum is a powerful command-line utility for calculating Rainbow or Rainstorm hashes of input data. This tool can operate in two modes: "digest" or "stream". In "digest" mode, Rainsum outputs a fixed-length hash in hex, while in "stream" mode it produces variable-length binary output.
+
+Rainsum also offers multiple hashing algorithms, sizes, and various configurable options to cater to a wide range of use cases.
+
+## 2. Basic Usage
+
+### 2.1 Command Structure
+The basic command structure of Rainsum is as follows:
+
+```
+rainsum [OPTIONS] [INFILE]
+```
+Here, `[OPTIONS]` is a list of options that modify the behavior of Rainsum and `[INFILE]` is the input file to hash. If no file is specified, Rainsum reads from standard input.
+
+### 2.2 Options
+Here are the options that you can use with Rainsum:
+
+- `-m, --mode [digest|stream]`: Specifies the mode. Default is `digest`.
+- `-a, --algorithm [bow|storm]`: Specify the hash algorithm to use. Default is `storm`.
+- `-s, --size [64-256|64-512]`: Specify the bit size of the hash. Default is `256`.
+- `-o, --output-file FILE`: Specifies the output file for the hash or stream.
+- `-t, --test-vectors`: Calculates the hash of the standard test vectors.
+- `-l, --output-length HASHES`: Sets the output length in hash iterations (stream only).
+- `--seed`: Seed value (64-bit number or string). If a string is used, it is hashed with Rainstorm to a 64-bit number.
+- `-h, --help`: Prints usage information.
+- `-v, --version`: Prints out the version of the software.
+
+## 3. Modes of Operation
+
+### 3.1 Digest Mode
+In digest mode, Rainsum calculates a fixed-length hash of the input data and outputs the result in hexadecimal form.
+
+For example, to calculate a 256-bit Rainstorm hash of `input.txt` and output it to `output.txt`, you would use:
+
+```
+rainsum -m digest -a storm -s 256 -o output.txt input.txt
+```
+
+### 3.2 Stream Mode
+In stream mode, Rainsum calculates a hash of the input data and then uses that hash as input to the next iteration of the hash function, repeating this process for a specified number of iterations. The result is a stream of binary data.
+
+For example, to generate a 512-bit Rainstorm hash stream of `input.txt` for 1000000 iterations and output it to `output.txt`, you would use:
+
+```
+rainsum -m stream -a storm -s 512 -l 1000000 -o output.txt input.txt
+```
+
+## 4. Hash Algorithms and Sizes
+Rainsum supports the following hash algorithms:
+
+- `bow`: Rainbow hash
+- `storm`: Rainstorm hash
+
+And these sizes (in bits):
+
+- Rainbow: `64`, `128`, `256`
+- Rainstorm: `64`, `128`, `256`, `512`
+
+## 5. Test Vectors
+Rainsum includes a set of predefined test vectors that you can use to verify the correct operation of the hash functions. To use these test vectors, include the `-t` or `--test-vectors` option in your command.
+
+## 6. Seed Values
+You can provide a seed value for the hash function using the `--seed` option followed by a 64-bit number or a string. If a string is used, Rainsum will hash it with Rainstorm to generate a 64-bit number.
+
+## 7. Help and Version Information
+Use `-h` or `--help` to print usage information. Use `-v` or `--version` to print the version of the software.
+
+## 8. Compilation
+Rainsum is written in C++. Make sure to have a modern C++ compiler and appropriate libraries (like filesystem, iostream, etc.) installed to compile the code. A makefile or build system setup might be required depending on your specific project configuration.
+
+## 9. Conclusion
+Rainsum provides a powerful and flexible command-line interface for calculating Rainbow and Rainstorm hashes. Whether you're working on a small project or a large-scale system, Rainsum offers the features and options you need to get the job done.
+
+# Developer Information
+
 ## Stability
 
 The hashes' stability may change over time, as we might modify constants, mixing specifics, and more as we gather insights. Should such changes alter the hashes' output, we will denote the changes with new version numbers. 
@@ -68,9 +156,3 @@ make
 ## Contributions
 
 We warmly welcome any analysis, along with faster implementations or suggested modifications. Collaboration is highly encouraged!
-
-## Genesis
-
-The fundamental concept for the mixing functions derived from Discohash, but has been significantly developed and extended. The overall architecture and processing flow of the hash were inspired by existing hash functions.
-
-
