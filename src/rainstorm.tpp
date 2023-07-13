@@ -87,6 +87,7 @@ namespace rainstorm {
     uint64_t  h[16];
     seed_t    seed;
     size_t    len;                  // length processed so far
+    size_t    olen;
     uint32_t  hashsize;
     bool      inner = 0;
     bool      final_block = false;
@@ -116,6 +117,7 @@ namespace rainstorm {
 
       state.len = 0;  // initialize length counter
       state.seed = seed;
+      state.olen = olen;
       state.hashsize = hashsize;
       return state;
     }
@@ -142,7 +144,7 @@ namespace rainstorm {
       }
 
       // If it's less than a block of data left, it's the final chunk
-      if (chunk_len > 0) {
+      if (chunk_len > 0 || this->olen == 0) {
         // Pad and process any remaining data less than 64 bytes (512 bits)
         memset(temp, (0x80 + chunk_len) & 255, sizeof(temp));
         memcpy(temp, chunk, chunk_len);
