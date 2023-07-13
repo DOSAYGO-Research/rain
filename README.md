@@ -186,13 +186,7 @@ Then, build the utility with the `make` command:
 make
 ```
 
-This will create an executable file `rainsum` in the `rain/bin` directory.
-
-To create a symbolic link in the project root directory for easy access, use the following command:
-
-```sh
-ln -sf rain/bin/rainsum
-```
+This will create an executable file `rainsum` in the `rain/bin` directory, and also create a symbolic link in the project root directory for easy access.
 
 If you want to install `rainsum` globally, so it can be run from any directory, use the `make install` command:
 
@@ -211,6 +205,8 @@ After installation, you can run `rainsum` from any directory:
 ```sh
 rainsum --test-vectors
 ```
+
+See the [Field Manual](#Rainsum-Field-Manual) for more information on usage. 
 
 ## Contributions
 
