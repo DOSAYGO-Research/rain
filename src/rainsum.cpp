@@ -165,6 +165,10 @@ void performHash(Mode mode, const std::string& algorithm, const std::string& inp
             std::vector<uint8_t> output(output_length);
             rainbow::finalize(state, size, output.data());
 
+            std::cout << "Length : " << state.len << std::endl;
+            std::cout << "File length : " << input_length << std::endl;
+
+
             // Write the output to the outfile
 
             if (mode == Mode::Digest) {
@@ -176,10 +180,14 @@ void performHash(Mode mode, const std::string& algorithm, const std::string& inp
               outfile.write(reinterpret_cast<char*>(output.data()), output_length);
             }
         } else {
+          if ( !freopen(NULL, "rb", stdin) ) {
+            std::cerr << "Anomaly: could not reopen stdin in binary mode." << std::endl;
+          }
           in_stream = &std::cin;
           // Read all data into the buffer
           buffer = std::vector<uint8_t>(std::istreambuf_iterator<char>(*in_stream), {});
           input_length = buffer.size();
+          std::cout << "File length : " << input_length << std::endl;
           generate_hash(mode, algorithm, buffer, seed, output_length, outfile, size);
           outfile << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
         }
