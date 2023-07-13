@@ -100,7 +100,7 @@ namespace rainbow {
       state.len = 0;  // initialize length counter
       state.seed = seed;
       state.hashsize = hashsize;
-      std::cout << "Len: " << olen << std::endl;
+      //std::cout << "Len: " << olen << std::endl;
       return state;
     }
 
