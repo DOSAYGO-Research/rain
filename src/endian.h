@@ -10,6 +10,8 @@ constexpr bool bswap = true;
 #error "Endianness not supported!"
 #endif
 
+#define CHUNK_SIZE 8192
+
 #define ROTR64(x, n) (((x) >> (n)) | ((x) << (64 - (n))))
 typedef uint64_t seed_t;
 
