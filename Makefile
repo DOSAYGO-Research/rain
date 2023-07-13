@@ -8,7 +8,7 @@ SRCS = $(wildcard src/*.cpp)
 OBJS = $(addprefix $(OBJDIR)/,$(notdir $(SRCS:.cpp=.o)))
 DEPS = $(OBJS:.o=.d)
 
-all: directories rainsum
+all: directories rainsum link
 
 directories: ${OBJDIR} ${BUILDDIR}
 
@@ -23,6 +23,14 @@ rainsum: $(OBJS)
 
 $(OBJDIR)/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c $< -o $@
+
+link:
+	ln -sf rain/bin/rainsum
+
+.PHONY: install
+
+install: rainsum
+	cp $(BUILDDIR)/rainsum /usr/local/bin/
 
 -include $(DEPS)
 

@@ -43,6 +43,48 @@ Rainstorm is a slower hash function with a tunable-round feature (with 4 rounds 
 
 Rainstorm's round number is adjustable, potentially offering additional security. However, please note that this is hypothetical until rigorous security analysis is completed. 
 
+## Building and Installing
+
+You can build and install the `rainsum` utility using the provided Makefile. First, clone the repository and change into the root directory of the project:
+
+```sh
+git clone https://github.com/dosyago/rain
+cd rain
+```
+
+Then, build the utility with the `make` command:
+
+```sh
+make
+```
+
+This will create an executable file `rainsum` in the `rain/bin` directory.
+
+To create a symbolic link in the project root directory for easy access, use the following command:
+
+```sh
+ln -sf rain/bin/rainsum
+```
+
+If you want to install `rainsum` globally, so it can be run from any directory, use the `make install` command:
+
+```sh
+make install
+```
+
+This command might require administrator privileges, depending on your system's configuration. If you encounter a permission error, try using `sudo`:
+
+```sh
+sudo make install
+```
+
+After installation, you can run `rainsum` from any directory:
+
+```sh
+rainsum --test-vectors
+```
+
+
 ## Note on Cryptographic Intent
 
 While Rainstorm's design reflects cryptographic hashing principles, it has not been formally analyzed and thus, cannot be considered 'secure.' We strongly encourage those interested to conduct an analysis and offer feedback.
@@ -171,13 +213,6 @@ ec05208dd1fbf47b9539a761af723612eaa810762ab7a77b715fcfb3bf44f04a "The quick brow
 47b5d8cb1df8d81ed23689936d2edaa7bd5c48f5bc463600a4d7a56342ac80b9 "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 ```
 
-## Building
-
-```sh
-git clone https://github.com/dosyago/rain
-cd rain/src
-make
-```
 
 ## Contributions
 
