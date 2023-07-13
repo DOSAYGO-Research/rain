@@ -11,6 +11,14 @@ enum class Mode {
   Stream
 };
 
+std::string modeToString(const Mode& mode) {
+    switch(mode) {
+        case Mode::Digest: return "Digest";
+        case Mode::Stream: return "Stream";
+        default: throw std::runtime_error("Unknown hash mode (expected digest or stream)");
+    }
+}
+
 std::istream& operator>>(std::istream& in, Mode& mode) {
   std::string token;
   in >> token;
@@ -34,11 +42,36 @@ std::istream& getInputStream() {
   #endif
 }
 
+enum class HashAlgorithm {
+    Rainbow,
+    Rainstorm,
+    Unknown
+};
+
+std::string hashAlgoToString(const HashAlgorithm& algo) {
+    switch(algo) {
+        case HashAlgorithm::Rainbow: return "Rainbow";
+        case HashAlgorithm::Rainstorm: return "Rainstorm";
+        default: throw std::runtime_error("Unknown hash algorithm value (expected rainbow or rainstorm)");
+    }
+}
+
+
+HashAlgorithm getHashAlgorithm(const std::string& algorithm) {
+    if (algorithm == "rainbow" || algorithm == "bow") {
+        return HashAlgorithm::Rainbow;
+    } else if (algorithm == "rainstorm" || algorithm == "storm") {
+        return HashAlgorithm::Rainstorm;
+    } else {
+        return HashAlgorithm::Unknown;
+    }
+}
+
 // Prototype of functions
 void usage();
-void performHash(Mode mode, const std::string& algorithm, const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, uint64_t output_length);
+void hashBuffer(Mode mode, HashAlgorithm algot, std::vector<uint8_t>& buffer, uint64_t seed, uint64_t output_length, std::ostream& outstream, uint32_t hash_size);
+void hashAnything(Mode mode, HashAlgorithm algot , const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, uint64_t output_length);
 std::string generate_filename(const std::string& filename);
-void generate_hash(Mode mode, const std::string& algorithm, std::vector<uint8_t>& buffer, uint64_t seed, uint64_t output_length, std::ostream& outstream, uint32_t hash_size);
 uint64_t hash_string_to_64_bit(const std::string& seed_str);
 
 uint64_t getFileSize(const std::string& filename) {

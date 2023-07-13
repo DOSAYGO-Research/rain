@@ -10,15 +10,16 @@ constexpr bool bswap = true;
 #error "Endianness not supported!"
 #endif
 
-#define CHUNK_SIZE 16384
-
 #define ROTR64(x, n) (((x) >> (n)) | ((x) << (64 - (n))))
+constexpr size_t CHUNK_SIZE = 16384;
+
 typedef uint64_t seed_t;
 
 struct IHashState {
     virtual void update(const uint8_t* chunk, size_t chunk_len) = 0;
     virtual void finalize(void* out) = 0;
     virtual ~IHashState() = default;
+    size_t len;
 };
 
 template <bool bswap>
