@@ -1,5 +1,31 @@
 # Rain
 
+- [Rain](#Rain)
+  - [Rainbow](#Rainbow)
+  - [Rainstorm - Unvetted for Security](#Rainstorm---Unvetted-for-Security)
+  - [Note on Cryptographic Intent](#Note-on-Cryptographic-Intent)
+  - [Genesis](#Genesis)
+  - [License](#License)
+- [Rainsum Field Manual](#Rainsum-Field-Manual)
+  - [1. Introduction](#1-Introduction)
+  - [2. Basic Usage](#2-Basic-Usage)
+    - [2.1 Command Structure](#21-Command-Structure)
+    - [2.2 Options](#22-Options)
+  - [3. Modes of Operation](#3-Modes-of-Operation)
+    - [3.1 Digest Mode](#31-Digest-Mode)
+    - [3.2 Stream Mode](#32-Stream-Mode)
+  - [4. Hash Algorithms and Sizes](#4-Hash-Algorithms-and-Sizes)
+  - [5. Test Vectors](#5-Test-Vectors)
+  - [6. Seed Values](#6-Seed-Values)
+  - [7. Help and Version Information](#7-Help-and-Version-Information)
+  - [8. Compilation](#8-Compilation)
+  - [9. Conclusion](#9-Conclusion)
+- [Developer Information](#Developer-Information)
+  - [Stability](#Stability)
+  - [Test vectors](#Test-vectors)
+  - [Building](#Building)
+  - [Contributions](#Contributions)
+
 This repository houses the Rainbow and Rainstorm hash functions, developed by Cris Stringfellow and licensed under Apache-2.0. The 64-bit variants have passed all tests in the [SMHasher3](https://gitlab.com/fwojcik/smhasher3) suite. [Results](results) can be found in the `results/` subdirectory.
 
 | Algorithm | Speed | Hash Size | Purpose | Core Mixing Function | Security |
