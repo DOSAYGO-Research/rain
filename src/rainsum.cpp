@@ -115,7 +115,7 @@ void hashAnything(Mode mode, HashAlgorithm algot, const std::string& inpath, std
                   throw std::runtime_error("Input file could not be read after " + std::to_string(state->len) + " bytes processed.");
                 }
                 std::streamsize bytes_read = in_stream->gcount();
-                if (bytes_read > 0) {
+                if (bytes_read > 0 || input_length == 0) {
                     // Update the state with the new chunk of data
                     state->update(chunk.data(), bytes_read);
                 }

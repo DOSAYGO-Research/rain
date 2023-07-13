@@ -100,6 +100,7 @@ namespace rainbow {
       state.len = 0;  // initialize length counter
       state.seed = seed;
       state.hashsize = hashsize;
+      std::cout << "Len: " << olen << std::endl;
       return state;
     }
 
@@ -134,7 +135,7 @@ namespace rainbow {
       }
       len += chunk_len;
 
-      //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
+      printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
 
       while (chunk_len >= 16) {
         uint64_t g =  GET_U64<bswap>(chunk, 0);
@@ -160,7 +161,7 @@ namespace rainbow {
         chunk_len -= 16;
       }
 
-      //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
+      printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
       
       if ( last_block ) {
         final_block = true;
@@ -188,7 +189,7 @@ namespace rainbow {
         mixB(h, seed);
         mixA(h);
 
-        //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
+        printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
       }
     }
 
@@ -243,7 +244,8 @@ namespace rainbow {
     uint64_t g = 0;
     bool inner = 0;
 
-    //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
+    std::cout << "Len: " << olen << std::endl;
+    printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
 
     while (len >= 16) {
       g =  GET_U64<bswap>(data, 0);
@@ -269,7 +271,7 @@ namespace rainbow {
       len  -= 16;
     }
 
-    //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
+    printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
 
     mixB(h, seed);
 
@@ -295,7 +297,7 @@ namespace rainbow {
     mixB(h, seed);
     mixA(h);
 
-    //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
+    printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
 
     g = 0;
     g -= h[2];
