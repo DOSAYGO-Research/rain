@@ -7,7 +7,7 @@
 #include <string>
 #include <ctime>
 #include <filesystem>
-#include "rainsum.h"
+#include "tool.h"
 
 int main(int argc, char** argv) {
   cxxopts::Options options("rainsum", "Calculate a Rainbow or Rainstorm hash.");
@@ -180,14 +180,16 @@ void performHash(Mode mode, const std::string& algorithm, const std::string& inp
               outfile.write(reinterpret_cast<char*>(output.data()), output_length);
             }
         } else {
-          if ( !freopen(NULL, "rb", stdin) ) {
-            std::cerr << "Anomaly: could not reopen stdin in binary mode." << std::endl;
-          }
-          in_stream = &std::cin;
+          in_stream = &getInputStream();
           // Read all data into the buffer
           buffer = std::vector<uint8_t>(std::istreambuf_iterator<char>(*in_stream), {});
           input_length = buffer.size();
           std::cout << "File length : " << input_length << std::endl;
+
+          // Instead of using the input as a string, convert it to a uint64_t seed
+          std::string buffer_string(buffer.begin(), buffer.end());
+          seed = hash_string_to_64_bit(buffer_string);
+
           generate_hash(mode, algorithm, buffer, seed, output_length, outfile, size);
           outfile << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
         }

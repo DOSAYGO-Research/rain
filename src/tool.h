@@ -23,6 +23,17 @@ std::istream& operator>>(std::istream& in, Mode& mode) {
   return in;
 }
 
+std::istream& getInputStream() {
+  #ifdef _WIN32
+      // On Windows, use std::cin
+      return std::cin;
+  #else
+      // On Unix-based systems, use std::ifstream with /dev/stdin
+      static std::ifstream in("/dev/stdin");
+      return in;
+  #endif
+}
+
 // Prototype of functions
 void usage();
 void performHash(Mode mode, const std::string& algorithm, const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, uint64_t output_length);
