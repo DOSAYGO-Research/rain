@@ -143,16 +143,22 @@ void performHash(Mode mode, const std::string& algorithm, const std::string& inp
             in_stream = &infile;
             input_length = getFileSize(inpath);
 
-            // Initialize the Rainbow hash state with the input length
-            rainbow::HashState state = rainbow::initialize(seed, input_length);
+            std::unique_ptr<IHashState> state;
+            if(algorithm == "rainbow" || algorithm == "bow") {
+              state = std::make_unique<rainbow::HashState>(rainbow::HashState::initialize(seed, input_length, size));
+            } else if(algorithm == "rainstorm" || algorithm == "storm") {
+              state = std::make_unique<rainstorm::HashState>(rainstorm::HashState::initialize(seed, input_length, size));
+            } else {
+              throw std::runtime_error("Invalid algorithm");
+            }
 
-            // Stream the file in 8192-byte chunks
+            // Stream the file in 16384-byte chunks
             while (*in_stream) {
                 in_stream->read(reinterpret_cast<char*>(chunk.data()), CHUNK_SIZE);
                 std::streamsize bytes_read = in_stream->gcount();
                 if (bytes_read > 0) {
                     // Update the state with the new chunk of data
-                    rainbow::update(state, chunk.data(), bytes_read);
+                    state->update(chunk.data(), bytes_read);
                 }
             }
 
@@ -163,10 +169,10 @@ void performHash(Mode mode, const std::string& algorithm, const std::string& inp
 
             // Finalize the hash
             std::vector<uint8_t> output(output_length);
-            rainbow::finalize(state, size, output.data());
+            state->finalize(output.data());
 
-            std::cout << "Length : " << state.len << std::endl;
-            std::cout << "File length : " << input_length << std::endl;
+            //std::cout << "Length : " << state.len << std::endl;
+            //std::cout << "File length : " << input_length << std::endl;
 
 
             // Write the output to the outfile
@@ -184,12 +190,6 @@ void performHash(Mode mode, const std::string& algorithm, const std::string& inp
           // Read all data into the buffer
           buffer = std::vector<uint8_t>(std::istreambuf_iterator<char>(*in_stream), {});
           input_length = buffer.size();
-          std::cout << "File length : " << input_length << std::endl;
-
-          // Instead of using the input as a string, convert it to a uint64_t seed
-          std::string buffer_string(buffer.begin(), buffer.end());
-          seed = hash_string_to_64_bit(buffer_string);
-
           generate_hash(mode, algorithm, buffer, seed, output_length, outfile, size);
           outfile << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
         }
@@ -199,7 +199,6 @@ void performHash(Mode mode, const std::string& algorithm, const std::string& inp
 }
 
 void generate_hash(Mode mode, const std::string& algorithm, std::vector<uint8_t>& buffer, uint64_t seed, uint64_t output_length, std::ostream& outstream, uint32_t hash_size) {
-  std::cout << "hash size: " << hash_size << std::endl;
   int byte_size = hash_size / 8;
   std::vector<uint8_t> temp_out(byte_size);
   

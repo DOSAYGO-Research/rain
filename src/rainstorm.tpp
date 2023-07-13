@@ -25,7 +25,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
-#include "endian.h"
+#include "common.h"
 
 namespace rainstorm {
   // more efficient implementations are welcome! 
@@ -81,6 +81,105 @@ namespace rainstorm {
       }
     }
   }
+
+  // streaming mode affordances
+  struct HashState : IHashState {
+    uint64_t  h[16];
+    seed_t    seed;
+    size_t    len;                  // length processed so far
+    uint32_t  hashsize;
+    bool      inner = 0;
+    bool      final_block = false;
+    bool      finalized = false;
+
+    // Initialize the state with known length
+    static HashState initialize(const seed_t seed, size_t olen, uint32_t hashsize) {
+      HashState state;
+      // initialize h based on rainstorm
+
+      state.h[0] = seed + olen + 1;
+      state.h[1] = seed + olen + 2;
+      state.h[2] = seed + olen + 2;
+      state.h[3] = seed + olen + 3;
+      state.h[4] = seed + olen + 5;
+      state.h[5] = seed + olen + 7;
+      state.h[6] = seed + olen + 11;
+      state.h[7] = seed + olen + 13;
+      state.h[8] = seed + olen + 17;
+      state.h[9] = seed + olen + 19;
+      state.h[10] = seed + olen + 23;
+      state.h[11] = seed + olen + 29;
+      state.h[12] = seed + olen + 31;
+      state.h[13] = seed + olen + 37;
+      state.h[14] = seed + olen + 41;
+      state.h[15] = seed + olen + 43;
+
+      state.len = 0;  // initialize length counter
+      state.seed = seed;
+      state.hashsize = hashsize;
+      return state;
+    }
+
+    // Update the state with a new chunk of data
+    void update(const uint8_t* chunk, size_t chunk_len) {
+      uint64_t temp[8];
+      if ( this->final_block ) {
+        // throw
+      }
+
+      while (chunk_len >= 64) {
+        for (int i = 0, j = 0; i < 8; ++i, j += 8) {
+          temp[i] = GET_U64<false>(chunk, j);
+        }
+
+        for (int i = 0; i < ROUNDS; i++) {
+          weakfunc(this->h, temp, i & 1);
+        }
+
+        chunk += 64;
+        chunk_len -= 64;
+        this->len += 64;
+      }
+
+      // If it's less than a block of data left, it's the final chunk
+      if (chunk_len > 0) {
+        // Pad and process any remaining data less than 64 bytes (512 bits)
+        memset(temp, (0x80 + chunk_len) & 255, sizeof(temp));
+        memcpy(temp, chunk, chunk_len);
+        temp[chunk_len >> 3] |= chunk_len >> (chunk_len - 56) * 8;
+
+        for (int i = 0; i < ROUNDS; i++) {
+          weakfunc(this->h, temp, i & 1);
+        }
+
+        for (int i = 0, j = 8; i < 8; i++, j++) {
+          h[i] -= h[j];
+        }
+
+        if (hashsize > 64) {
+          for (int i = 0; i < std::max((int)this->hashsize / 64, FINAL_ROUNDS); i++) weakfunc(h, temp, true);
+        }
+
+        this->len += chunk_len;
+        this->final_block = true;
+      }
+    }
+
+    // Finalize the hash and return the result
+    void finalize(void* out) {
+      // finalize hash
+      if (finalized) {
+        return;
+      } 
+
+      // Output requested hash size
+      for (int i = 0, j = 0; i < std::min(8, (int)this->hashsize / 64); i++, j += 8) {
+        PUT_U64<false>(h[i], (uint8_t *)out, j);
+      }
+
+      finalized = true;
+    }
+  };
 
   template <uint32_t hashsize, bool bswap>
   //void newnewhash(const void* in, const size_t len, const seed_t seed, void* out) {

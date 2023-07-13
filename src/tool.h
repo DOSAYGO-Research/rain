@@ -4,7 +4,7 @@
 #include "rainbow.tpp"
 #include "rainstorm.tpp"
 #include "cxxopts.hpp"
-#include "endian.h"
+#include "common.h"
 
 enum class Mode {
   Digest,
