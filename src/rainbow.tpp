@@ -25,7 +25,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
-#include "endian.h"
+#include "common.h"
 
 namespace rainbow {
   // P to W are primes chosen for their excellent avalanche properties
@@ -80,14 +80,170 @@ namespace rainbow {
     s[1] = a; s[2] = b; 
   }
 
+  // streaming mode affordances
+  struct HashState : IHashState {
+    uint64_t  h[4];
+    seed_t    seed;
+    size_t    len;                  // length processed so far
+    uint32_t  hashsize;
+    bool      inner = 0;
+    bool      final_block = false;
+    bool      finalized = false;
+
+    // Initialize the state with known length
+    static HashState initialize(const seed_t seed, size_t olen, uint32_t hashsize) {
+      HashState state;
+      state.h[0] = seed + olen + 1;
+      state.h[1] = seed + olen + 3;
+      state.h[2] = seed + olen + 5;
+      state.h[3] = seed + olen + 7;
+      state.len = 0;  // initialize length counter
+      state.seed = seed;
+      state.hashsize = hashsize;
+      return state;
+    }
+
+    /*
+      // Initialize the state with unknown length (streaming mode)
+      // for this initialization we invert the normal monotonic increasing pattern of the IV
+      // by combining a decreasing sequence of primes, with the original increasing one
+      // this means that, if we stream a file without knowing its length (say by stdin)
+      // and we hash a file directly (by knowing its length)
+      // the result will be different
+      // This is not ideal, and may be considered a design flaw
+      // For now the way we work around that is, if we read from stdin
+      // we do not use streaming mode. We only use streaming mode when we
+      // are reading from a known file (and have the length)
+      static HashState initialize(const seed_t seed) {
+        HashState state;
+        h[0] = seed + 1002;   // 1001 + 1;
+        h[1] = seed + 1000;   // 997 + 3;
+        h[2] = seed + 988;    // 983 + 5;
+        h[3] = seed + 984;    // 977 + 7;
+        len = 0;  // initialize length counter
+        return state;
+      }
+    */
+
+    // Update the state with a new chunk of data
+    void update(const uint8_t* chunk, size_t chunk_len) {
+      // update state based on chunk
+      bool last_block = chunk_len < CHUNK_SIZE;
+      if ( final_block ) {
+        // throw
+      }
+      len += chunk_len;
+
+      //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
+
+      while (chunk_len >= 16) {
+        uint64_t g =  GET_U64<bswap>(chunk, 0);
+
+        h[0] -= g;
+        h[1] += g;
+
+        chunk += 8;
+
+        g =  GET_U64<bswap>(chunk, 0);
+
+        h[2] += g;
+        h[3] -= g;
+
+        if ( inner ) {
+          mixB(h, seed);
+        } else {
+          mixA(h);
+        }
+        inner ^= 1;
+
+        chunk += 8;
+        chunk_len -= 16;
+      }
+
+      //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
+      
+      if ( last_block ) {
+        final_block = true;
+        mixB(h, seed);
+
+        switch (chunk_len) {
+          case 15:  h[0] += (uint64_t)chunk[14] << 56; 
+          case 14:  h[1] += (uint64_t)chunk[13] << 48;
+          case 13:  h[2] += (uint64_t)chunk[12] << 40; 
+          case 12:  h[3] += (uint64_t)chunk[11] << 32;
+          case 11:  h[0] += (uint64_t)chunk[10] << 24;
+          case 10:  h[1] += (uint64_t)chunk[9] <<  16; 
+          case 9:   h[2] += (uint64_t)chunk[8] << 8;
+          case 8:   h[3] += chunk[7]; 
+          case 7:   h[0] += (uint64_t)chunk[6] << 48; 
+          case 6:   h[1] += (uint64_t)chunk[5] << 40;
+          case 5:   h[2] += (uint64_t)chunk[4] << 32;
+          case 4:   h[3] += (uint64_t)chunk[3] << 24;
+          case 3:   h[0] += (uint64_t)chunk[2] << 16;
+          case 2:   h[1] += (uint64_t)chunk[1] <<  8; 
+          case 1:   h[2] += (uint64_t)chunk[0];
+        }
+
+        mixA(h);
+        mixB(h, seed);
+        mixA(h);
+
+        //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
+      }
+    }
+
+    // Finalize the hash and return the result
+    void finalize(void* out) {
+      // finalize hash
+      if ( finalized ) {
+        return;
+      } 
+      
+      uint64_t g = 0;
+      g -= h[2];
+      g -= h[3];
+
+      PUT_U64<bswap>(g, (uint8_t *)out, 0);
+      if (this->hashsize == 128) {
+        mixA(h);
+        g = 0;
+        g -= h[3];
+        g -= h[2];
+        PUT_U64<bswap>(g, (uint8_t *)out, 8);
+      } else if ( this->hashsize == 256) {
+        mixA(h);
+        g = 0;
+        g -= h[3];
+        g -= h[2];
+        PUT_U64<bswap>(g, (uint8_t *)out, 8);
+        mixA(h);
+        mixB(h, seed);
+        mixA(h);
+        g = 0;
+        g -= h[3];
+        g -= h[2];
+        PUT_U64<bswap>(g, (uint8_t *)out, 16);
+        mixA(h);
+        g = 0;
+        g -= h[3];
+        g -= h[2];
+        PUT_U64<bswap>(g, (uint8_t *)out, 24);
+      }
+
+      finalized = true;
+    }
+  };
+
+  // one big func mode (memory inefficient, but simple call)
   template <uint32_t hashsize, bool bswap>
-  //void newhash(const void* in, const size_t olen, const seed_t seed, void* out) {
   static void rainbow(const void* in, const size_t olen, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[4] = {seed + olen + 1, seed + olen + 3, seed + olen + 5, seed + olen + 7};
     size_t len = olen;
     uint64_t g = 0;
     bool inner = 0;
+
+    //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
 
     while (len >= 16) {
       g =  GET_U64<bswap>(data, 0);
@@ -113,6 +269,8 @@ namespace rainbow {
       len  -= 16;
     }
 
+    //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
+
     mixB(h, seed);
 
     switch (len) {
@@ -136,6 +294,8 @@ namespace rainbow {
     mixA(h);
     mixB(h, seed);
     mixA(h);
+
+    //printf("h: %016llx %016llx %016llx %016llx\n", h[0], h[1], h[2], h[3]);
 
     g = 0;
     g -= h[2];

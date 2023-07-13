@@ -7,45 +7,7 @@
 #include <string>
 #include <ctime>
 #include <filesystem>
-#include "rainbow.tpp"
-#include "rainstorm.tpp"
-#include "cxxopts.hpp"
-
-// Adjust this path based on the endian.h file location
-#include "endian.h"
-
-enum class Mode {
-  Digest,
-  Stream
-};
-
-std::istream& operator>>(std::istream& in, Mode& mode) {
-  std::string token;
-  in >> token;
-  if (token == "digest")
-    mode = Mode::Digest;
-  else if (token == "stream")
-    mode = Mode::Stream;
-  else
-    in.setstate(std::ios_base::failbit);
-  return in;
-}
-
-// test vectors
-std::vector<std::string> test_vectors = {"", 
-                     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 
-                     "The quick brown fox jumps over the lazy dog", 
-                     "The quick brown fox jumps over the lazy cog", 
-                     "The quick brown fox jumps over the lazy dog.", 
-                     "After the rainstorm comes the rainbow.", 
-                     std::string(64, '@')};
-
-// Prototype of functions
-void usage();
-void performHash(Mode mode, const std::string& algorithm, const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, uint64_t output_length);
-std::string generate_filename(const std::string& filename);
-void generate_hash(Mode mode, const std::string& algorithm, std::vector<char>& buffer, uint64_t seed, uint64_t output_length, std::ostream& outstream, uint32_t hash_size);
-uint64_t hash_string_to_64_bit(const std::string& seed_str);
+#include "tool.h"
 
 int main(int argc, char** argv) {
   cxxopts::Options options("rainsum", "Calculate a Rainbow or Rainstorm hash.");
@@ -96,7 +58,6 @@ int main(int argc, char** argv) {
     inpath = result.unmatched().front();
   } else {
     // No filename provided, read from stdin
-    inpath = "/dev/stdin";
   }
 
   std::string algorithm = result["algorithm"].as<std::string>();
@@ -111,30 +72,17 @@ int main(int argc, char** argv) {
     output_length *= size;
   }
 
-  performHash(mode, algorithm, inpath, outpath, size, use_test_vectors, seed, output_length);
+  if (mode == Mode::Digest) {
+      performHash(Mode::Digest, algorithm, inpath, outpath, size, use_test_vectors, seed, size / 8);
+  } else {
+      performHash(Mode::Stream, algorithm, inpath, outpath, size, use_test_vectors, seed, output_length);
+  }
 
   return 0;
 }
 
-void usage() {
-  std::cout << "Usage: rainsum [OPTIONS] [INFILE]\n"
-            << "Calculate a Rainbow or Rainstorm hash.\n\n"
-            << "Options:\n"
-            << "  -m, --mode [digest|stream]        Specifies the mode, where:\n"
-            << "                                    digest mode (the default) gives a fixed length hash in hex, or\n"
-            << "                                    stream mode gives a variable length binary feedback output\n"
-            << "  -a, --algorithm [bow|storm]       Specify the hash algorithm to use. Default: storm\n"
-            << "  -s, --size [64-256|64-512]        Specify the bit size of the hash. Default: 256\n"
-            << "  -o, --output-file FILE            Output file for the hash or stream\n"
-            << "  -t, --test-vectors                Calculate the hash of the standard test vectors\n"
-            << "  -l, --output-length HASHES        Set the output length in hash iterations (stream only)\n"
-            << "  -v, --version                     Print out the version\n"
-            << "  --seed                            Seed value (64-bit number or string). If string is used,\n"
-            << "                                    it is hashed with Rainstorm to a 64-bit number\n";
-}
-
 template<bool bswap>
-void invokeHash(const std::string& algorithm, uint64_t seed, std::vector<char>& buffer, std::vector<uint8_t>& temp_out, int hash_size) {
+void invokeHash(const std::string& algorithm, uint64_t seed, std::vector<uint8_t>& buffer, std::vector<uint8_t>& temp_out, int hash_size) {
   if(algorithm == "rainbow" || algorithm == "bow") {
     switch(hash_size) {
       case 64:
@@ -170,60 +118,87 @@ void invokeHash(const std::string& algorithm, uint64_t seed, std::vector<char>& 
   }
 }
 
-uint64_t hash_string_to_64_bit(const std::string& seed_str) {
-    std::vector<char> buffer(seed_str.begin(), seed_str.end());
-    std::vector<uint8_t> hash_output(8);  // 64 bits = 8 bytes
-    rainstorm::rainstorm<64, bswap>(buffer.data(), buffer.size(), 0, hash_output.data());  // assuming bswap is defined elsewhere
-    uint64_t seed = 0;
-    std::memcpy(&seed, hash_output.data(), 8);
-    return seed;
-}
-
 void performHash(Mode mode, const std::string& algorithm, const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, uint64_t output_length) {
-  std::vector<char> buffer;
-  std::ofstream outfile(outpath, std::ios::binary);
+    std::vector<uint8_t> buffer;
+    std::ofstream outfile(outpath, std::ios::binary);
+    std::vector<uint8_t> chunk(CHUNK_SIZE);
 
-  if (use_test_vectors) {
-    for (const auto& test_vector : test_vectors) {
-      buffer.assign(test_vector.begin(), test_vector.end());
-      generate_hash(mode, algorithm, buffer, seed, output_length, outfile, size);
-      outfile << ' ' << '"' << test_vector << '"' << '\n';
+    if (use_test_vectors) {
+        for (const auto& test_vector : test_vectors) {
+            buffer.assign(test_vector.begin(), test_vector.end());
+            generate_hash(mode, algorithm, buffer, seed, output_length, outfile, size);
+            outfile << ' ' << '"' << test_vector << '"' << '\n';
+        }
+    } else {
+        std::istream* in_stream = nullptr;
+        std::ifstream infile;
+
+        uint64_t input_length = 0;
+
+        if (!inpath.empty()) {
+            infile.open(inpath, std::ios::binary);
+            if (infile.fail()) {
+                throw std::runtime_error("Cannot open file");
+            }
+            in_stream = &infile;
+            input_length = getFileSize(inpath);
+
+            std::unique_ptr<IHashState> state;
+            if(algorithm == "rainbow" || algorithm == "bow") {
+              state = std::make_unique<rainbow::HashState>(rainbow::HashState::initialize(seed, input_length, size));
+            } else if(algorithm == "rainstorm" || algorithm == "storm") {
+              state = std::make_unique<rainstorm::HashState>(rainstorm::HashState::initialize(seed, input_length, size));
+            } else {
+              throw std::runtime_error("Invalid algorithm");
+            }
+
+            // Stream the file in 16384-byte chunks
+            while (*in_stream) {
+                in_stream->read(reinterpret_cast<char*>(chunk.data()), CHUNK_SIZE);
+                std::streamsize bytes_read = in_stream->gcount();
+                if (bytes_read > 0) {
+                    // Update the state with the new chunk of data
+                    state->update(chunk.data(), bytes_read);
+                }
+            }
+
+            // Close the file if it's open
+            if (infile.is_open()) {
+                infile.close();
+            }
+
+            // Finalize the hash
+            std::vector<uint8_t> output(output_length);
+            state->finalize(output.data());
+
+            //std::cout << "Length : " << state.len << std::endl;
+            //std::cout << "File length : " << input_length << std::endl;
+
+
+            // Write the output to the outfile
+
+            if (mode == Mode::Digest) {
+              for (const auto& byte : output) {
+                outfile << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+              }
+              outfile << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
+            } else {
+              outfile.write(reinterpret_cast<char*>(output.data()), output_length);
+            }
+        } else {
+          in_stream = &getInputStream();
+          // Read all data into the buffer
+          buffer = std::vector<uint8_t>(std::istreambuf_iterator<char>(*in_stream), {});
+          input_length = buffer.size();
+          generate_hash(mode, algorithm, buffer, seed, output_length, outfile, size);
+          outfile << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
+        }
     }
-  } else {
-    std::ifstream infile(inpath, std::ios::binary);
-    buffer = std::vector<char>((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
-    infile.close();
-    
-    generate_hash(mode, algorithm, buffer, seed, output_length, outfile, size);
-    if ( mode == Mode::Digest ) {
-      outfile << ' ' << inpath << '\n';
-    }
-  }
-  
-  outfile.close();
+
+    outfile.close();
 }
 
-std::string generate_filename(const std::string& filename) {
-  std::filesystem::path p{filename};
-  std::string new_filename;
-  std::string timestamp = "-" + std::to_string(std::time(nullptr));
-
-  if (std::filesystem::exists(p)) {
-    new_filename = p.stem().string() + timestamp + p.extension().string();
-    
-    // Handle filename collision
-    int counter = 1;
-    while (std::filesystem::exists(new_filename)) {
-      new_filename = p.stem().string() + timestamp + "-" + std::to_string(counter++) + p.extension().string();
-    }
-  } else {
-    new_filename = filename;
-  }
-
-  return new_filename;
-}
-
-void generate_hash(Mode mode, const std::string& algorithm, std::vector<char>& buffer, uint64_t seed, uint64_t output_length, std::ostream& outstream, uint32_t hash_size) {
+void generate_hash(Mode mode, const std::string& algorithm, std::vector<uint8_t>& buffer, uint64_t seed, uint64_t output_length, std::ostream& outstream, uint32_t hash_size) {
   int byte_size = hash_size / 8;
   std::vector<uint8_t> temp_out(byte_size);
   
@@ -251,3 +226,4 @@ void generate_hash(Mode mode, const std::string& algorithm, std::vector<char>& b
     }
   }
 }
+
