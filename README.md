@@ -1,6 +1,7 @@
 # Rain
 
 - [Rain](#Rain)
+  - [Repository structure](#repository-structure)
   - [Rainbow](#Rainbow)
   - [Rainstorm - Unvetted for Security](#Rainstorm---Unvetted-for-Security)
   - [Note on Cryptographic Intent](#Note-on-Cryptographic-Intent)
@@ -36,6 +37,48 @@ This repository houses the Rainbow and Rainstorm hash functions, developed by Cr
 ## Rainbow 
 
 Rainbow is a fast hash function (13.2 GiB/sec, 4.61 bytes/cycle on long messages, 24.8 cycles/hash for short messages). It's intended for general-purpose, non-cryptographic hashing. The core mixing function utilizes multiplication, subtraction/addition, rotation, and XOR. 
+
+## Repository structure
+
+Below is the repo structure after running make. 
+
+```tree
+.
+|-- LICENSE.txt
+|-- Makefile
+|-- README.md
+|-- rain
+|   |-- bin
+|   |   `-- rainsum
+|   `-- obj
+|       |-- rainsum.d
+|       `-- rainsum.o
+|-- rainsum -> rain/bin/rainsum
+|-- results
+|   |-- dieharder
+|   |   |-- README.md
+|   |   |-- rainbow-256.txt
+|   |   |-- rainbow-64-infinite.txt
+|   |   |-- rainstorm-256.txt
+|   |   `-- rainstorm-64-infinite.txt
+|   `-- smhasher3
+|       |-- rainbow-064.txt
+|       |-- rainbow-128.txt
+|       |-- rainstorm-064.txt
+|       `-- rainstorm-128.txt
+|-- scripts
+|   |-- 1srain.sh
+|   `-- blockchain.sh
+`-- src
+    |-- common.h
+    |-- cxxopts.hpp
+    |-- rainbow.tpp
+    |-- rainstorm.tpp
+    |-- rainsum.cpp
+    `-- tool.h
+
+9 directories, 24 files
+```
 
 ## Rainstorm - **Unvetted for Security**
 
