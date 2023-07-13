@@ -10,9 +10,9 @@
 #include "rainbow.tpp"
 #include "rainstorm.tpp"
 #include "cxxopts.hpp"
-
-// Adjust this path based on the endian.h file location
 #include "endian.h"
+
+#define CHUNK_SIZE 8192
 
 enum class Mode {
   Digest,
@@ -96,7 +96,6 @@ int main(int argc, char** argv) {
     inpath = result.unmatched().front();
   } else {
     // No filename provided, read from stdin
-    inpath = "/dev/stdin";
   }
 
   std::string algorithm = result["algorithm"].as<std::string>();
@@ -179,28 +178,56 @@ uint64_t hash_string_to_64_bit(const std::string& seed_str) {
     return seed;
 }
 
-void performHash(Mode mode, const std::string& algorithm, const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, uint64_t output_length) {
-  std::vector<char> buffer;
-  std::ofstream outfile(outpath, std::ios::binary);
+#include <fstream>
+#include <vector>
+#include "rainbow.h" // Include the Rainbow library
 
-  if (use_test_vectors) {
-    for (const auto& test_vector : test_vectors) {
-      buffer.assign(test_vector.begin(), test_vector.end());
-      generate_hash(mode, algorithm, buffer, seed, output_length, outfile, size);
-      outfile << ' ' << '"' << test_vector << '"' << '\n';
+#define CHUNK_SIZE 8192
+
+void performHash(Mode mode, const std::string& algorithm, const std::string& inpath, const std::string& outpath, uint32_t size, bool use_test_vectors, uint64_t seed, uint64_t output_length) {
+    std::vector<char> buffer;
+    std::ofstream outfile(outpath, std::ios::binary);
+    std::vector<uint8_t> chunk(CHUNK_SIZE);
+
+    if (use_test_vectors) {
+        for (const auto& test_vector : test_vectors) {
+            buffer.assign(test_vector.begin(), test_vector.end());
+            generate_hash(mode, algorithm, buffer, seed, output_length, outfile, size);
+            outfile << ' ' << '"' << test_vector << '"' << '\n';
+        }
+    } else {
+        std::ifstream infile(inpath, std::ios::binary);
+        if (infile.fail()) {
+            throw std::runtime_error("Cannot open file");
+        }
+
+        // Initialize the Rainbow hash state
+        rainbow::HashState state = rainbow::initialize(seed, size);
+
+        // Stream the file in 8192-byte chunks
+        while (infile) {
+            infile.read(reinterpret_cast<char*>(chunk.data()), CHUNK_SIZE);
+            std::streamsize bytes_read = infile.gcount();
+            if (bytes_read > 0) {
+                // Update the state with the new chunk of data
+                rainbow::update(state, chunk.data(), bytes_read);
+            }
+        }
+        infile.close();
+
+        // Finalize the hash
+        std::vector<uint8_t> output(output_length);
+        rainbow::finalize(state, output_length, output.data());
+
+        // Write the output to the outfile
+        outfile.write(reinterpret_cast<char*>(output.data()), output_length);
+
+        if ( mode == Mode::Digest ) {
+            outfile << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
+        }
     }
-  } else {
-    std::ifstream infile(inpath, std::ios::binary);
-    buffer = std::vector<char>((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
-    infile.close();
-    
-    generate_hash(mode, algorithm, buffer, seed, output_length, outfile, size);
-    if ( mode == Mode::Digest ) {
-      outfile << ' ' << inpath << '\n';
-    }
-  }
-  
-  outfile.close();
+
+    outfile.close();
 }
 
 std::string generate_filename(const std::string& filename) {

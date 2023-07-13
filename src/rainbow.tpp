@@ -80,8 +80,153 @@ namespace rainbow {
     s[1] = a; s[2] = b; 
   }
 
+  // streaming mode affordances
+  struct HashState {
+    uint64_t  h[4];
+    seed_t    seed;
+    size_t    len;                  // length processed so far
+    bool      inner = 0;
+    bool      final_block = false;
+    bool      finalized = false;
+  };
+
+  // Initialize the state with known length
+  static HashState initialize(const seed_t seed, size_t olen) {
+    HashState state;
+    state.h[0] = seed + olen + 1;
+    state.h[1] = seed + olen + 3;
+    state.h[2] = seed + olen + 5;
+    state.h[3] = seed + olen + 7;
+    state.len = 0;  // initialize length counter
+    state.seed = seed;
+    return state;
+  }
+
+  /*
+    // Initialize the state with unknown length (streaming mode)
+    // for this initialization we invert the normal monotonic increasing pattern of the IV
+    // by combining a decreasing sequence of primes, with the original increasing one
+    // this means that, if we stream a file without knowing its length (say by stdin)
+    // and we hash a file directly (by knowing its length)
+    // the result will be different
+    // This is not ideal, and may be considered a design flaw
+    // For now the way we work around that is, if we read from stdin
+    // we do not use streaming mode. We only use streaming mode when we
+    // are reading from a known file (and have the length)
+    static HashState initialize(const seed_t seed) {
+      HashState state;
+      state.h[0] = seed + 1002;   // 1001 + 1;
+      state.h[1] = seed + 1000;   // 997 + 3;
+      state.h[2] = seed + 988;    // 983 + 5;
+      state.h[3] = seed + 984;    // 977 + 7;
+      state.len = 0;  // initialize length counter
+      return state;
+    }
+  */
+
+  // Update the state with a new chunk of data
+  static void update(HashState& state, const uint8_t* chunk, size_t chunk_len) {
+    // update state based on chunk
+    if ( state.final_block ) {
+      // throw
+    }
+    state.len += chunk_len;
+
+    while (chunk_len >= 16) {
+      uint64_t g =  GET_U64<bswap>(chunk, 0);
+
+      state.h[0] -= g;
+      state.h[1] += g;
+
+      chunk += 8;
+
+      g =  GET_U64<bswap>(chunk, 0);
+
+      state.h[2] += g;
+      state.h[3] -= g;
+
+      if ( state.inner ) {
+        mixB(state.h, state.seed);
+      } else {
+        mixA(state.h);
+      }
+      state.inner ^= 1;
+
+      chunk += 8;
+      chunk_len -= 16;
+    }
+    
+    if ( chunk_len > 0 ) {
+      state.final_block = true;
+      mixB(state.h, state.seed);
+
+      switch (chunk_len) {
+        case 15:  state.h[0] += (uint64_t)chunk[14] << 56; 
+        case 14:  state.h[1] += (uint64_t)chunk[13] << 48;
+        case 13:  state.h[2] += (uint64_t)chunk[12] << 40; 
+        case 12:  state.h[3] += (uint64_t)chunk[11] << 32;
+        case 11:  state.h[0] += (uint64_t)chunk[10] << 24;
+        case 10:  state.h[1] += (uint64_t)chunk[9] <<  16; 
+        case 9:   state.h[2] += (uint64_t)chunk[8] << 8;
+        case 8:   state.h[3] += chunk[7]; 
+        case 7:   state.h[0] += (uint64_t)chunk[6] << 48; 
+        case 6:   state.h[1] += (uint64_t)chunk[5] << 40;
+        case 5:   state.h[2] += (uint64_t)chunk[4] << 32;
+        case 4:   state.h[3] += (uint64_t)chunk[3] << 24;
+        case 3:   state.h[0] += (uint64_t)chunk[2] << 16;
+        case 2:   state.h[1] += (uint64_t)chunk[1] <<  8; 
+        case 1:   state.h[2] += (uint64_t)chunk[0];
+      }
+
+      mixA(state.h);
+      mixB(state.h, state.seed);
+      mixA(state.h);
+    }
+  }
+
+  // Finalize the hash and return the result
+  static void finalize(HashState& state, int hashsize, void* out) {
+    // finalize hash
+    if ( state.finalized ) {
+      return;
+    } 
+    
+    uint64_t g = 0;
+    g -= state.h[2];
+    g -= state.h[3];
+
+    PUT_U64<bswap>(g, (uint8_t *)out, 0);
+    if (hashsize == 128) {
+      mixA(state.h);
+      g = 0;
+      g -= state.h[3];
+      g -= state.h[2];
+      PUT_U64<bswap>(g, (uint8_t *)out, 8);
+    } else if ( hashsize == 256) {
+      mixA(state.h);
+      g = 0;
+      g -= state.h[3];
+      g -= state.h[2];
+      PUT_U64<bswap>(g, (uint8_t *)out, 8);
+      mixA(state.h);
+      mixB(state.h, state.seed);
+      mixA(state.h);
+      g = 0;
+      g -= state.h[3];
+      g -= state.h[2];
+      PUT_U64<bswap>(g, (uint8_t *)out, 16);
+      mixA(state.h);
+      g = 0;
+      g -= state.h[3];
+      g -= state.h[2];
+      PUT_U64<bswap>(g, (uint8_t *)out, 24);
+    }
+
+    state.finalized = true;
+  }
+
+  // one big func mode (memory inefficient, but simple call)
   template <uint32_t hashsize, bool bswap>
-  //void newhash(const void* in, const size_t olen, const seed_t seed, void* out) {
   static void rainbow(const void* in, const size_t olen, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[4] = {seed + olen + 1, seed + olen + 3, seed + olen + 5, seed + olen + 7};
