@@ -23,7 +23,7 @@
 - [Developer Information](#Developer-Information)
   - [Stability](#Stability)
   - [Test vectors](#Test-vectors)
-  - [Building](#Building)
+  - [Building and Installing](#Building-and-Installing)
   - [Contributions](#Contributions)
 
 This repository houses the Rainbow and Rainstorm hash functions, developed by Cris Stringfellow and licensed under Apache-2.0. The 64-bit variants have passed all tests in the [SMHasher3](https://gitlab.com/fwojcik/smhasher3) suite. [Results](results) can be found in the `results/` subdirectory.
@@ -42,48 +42,6 @@ Rainbow is a fast hash function (13.2 GiB/sec, 4.61 bytes/cycle on long messages
 Rainstorm is a slower hash function with a tunable-round feature (with 4 rounds runs at 4.7 GiB/sec). It's designed with cryptographic hashing in mind, but it hasn't been formally analyzed for security, so we provide no guarantees. The core mixing function uses addition/subtraction, rotation, and XOR.
 
 Rainstorm's round number is adjustable, potentially offering additional security. However, please note that this is hypothetical until rigorous security analysis is completed. 
-
-## Building and Installing
-
-You can build and install the `rainsum` utility using the provided Makefile. First, clone the repository and change into the root directory of the project:
-
-```sh
-git clone https://github.com/dosyago/rain
-cd rain
-```
-
-Then, build the utility with the `make` command:
-
-```sh
-make
-```
-
-This will create an executable file `rainsum` in the `rain/bin` directory.
-
-To create a symbolic link in the project root directory for easy access, use the following command:
-
-```sh
-ln -sf rain/bin/rainsum
-```
-
-If you want to install `rainsum` globally, so it can be run from any directory, use the `make install` command:
-
-```sh
-make install
-```
-
-This command might require administrator privileges, depending on your system's configuration. If you encounter a permission error, try using `sudo`:
-
-```sh
-sudo make install
-```
-
-After installation, you can run `rainsum` from any directory:
-
-```sh
-rainsum --test-vectors
-```
-
 
 ## Note on Cryptographic Intent
 
@@ -213,6 +171,46 @@ ec05208dd1fbf47b9539a761af723612eaa810762ab7a77b715fcfb3bf44f04a "The quick brow
 47b5d8cb1df8d81ed23689936d2edaa7bd5c48f5bc463600a4d7a56342ac80b9 "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 ```
 
+## Building and Installing
+
+You can build and install the `rainsum` utility using the provided Makefile. First, clone the repository and change into the root directory of the project:
+
+```sh
+git clone https://github.com/dosyago/rain
+cd rain
+```
+
+Then, build the utility with the `make` command:
+
+```sh
+make
+```
+
+This will create an executable file `rainsum` in the `rain/bin` directory.
+
+To create a symbolic link in the project root directory for easy access, use the following command:
+
+```sh
+ln -sf rain/bin/rainsum
+```
+
+If you want to install `rainsum` globally, so it can be run from any directory, use the `make install` command:
+
+```sh
+make install
+```
+
+This command might require administrator privileges, depending on your system's configuration. If you encounter a permission error, try using `sudo`:
+
+```sh
+sudo make install
+```
+
+After installation, you can run `rainsum` from any directory:
+
+```sh
+rainsum --test-vectors
+```
 
 ## Contributions
 
