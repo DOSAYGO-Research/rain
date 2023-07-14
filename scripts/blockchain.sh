@@ -3,7 +3,7 @@
 # Function to calculate and print hash
 calculate_hash() {
     input=$1
-    hash=$(echo "$input" | ./../rain/bin/rainsum -a rainstorm -s 512 | cut -d ' ' -f1 | tee /dev/stderr)
+    hash=$(echo "$input" | ./rainsum -a rainstorm -s 512 | cut -d ' ' -f1 | tee /dev/stderr)
     echo $hash
 }
 

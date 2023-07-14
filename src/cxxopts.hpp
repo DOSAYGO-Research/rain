@@ -55,8 +55,8 @@ THE SOFTWARE.
 #define CXXOPTS_LINKONCE_CONST	__declspec(selectany) extern
 #define CXXOPTS_LINKONCE		__declspec(selectany) extern
 #else
-#define CXXOPTS_LINKONCE_CONST
-#define CXXOPTS_LINKONCE
+#define CXXOPTS_LINKONCE_CONST	
+#define CXXOPTS_LINKONCE		
 #endif
 
 #ifndef CXXOPTS_NO_REGEX
@@ -71,14 +71,6 @@ THE SOFTWARE.
 #      define CXXOPTS_HAS_OPTIONAL
 #    endif
 #  endif
-#endif
-
-#define CXXOPTS_FALLTHROUGH
-#ifdef __has_cpp_attribute
-  #if __has_cpp_attribute(fallthrough)
-    #undef CXXOPTS_FALLTHROUGH
-    #define CXXOPTS_FALLTHROUGH [[fallthrough]]
-  #endif
 #endif
 
 #if __cplusplus >= 201603L
@@ -238,10 +230,10 @@ stringAppend(String& s, Iterator begin, Iterator end)
 }
 
 inline
-size_t
+std::size_t
 stringLength(const String& s)
 {
-  return static_cast<size_t>(s.length());
+  return s.length();
 }
 
 inline
@@ -345,8 +337,13 @@ empty(const std::string& s)
 namespace cxxopts {
 
 namespace {
+#ifdef _WIN32
 CXXOPTS_LINKONCE_CONST std::string LQUOTE("\'");
 CXXOPTS_LINKONCE_CONST std::string RQUOTE("\'");
+#else
+CXXOPTS_LINKONCE_CONST std::string LQUOTE("‘");
+CXXOPTS_LINKONCE_CONST std::string RQUOTE("’");
+#endif
 } // namespace
 
 // GNU GCC with -Weffc++ will issue a warning regarding the upcoming class, we
@@ -367,9 +364,6 @@ class Value : public std::enable_shared_from_this<Value>
   virtual
   std::shared_ptr<Value>
   clone() const = 0;
-
-  virtual void
-  add(const std::string& text) const = 0;
 
   virtual void
   parse(const std::string& text) const = 0;
@@ -764,31 +758,29 @@ inline ArguDesc ParseArgument(const char *arg, bool &matched)
 
 namespace {
 CXXOPTS_LINKONCE
-const char* const integer_pattern =
-  "(-)?(0x)?([0-9a-zA-Z]+)|((0x)?0)";
+std::basic_regex<char> integer_pattern
+  ("(-)?(0x)?([0-9a-zA-Z]+)|((0x)?0)");
 CXXOPTS_LINKONCE
-const char* const truthy_pattern =
-  "(t|T)(rue)?|1";
+std::basic_regex<char> truthy_pattern
+  ("(t|T)(rue)?|1");
 CXXOPTS_LINKONCE
-const char* const falsy_pattern =
-  "(f|F)(alse)?|0";
+std::basic_regex<char> falsy_pattern
+  ("(f|F)(alse)?|0");
 CXXOPTS_LINKONCE
-const char* const option_pattern =
-  "--([[:alnum:]][-_[:alnum:]\\.]+)(=(.*))?|-([[:alnum:]].*)";
+std::basic_regex<char> option_matcher
+  ("--([[:alnum:]][-_[:alnum:]\\.]+)(=(.*))?|-([[:alnum:]].*)");
 CXXOPTS_LINKONCE
-const char* const option_specifier_pattern =
-  "([[:alnum:]][-_[:alnum:]\\.]*)(,[ ]*[[:alnum:]][-_[:alnum:]]*)*";
+std::basic_regex<char> option_specifier
+  ("([[:alnum:]][-_[:alnum:]\\.]*)(,[ ]*[[:alnum:]][-_[:alnum:]]*)*");
 CXXOPTS_LINKONCE
-const char* const option_specifier_separator_pattern = ", *";
+std::basic_regex<char> option_specifier_separator(", *");
 
 } // namespace
 
 inline IntegerDesc SplitInteger(const std::string &text)
 {
-  static const std::basic_regex<char> integer_matcher(integer_pattern);
-
   std::smatch match;
-  std::regex_match(text, match, integer_matcher);
+  std::regex_match(text, match, integer_pattern);
 
   if (match.length() == 0)
   {
@@ -812,17 +804,15 @@ inline IntegerDesc SplitInteger(const std::string &text)
 
 inline bool IsTrueText(const std::string &text)
 {
-  static const std::basic_regex<char> truthy_matcher(truthy_pattern);
   std::smatch result;
-  std::regex_match(text, result, truthy_matcher);
+  std::regex_match(text, result, truthy_pattern);
   return !result.empty();
 }
 
 inline bool IsFalseText(const std::string &text)
 {
-  static const std::basic_regex<char> falsy_matcher(falsy_pattern);
   std::smatch result;
-  std::regex_match(text, result, falsy_matcher);
+  std::regex_match(text, result, falsy_pattern);
   return !result.empty();
 }
 
@@ -831,25 +821,22 @@ inline bool IsFalseText(const std::string &text)
 // (without considering which or how many are single-character)
 inline OptionNames split_option_names(const std::string &text)
 {
-  static const std::basic_regex<char> option_specifier_matcher(option_specifier_pattern);
-  if (!std::regex_match(text.c_str(), option_specifier_matcher))
+  if (!std::regex_match(text.c_str(), option_specifier))
   {
     throw_or_mimic<exceptions::invalid_option_format>(text);
   }
 
   OptionNames split_names;
 
-  static const std::basic_regex<char> option_specifier_separator_matcher(option_specifier_separator_pattern);
   constexpr int use_non_matches { -1 };
   auto token_iterator = std::sregex_token_iterator(
-    text.begin(), text.end(), option_specifier_separator_matcher, use_non_matches);
+    text.begin(), text.end(), option_specifier_separator, use_non_matches);
   std::copy(token_iterator, std::sregex_token_iterator(), std::back_inserter(split_names));
   return split_names;
 }
 
 inline ArguDesc ParseArgument(const char *arg, bool &matched)
 {
-  static const std::basic_regex<char> option_matcher(option_pattern);
   std::match_results<const char*> result;
   std::regex_match(arg, result, option_matcher);
   matched = !result.empty();
@@ -1067,22 +1054,6 @@ parse_value(const std::string& text, std::vector<T>& value)
   }
 }
 
-template <typename T>
-void
-add_value(const std::string& text, T& value)
-{
-  parse_value(text, value);
-}
-
-template <typename T>
-void
-add_value(const std::string& text, std::vector<T>& value)
-{
-  T v;
-  add_value(text, v);
-  value.emplace_back(std::move(v));
-}
-
 #ifdef CXXOPTS_HAS_OPTIONAL
 template <typename T>
 void
@@ -1154,12 +1125,6 @@ class abstract_value : public Value
     m_implicit = rhs.m_implicit;
     m_default_value = rhs.m_default_value;
     m_implicit_value = rhs.m_implicit_value;
-  }
-
-  void
-  add(const std::string& text) const override
-  {
-    add_value(text, *m_store);
   }
 
   void
@@ -1448,19 +1413,6 @@ class OptionValue
 {
   public:
   void
-  add
-  (
-    const std::shared_ptr<const OptionDetails>& details,
-    const std::string& text
-  )
-  {
-    ensure_value(details);
-    ++m_count;
-    m_value->add(text);
-    m_long_names = &details->long_names();
-  }
-
-  void
   parse
   (
     const std::shared_ptr<const OptionDetails>& details,
@@ -1546,7 +1498,7 @@ CXXOPTS_DIAGNOSTIC_POP
 class KeyValue
 {
   public:
-  KeyValue(std::string key_, std::string value_) noexcept
+  KeyValue(std::string key_, std::string value_)
   : m_key(std::move(key_))
   , m_value(std::move(value_))
   {
@@ -1599,7 +1551,7 @@ class ParseResult
     Iterator(const Iterator&) = default;
 
 // GCC complains about m_iter not being initialised in the member
-// initializer list
+// initializer list 
 CXXOPTS_DIAGNOSTIC_PUSH
 CXXOPTS_IGNORE_WARNING("-Weffc++")
     Iterator(const ParseResult *pr, bool end=false)
@@ -1830,7 +1782,7 @@ class OptionParser
   );
 
   void
-  add_to_option(const std::shared_ptr<OptionDetails>& value, const std::string& arg);
+  add_to_option(OptionMap::const_iterator iter, const std::string& option, const std::string& arg);
 
   void
   parse_option
@@ -2285,7 +2237,6 @@ OptionAdder::operator()
   case 1:
     short_name = *first_short_name_iter;
     option_names.erase(first_short_name_iter);
-    CXXOPTS_FALLTHROUGH;
   case 0:
     break;
   default:
@@ -2377,13 +2328,9 @@ OptionParser::checked_parse_arg
 
 inline
 void
-OptionParser::add_to_option(const std::shared_ptr<OptionDetails>& value, const std::string& arg)
+OptionParser::add_to_option(OptionMap::const_iterator iter, const std::string& option, const std::string& arg)
 {
-  auto hash = value->hash();
-  auto& result = m_parsed[hash];
-  result.add(value, arg);
-
-  m_sequential.emplace_back(value->essential_name(), arg);
+  parse_option(iter->second, option, arg);
 }
 
 inline
@@ -2400,14 +2347,14 @@ OptionParser::consume_positional(const std::string& a, PositionalListIterator& n
         auto& result = m_parsed[iter->second->hash()];
         if (result.count() == 0)
         {
-          add_to_option(iter->second, a);
+          add_to_option(iter, *next, a);
           ++next;
           return true;
         }
         ++next;
         continue;
       }
-      add_to_option(iter->second, a);
+      add_to_option(iter, *next, a);
       return true;
     }
     throw_or_mimic<exceptions::no_such_option>(*next);

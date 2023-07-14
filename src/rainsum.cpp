@@ -1,5 +1,3 @@
-#define VERSION "1.0.3"
-
 #include <iostream>
 #include <fstream>
 #include <iomanip>
