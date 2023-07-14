@@ -6,6 +6,8 @@
 #include "cxxopts.hpp"
 #include "common.h"
 
+#define VERSION "1.0.3"
+
 enum class Mode {
   Digest,
   Stream
