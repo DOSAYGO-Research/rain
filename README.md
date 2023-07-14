@@ -223,10 +223,10 @@ git clone https://github.com/dosyago/rain
 cd rain
 ```
 
-Then, build the utility with the `make` command:
+Then, build the utility with the helper script:
 
 ```sh
-make
+./scripts/build.sh
 ```
 
 This will create an executable file `rainsum` in the `rain/bin` directory, and also create a symbolic link in the project root directory for easy access.
