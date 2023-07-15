@@ -8,9 +8,14 @@ SRCS = $(wildcard src/*.cpp)
 OBJS = $(addprefix $(OBJDIR)/,$(notdir $(SRCS:.cpp=.o)))
 DEPS = $(OBJS:.o=.d)
 
-all: directories rainsum link
+WASMDIR = wasm
+WASM_SOURCE = src/rainstorm.cpp
+WASM_TARGET = wasm/rainstorm.js
+EMCCFLAGS = -O3 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" 
 
-directories: ${OBJDIR} ${BUILDDIR}
+all: directories rainsum link rainstorm
+
+directories: ${OBJDIR} ${BUILDDIR} ${WASMDIR}
 
 ${OBJDIR}:
 	mkdir -p ${OBJDIR}
@@ -18,11 +23,22 @@ ${OBJDIR}:
 ${BUILDDIR}:
 	mkdir -p ${BUILDDIR}
 
+${WASMDIR}:
+	mkdir -p ${WASMDIR}
+
 rainsum: $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(BUILDDIR)/$@ $^
 
 $(OBJDIR)/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c $< -o $@
+
+rainstorm: $(WASM_TARGET)
+
+$(WASM_TARGET): $(WASM_SOURCE)
+	@[ -d wasm ] || mkdir -p wasm
+	emcc $(EMCCFLAGS) -s MODULARIZE=1 -s 'EXPORT_NAME="createRainstormModule"' -o $(WASMDIR)/rainstorm.js $(WASM_SOURCE)
+
+
 
 link:
 	ln -sf rain/bin/rainsum
@@ -37,5 +53,6 @@ install: rainsum
 .PHONY: clean
 
 clean:
-	rm -rf $(OBJDIR) $(BUILDDIR) rainsum
+	rm -rf $(OBJDIR) $(BUILDDIR) rainsum $(WASM_TARGET) 
+
 
