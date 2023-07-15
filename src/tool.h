@@ -1,8 +1,8 @@
 #include <fstream>
 #include <sys/stat.h>
 
-#include "rainbow.tpp"
-#include "rainstorm.tpp"
+#include "rainbow.cpp"
+#include "rainstorm.cpp"
 #include "cxxopts.hpp"
 #include "common.h"
 
