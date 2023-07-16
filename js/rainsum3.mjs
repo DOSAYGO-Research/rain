@@ -40,14 +40,14 @@ async function testVectors() {
 
 async function rainstormHash(hashSize, seed, input) {
     // Convert the input to a bytes
-    let data = new TextEncoder().encode(input);
-
-    // Copy the data into the allocated WASM memory
-    // Retrieve the hash from the WASM memory
-    let hash = rainstorm.module.HEAPU8.subarray(data.length, data.length + hashSize / 8);
+    let fakeData = new TextEncoder().encode(input);
+    let data = rainstorm.module.stringToUTF8(input);
+    seed = BigInt(seed);
+    console.log(fakeData, fakeData.length);
 
     // Choose the correct hash function based on the hash size
     let hashFunc;
+
     switch (hashSize) {
         case 64:
             hashFunc = rainstorm.module._rainstormHash64;
@@ -65,7 +65,9 @@ async function rainstormHash(hashSize, seed, input) {
             throw new Error(`Unsupported hash size: ${hashSize}`);
     }
 
-    hashFunc(data, data.length, seed, hash);
+    hashFunc(data, fakeData.length, seed, rainstorm.module.HEAPU8);
+
+    let hash = rainstorm.module.HEAPU8.subarray(0, hashSize / 8);
 
     // Return the hash as a Uint8Array
     return Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');

@@ -81,7 +81,7 @@ void hashAnything(Mode mode, HashAlgorithm algot, const std::string& inpath, std
         for (const auto& test_vector : test_vectors) {
             buffer.assign(test_vector.begin(), test_vector.end());
             hashBuffer(mode, algot, buffer, seed, output_length, outstream, size);
-            outstream << ' ' << '"' << test_vector << '"' << '\n';
+            outstream << ' ' << '"' << test_vector << '"' << seed << '\n';
         }
     } else {
         std::istream* in_stream = nullptr;

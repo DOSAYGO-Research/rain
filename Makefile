@@ -11,7 +11,8 @@ DEPS = $(OBJS:.o=.d)
 WASMDIR = wasm
 WASM_SOURCE = src/rainstorm.cpp
 WASM_TARGET = wasm/rainstorm.js
-EMCCFLAGS = -O3 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" 
+# we need to add stringToUTF8 to exported functions rather than runtime methods because of: https://github.com/emscripten-core/emscripten/blob/main/ChangeLog.md#3135---040323
+EMCCFLAGS = -O3 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512', 'stringToUTF8']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT
 
 all: directories rainsum link rainstorm
 
@@ -37,8 +38,7 @@ rainstorm: $(WASM_TARGET)
 $(WASM_TARGET): $(WASM_SOURCE)
 	@[ -d wasm ] || mkdir -p wasm
 	emcc $(EMCCFLAGS) -s MODULARIZE=1 -s 'EXPORT_NAME="createRainstormModule"' -o $(WASMDIR)/rainstorm.js $(WASM_SOURCE)
-
-
+	#emcc $(EMCCFLAGS) -o $(WASMDIR)/rainstorm.html $(WASM_SOURCE)
 
 link:
 	ln -sf rain/bin/rainsum
