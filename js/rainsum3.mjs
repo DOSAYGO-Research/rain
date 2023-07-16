@@ -21,7 +21,16 @@ const rainstorm = {
   }
 }
 
-testVectors();
+run();
+
+async function run() {
+  await rainstorm.untilLoaded;
+  if ( !process.argv[2] ) {
+    testVectors();
+  } else {
+    console.log(`${await rainstormHash(256, 0, process.argv[2])} "${process.argv[2]}"`);
+  }
+}
 
 async function testVectors() {
   await rainstorm.untilLoaded;
@@ -39,50 +48,51 @@ async function testVectors() {
 }
 
 async function rainstormHash(hashSize, seed, input) {
-    // Convert the input to a bytes
-    const {stringToUTF8, lengthBytesUTF8} = rainstorm.module;
-    const HEAP = rainstorm.module.HEAPU8;
+  await rainstorm.untilLoaded;
+  // Convert the input to a bytes
+  const {stringToUTF8, lengthBytesUTF8} = rainstorm.module;
+  const HEAP = rainstorm.module.HEAPU8;
 
-    const hashPtr = 0;
-    const hashLength = hashSize/8;
-    const inputPtr = 80;
-    const inputLength = lengthBytesUTF8(input);
+  const hashPtr = 0;
+  const hashLength = hashSize/8;
+  const inputPtr = 80;
+  const inputLength = lengthBytesUTF8(input);
 
-    let data = stringToUTF8(input, inputPtr, inputLength + 1);
-    seed = BigInt(seed);
+  let data = stringToUTF8(input, inputPtr, inputLength + 1);
+  seed = BigInt(seed);
 
-    // Choose the correct hash function based on the hash size
-    let hashFunc;
+  // Choose the correct hash function based on the hash size
+  let hashFunc;
 
-    switch (hashSize) {
-        case 64:
-            hashFunc = rainstorm.module._rainstormHash64;
-            break;
-        case 128:
-            hashFunc = rainstorm.module._rainstormHash128;
-            break;
-        case 256:
-            hashFunc = rainstorm.module._rainstormHash256;
-            break;
-        case 512:
-            hashFunc = rainstorm.module._rainstormHash512;
-            break;
-        default:
-            throw new Error(`Unsupported hash size: ${hashSize}`);
-    }
+  switch (hashSize) {
+      case 64:
+          hashFunc = rainstorm.module._rainstormHash64;
+          break;
+      case 128:
+          hashFunc = rainstorm.module._rainstormHash128;
+          break;
+      case 256:
+          hashFunc = rainstorm.module._rainstormHash256;
+          break;
+      case 512:
+          hashFunc = rainstorm.module._rainstormHash512;
+          break;
+      default:
+          throw new Error(`Unsupported hash size: ${hashSize}`);
+  }
 
-    //console.log(`Will call hash with args for: ${input}`);
-    //console.log({inputPtr, inputLength, seed, hashPtr});
-    hashFunc(inputPtr, inputLength, seed, hashPtr);
+  //console.log(`Will call hash with args for: ${input}`);
+  //console.log({inputPtr, inputLength, seed, hashPtr});
+  hashFunc(inputPtr, inputLength, seed, hashPtr);
 
-    let hash = rainstorm.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
+  let hash = rainstorm.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
 
-    // Return the hash as a Uint8Array
-    const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
+  // Return the hash as a Uint8Array
+  const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
 
-    // zero memory
-    HEAP.set(new Uint8Array(inputPtr + inputLength + 10));
+  // zero memory
+  HEAP.set(new Uint8Array(inputPtr + inputLength + 10));
 
-    return hashHex;
+  return hashHex;
 }
 
