@@ -40,10 +40,16 @@ async function testVectors() {
 
 async function rainstormHash(hashSize, seed, input) {
     // Convert the input to a bytes
-    let fakeData = new TextEncoder().encode(input);
-    let data = rainstorm.module.stringToUTF8(input);
+    const {stringToUTF8, lengthBytesUTF8} = rainstorm.module;
+    const HEAP = rainstorm.module.HEAPU8;
+
+    const hashPtr = 0;
+    const hashLength = hashSize/8;
+    const inputPtr = 80;
+    const inputLength = lengthBytesUTF8(input);
+
+    let data = stringToUTF8(input, inputPtr, inputLength + 1);
     seed = BigInt(seed);
-    console.log(fakeData, fakeData.length);
 
     // Choose the correct hash function based on the hash size
     let hashFunc;
@@ -65,11 +71,18 @@ async function rainstormHash(hashSize, seed, input) {
             throw new Error(`Unsupported hash size: ${hashSize}`);
     }
 
-    hashFunc(data, fakeData.length, seed, rainstorm.module.HEAPU8);
+    console.log(`Will call hash with args for: ${input}`);
+    console.log({inputPtr, inputLength, seed, hashPtr});
+    hashFunc(inputPtr, inputLength, seed, hashPtr);
 
-    let hash = rainstorm.module.HEAPU8.subarray(0, hashSize / 8);
+    let hash = rainstorm.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
 
     // Return the hash as a Uint8Array
-    return Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
+    const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
+
+    // zero memory
+    HEAP.set(new Uint8Array(inputPtr + inputLength + 10));
+
+    return hashHex;
 }
 

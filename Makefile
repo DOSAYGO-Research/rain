@@ -12,7 +12,7 @@ WASMDIR = wasm
 WASM_SOURCE = src/rainstorm.cpp
 WASM_TARGET = wasm/rainstorm.js
 # we need to add stringToUTF8 to exported functions rather than runtime methods because of: https://github.com/emscripten-core/emscripten/blob/main/ChangeLog.md#3135---040323
-EMCCFLAGS = -O3 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512', 'stringToUTF8']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT
+EMCCFLAGS = -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512', 'stringToUTF8', 'lengthBytesUTF8']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT
 
 all: directories rainsum link rainstorm
 
