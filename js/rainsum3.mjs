@@ -71,8 +71,8 @@ async function rainstormHash(hashSize, seed, input) {
             throw new Error(`Unsupported hash size: ${hashSize}`);
     }
 
-    console.log(`Will call hash with args for: ${input}`);
-    console.log({inputPtr, inputLength, seed, hashPtr});
+    //console.log(`Will call hash with args for: ${input}`);
+    //console.log({inputPtr, inputLength, seed, hashPtr});
     hashFunc(inputPtr, inputLength, seed, hashPtr);
 
     let hash = rainstorm.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
