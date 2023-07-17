@@ -79,7 +79,6 @@ export async function rainstormHash(hashSize, seed, input) {
 
   // Convert the input to a bytes
   const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rainstorm.module;
-  const HEAP = rainstorm.module.HEAPU8;
 
   const hashLength = hashSize/8;
   const hashPtr = _malloc(hashLength);
@@ -94,10 +93,10 @@ export async function rainstormHash(hashSize, seed, input) {
   } else {
     inputLength = input.length;
     inputPtr = _malloc(inputLength);
-    HEAP.set(input, inputPtr);
+    rainstorm.module.HEAPU8.set(input, inputPtr);
   }
 
-  seed = BigInt(seed);
+  //seed = BigInt(seed);
 
   // Choose the correct hash function based on the hash size
   let hashFunc;
@@ -121,7 +120,7 @@ export async function rainstormHash(hashSize, seed, input) {
 
   hashFunc(inputPtr, inputLength, seed, hashPtr);
 
-  let hash = HEAP.subarray(hashPtr, hashPtr + hashLength);
+  let hash = rainstorm.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
 
   // Return the hash as a Uint8Array
   const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
@@ -138,7 +137,6 @@ export async function rainbowHash(hashSize, seed, input) {
 
   // Convert the input to a bytes
   const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rainbow.module;
-  const HEAP = rainbow.module.HEAPU8;
 
   const hashLength = hashSize/8;
   const hashPtr = _malloc(hashLength);
@@ -153,10 +151,10 @@ export async function rainbowHash(hashSize, seed, input) {
   } else {
     inputLength = input.length;
     inputPtr = _malloc(inputLength);
-    HEAP.set(input, inputPtr);
+    rainbow.module.HEAPU8.set(input, inputPtr);
   }
 
-  seed = BigInt(seed);
+  //seed = BigInt(seed);
 
   // Choose the correct hash function based on the hash size
   let hashFunc;
@@ -177,7 +175,7 @@ export async function rainbowHash(hashSize, seed, input) {
 
   hashFunc(inputPtr, inputLength, seed, hashPtr);
 
-  let hash = HEAP.subarray(hashPtr, hashPtr + hashLength);
+  let hash = rainbow.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
 
   // Return the hash as a Uint8Array
   const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
