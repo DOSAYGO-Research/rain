@@ -3,7 +3,7 @@ import fs from 'fs';
 import process from 'process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { rainstormHash } from './lib/rainstorm.mjs';
+import { rainbowHash, rainstormHash } from './lib/api.mjs';
 
 const testVectors = [
     "",

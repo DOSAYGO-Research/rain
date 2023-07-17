@@ -18,7 +18,7 @@ BOW_WASM_TARGET = wasm/rainbow.js
 STORM_EMCCFLAGS = -O3 -s ASSERTIONS=1 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT
 BOW_EMCCFLAGS = -O3 -s ASSERTIONS=1 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainbowHash64', '_rainbowHash128', '_rainbowHash256', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT
 
-all: directories rainsum link rainswasm
+all: directories rainsum link rainwasm
 
 directories: ${OBJDIR} ${BUILDDIR} ${WASMDIR}
 
@@ -41,8 +41,6 @@ rainstorm: $(STORM_WASM_TARGET)
 
 rainbow: $(BOW_WASM_TARGET)
 
-rainwasm: $(STORM_WASM_TARGET) $(BOW_WASM_TARGET)
-
 wasmhtml: $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
 	@[ -d wasm ] || mkdir -p wasm
 	emcc $(EMCCFLAGS) -o $(WASMDIR)/rainstorm.html $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
@@ -54,6 +52,8 @@ $(STORM_WASM_TARGET): $(STORM_WASM_SOURCE)
 $(BOW_WASM_TARGET): $(BOW_WASM_SOURCE)
 	@[ -d wasm ] || mkdir -p wasm
 	emcc $(BOW_EMCCFLAGS) -s MODULARIZE=1 -s 'EXPORT_NAME="createRainbowModule"' -o $(BOW_WASM_TARGET) $(BOW_WASM_SOURCE)
+
+rainwasm: $(STORM_WASM_TARGET) $(BOW_WASM_TARGET)
 
 link:
 	ln -sf rain/bin/rainsum
