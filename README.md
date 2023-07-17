@@ -40,20 +40,38 @@ Rainbow is a fast hash function (13.2 GiB/sec, 4.61 bytes/cycle on long messages
 
 ## Repository structure
 
-Below is the repo structure after running make. 
+Below is the repo structure before running make (but after npm install in `js/` and `scripts/`. 
 
 ```tree
 .
 |-- LICENSE.txt
 |-- Makefile
 |-- README.md
+|-- js
+|   |-- lib
+|   |   `-- api.mjs
+|   |-- node_modules
+|   |   |-- ansi-regex
+|   |   |-- ansi-styles
+|   |   |-- cliui
+|   |   |-- color-convert
+|   |   |-- color-name
+|   |   |-- emoji-regex
+|   |   |-- escalade
+|   |   |-- get-caller-file
+|   |   |-- is-fullwidth-code-point
+|   |   |-- require-directory
+|   |   |-- string-width
+|   |   |-- strip-ansi
+|   |   |-- wrap-ansi
+|   |   |-- y18n
+|   |   |-- yargs
+|   |   `-- yargs-parser
+|   |-- package-lock.json
+|   |-- package.json
+|   |-- rainsum.mjs
+|   `-- test.mjs
 |-- rain
-|   |-- bin
-|   |   `-- rainsum
-|   `-- obj
-|       |-- rainsum.d
-|       `-- rainsum.o
-|-- rainsum -> rain/bin/rainsum
 |-- results
 |   |-- dieharder
 |   |   |-- README.md
@@ -68,16 +86,27 @@ Below is the repo structure after running make.
 |       `-- rainstorm-128.txt
 |-- scripts
 |   |-- 1srain.sh
-|   `-- blockchain.sh
-`-- src
-    |-- common.h
-    |-- cxxopts.hpp
-    |-- rainbow.tpp
-    |-- rainstorm.tpp
-    |-- rainsum.cpp
-    `-- tool.h
+|   |-- bench.mjs
+|   |-- blockchain.sh
+|   |-- build.sh
+|   |-- node_modules
+|   |   `-- chalk
+|   |-- package-lock.json
+|   |-- package.json
+|   |-- testjs.sh
+|   |-- vectors.sh
+|   `-- verify.sh
+|-- src
+|   |-- common.h
+|   |-- cxxopts.hpp
+|   |-- rainbow.cpp
+|   |-- rainstorm.cpp
+|   |-- rainsum.cpp
+|   `-- tool.h
+`-- verification
+    `-- vectors.txt
 
-9 directories, 24 files
+29 directories, 33 files
 ```
 
 ## Rainstorm - **Unvetted for Security**
@@ -106,6 +135,10 @@ This repository and content is licensed under Apache-2.0 unless otherwise noted.
 Rainsum is a powerful command-line utility for calculating Rainbow or Rainstorm hashes of input data. This tool can operate in two modes: "digest" or "stream". In "digest" mode, Rainsum outputs a fixed-length hash in hex, while in "stream" mode it produces variable-length binary output.
 
 Rainsum also offers multiple hashing algorithms, sizes, and various configurable options to cater to a wide range of use cases.
+
+### JavaScript WASM Version
+
+There is also a JavaScript WASM version, consistent with the C++ version, and 8 - 16 times slower on small and medium inputs (100 bytes to 10MiB), and 2 - 3 times slower on large inputs (100MiB and up), at `js/rainsum.mjs`. This JavaScript version of rainsum can be used mostly like the C++ version, so the below guide and instrutions suffice essentially for both.
 
 ## 2. Basic Usage
 
