@@ -37,7 +37,7 @@ const argv = yargs(hideBin(process.argv))
     .argv;
 
 async function hashBuffer(mode, algorithm, seed, buffer, outputStream, hashSize, inputName) {
-    const hash = await rainstormHash(hashSize, seed, buffer.toString('binary'));
+    const hash = await rainstormHash(hashSize, seed, buffer);
     outputStream.write(`${hash} ${inputName}\n`);
 }
 
