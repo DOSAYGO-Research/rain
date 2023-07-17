@@ -1,6 +1,7 @@
 CXX = clang++
-CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O3
+CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O3 
 DEPFLAGS = -MMD -MF $(@:.o=.d)
+LDFLAGS = 
 
 OBJDIR = rain/obj
 BUILDDIR = rain/bin
@@ -28,7 +29,7 @@ ${WASMDIR}:
 	mkdir -p ${WASMDIR}
 
 rainsum: $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $(BUILDDIR)/$@ $^
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BUILDDIR)/$@ $^
 
 $(OBJDIR)/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c $< -o $@

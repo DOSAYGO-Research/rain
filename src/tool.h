@@ -1,6 +1,12 @@
 #include <fstream>
 #include <sys/stat.h>
 
+// only define USE_FILESYSTEM if it is supported and needed
+#ifdef USE_FILESYSTEM
+#include <filesystem>
+#endif
+
+
 #include "rainbow.cpp"
 #include "rainstorm.cpp"
 #include "cxxopts.hpp"
@@ -84,6 +90,7 @@ uint64_t getFileSize(const std::string& filename) {
     return st.st_size;
 }
 
+#ifdef USE_FILESYSTEM
 std::string generate_filename(const std::string& filename) {
   std::filesystem::path p{filename};
   std::string new_filename;
@@ -91,7 +98,7 @@ std::string generate_filename(const std::string& filename) {
 
   if (std::filesystem::exists(p)) {
     new_filename = p.stem().string() + timestamp + p.extension().string();
-    
+
     // Handle filename collision
     int counter = 1;
     while (std::filesystem::exists(new_filename)) {
@@ -103,6 +110,13 @@ std::string generate_filename(const std::string& filename) {
 
   return new_filename;
 }
+
+#else
+// If filesystem isn't available, just return the filename as it is
+std::string generate_filename(const std::string& filename) {
+  return filename;
+}
+#endif
 
 uint64_t hash_string_to_64_bit(const std::string& seed_str) {
     std::vector<char> buffer(seed_str.begin(), seed_str.end());
