@@ -193,7 +193,6 @@ namespace rainstorm {
   };
 
   template <uint32_t hashsize, bool bswap>
-  //void newnewhash(const void* in, const size_t len, const seed_t seed, void* out) {
   static void rainstorm(const void* in, const size_t len, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[16] = {
@@ -216,7 +215,7 @@ namespace rainstorm {
     };
 
     uint64_t temp[8];
-    size_t lenRemaining = len;
+    uint64_t lenRemaining = len;
 
     // Process 512-bit blocks
     while (lenRemaining >= 64) {
@@ -235,7 +234,7 @@ namespace rainstorm {
     // Pad and process any remaining data less than 64 bytes (512 bits)
     memset(temp, (0x80+lenRemaining) & 255, sizeof(temp));
     memcpy(temp, data, lenRemaining);
-    temp[lenRemaining >> 3] |= lenRemaining >> (lenRemaining - 56)*8;
+    temp[lenRemaining >> 3] |= (uint64_t)(lenRemaining << ((lenRemaining&7)*8));
 
     for( int i = 0; i < ROUNDS; i++) {
       weakfunc(h, temp, i&1);

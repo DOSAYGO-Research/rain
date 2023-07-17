@@ -1,0 +1,28 @@
+{
+  "name": "rainsum",
+  "version": "0.0.1",
+  "module": true,
+  "type": "module",
+  "description": "Rain hashes in JavaScript via WASM",
+  "main": "rainsum.js",
+  "scripts": {
+    "test": "node rainsum.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dosyago/rain.git"
+  },
+  "keywords": [
+    "hash",
+    "rain"
+  ],
+  "author": "@dosy",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dosyago/rain/issues"
+  },
+  "homepage": "https://github.com/dosyago/rain#readme",
+  "dependencies": {
+    "yargs": "latest"
+  }
+}
