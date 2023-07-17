@@ -10,12 +10,15 @@ OBJS = $(addprefix $(OBJDIR)/,$(notdir $(SRCS:.cpp=.o)))
 DEPS = $(OBJS:.o=.d)
 
 WASMDIR = wasm
-WASM_SOURCE = src/rainstorm.cpp
-WASM_TARGET = wasm/rainstorm.js
+STORM_WASM_SOURCE = src/rainstorm.cpp
+STORM_WASM_TARGET = wasm/rainstorm.js
+BOW_WASM_SOURCE = src/rainbow.cpp
+BOW_WASM_TARGET = wasm/rainbow.js
 # we need to add stringToUTF8 to exported functions rather than runtime methods because of: https://github.com/emscripten-core/emscripten/blob/main/ChangeLog.md#3135---040323
-EMCCFLAGS = -O3 -s ASSERTIONS=1 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT
+STORM_EMCCFLAGS = -O3 -s ASSERTIONS=1 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT=1 -s ALLOW_MEMORY_GROWTH=1
+BOW_EMCCFLAGS = -O3 -s ASSERTIONS=1 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainbowHash64', '_rainbowHash128', '_rainbowHash256', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT=1 -s ALLOW_MEMORY_GROWTH=1
 
-all: directories rainsum link rainstorm
+all: directories rainsum link rainwasm
 
 directories: ${OBJDIR} ${BUILDDIR} ${WASMDIR}
 
@@ -34,15 +37,23 @@ rainsum: $(OBJS)
 $(OBJDIR)/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) $(DEPFLAGS) -c $< -o $@
 
-rainstorm: $(WASM_TARGET)
+rainstorm: $(STORM_WASM_TARGET)
 
-wasmhtml: $(WASM_SOURCE)
-	@[ -d wasm ] || mkdir -p wasm
-	emcc $(EMCCFLAGS) -o $(WASMDIR)/rainstorm.html $(WASM_SOURCE)
+rainbow: $(BOW_WASM_TARGET)
 
-$(WASM_TARGET): $(WASM_SOURCE)
+wasmhtml: $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
 	@[ -d wasm ] || mkdir -p wasm
-	emcc $(EMCCFLAGS) -s MODULARIZE=1 -s 'EXPORT_NAME="createRainstormModule"' -o $(WASMDIR)/rainstorm.js $(WASM_SOURCE)
+	emcc $(EMCCFLAGS) -o $(WASMDIR)/rainstorm.html $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
+
+$(STORM_WASM_TARGET): $(STORM_WASM_SOURCE)
+	@[ -d wasm ] || mkdir -p wasm
+	emcc $(STORM_EMCCFLAGS) -s MODULARIZE=1 -s 'EXPORT_NAME="createRainstormModule"' -o $(STORM_WASM_TARGET) $(STORM_WASM_SOURCE)
+
+$(BOW_WASM_TARGET): $(BOW_WASM_SOURCE)
+	@[ -d wasm ] || mkdir -p wasm
+	emcc $(BOW_EMCCFLAGS) -s MODULARIZE=1 -s 'EXPORT_NAME="createRainbowModule"' -o $(BOW_WASM_TARGET) $(BOW_WASM_SOURCE)
+
+rainwasm: $(STORM_WASM_TARGET) $(BOW_WASM_TARGET)
 
 link:
 	ln -sf rain/bin/rainsum
@@ -57,6 +68,6 @@ install: rainsum
 .PHONY: clean
 
 clean:
-	rm -rf $(OBJDIR) $(BUILDDIR) rainsum $(WASM_TARGET) 
+	rm -rf $(OBJDIR) $(BUILDDIR) rainsum $(WASMDIR)
 
 

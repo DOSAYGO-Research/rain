@@ -20,11 +20,19 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 **/
-#define __RAINBNOWVERSION__ "1.0.4"
+#define __RAINBNOWVERSION__ "1.0.5"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#define KEEPALIVE EMSCRIPTEN_KEEPALIVE
+#else
+#define KEEPALIVE
+#endif
+
 #include "common.h"
 
 namespace rainbow {
@@ -331,3 +339,20 @@ namespace rainbow {
     }
   }
 }
+
+#ifdef __EMSCRIPTEN__
+// Then outside the namespace, you declare the rainstorm function with C linkage.
+extern "C" {
+  KEEPALIVE void rainbowHash64(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainbow::rainbow<64, false>(in, len, seed, out);
+  }
+
+  KEEPALIVE void rainbowHash128(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainbow::rainbow<128, false>(in, len, seed, out);
+  }
+
+  KEEPALIVE void rainbowHash256(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainbow::rainbow<256, false>(in, len, seed, out);
+  }
+}
+#endif

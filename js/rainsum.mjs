@@ -3,7 +3,7 @@ import fs from 'fs';
 import process from 'process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { rainstormHash } from './lib/rainstorm.mjs';
+import { rainbowHash, rainstormHash } from './lib/api.mjs';
 
 const testVectors = [
     "",
@@ -47,8 +47,13 @@ const argv = yargs(hideBin(process.argv))
     .argv;
 
 async function hashBuffer(mode, algorithm, seed, buffer, outputStream, hashSize, inputName) {
-    const hash = await rainstormHash(hashSize, seed, buffer);
-    outputStream.write(`${hash} ${inputName}\n`);
+  let hash;
+  if ( algorithm.endsWith('storm' ) ) {
+    hash = await rainstormHash(hashSize, seed, buffer);
+  } else if ( algorithm.endsWith('bow') ) {
+    hash = await rainbowHash(hashSize, seed, buffer);
+  }
+  outputStream.write(`${hash} ${inputName}\n`);
 }
 
 async function hashAnything(mode, algorithm, seed, inputPath, outputPath, size) {
@@ -70,22 +75,24 @@ async function hashAnything(mode, algorithm, seed, inputPath, outputPath, size) 
 }
 
 async function main() {
-    if (argv['test-vectors']) {
-        for (const testVector of testVectors) {
-            const hash = await rainstormHash(256, 0, testVector);
-            console.log(`${hash} "${testVector}"`);
-        }
-        return;
+  const algorithm = (argv.algorithm || 'rainbow').toLocaleLowerCase();
+
+  if (argv['test-vectors']) {
+    const hashFun = algorithm.endsWith('bow') ? rainbowHash : rainstormHash;
+    for (const testVector of testVectors) {
+        const hash = await hashFun(256, 0, testVector);
+        console.log(`${hash} "${testVector}"`);
     }
+    return;
+  }
 
-    const mode = argv.mode || 'digest';
-    const algorithm = argv.algorithm || 'rainstorm';
-    const size = argv.size || 256;
-    const seed = BigInt(argv['seed'] || 0);
-    const inputPath = argv._[0] || argv['input-file'] || '/dev/stdin';
-    const outputPath = argv['output-file'] || '/dev/stdout';
+  const mode = argv.mode || 'digest';
+  const size = argv.size || 256;
+  const seed = BigInt(argv['seed'] || 0);
+  const inputPath = argv._[0] || argv['input-file'] || '/dev/stdin';
+  const outputPath = argv['output-file'] || '/dev/stdout';
 
-    await hashAnything(mode, algorithm, seed, inputPath, outputPath, size);
+  await hashAnything(mode, algorithm, seed, inputPath, outputPath, size);
 }
 
 main();
