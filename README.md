@@ -200,7 +200,7 @@ e21780122142956ff99d560069a123b75d014f0b110d307d9b23d79f58ebeb29 "After the rain
 a46a9e5cba400ed3e1deec852fb0667e8acbbcfeb71cf0f3a1901396aaae6e19 "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 ```
 
-**Rainstorm v0.0.2 Test Vectors**
+**Rainstorm v0.0.5 Test Vectors**
 
 `./rainsum --test-vectors`:
 

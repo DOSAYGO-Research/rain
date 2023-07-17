@@ -20,11 +20,20 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 **/
-#define __STORMVERSION__ "0.0.2"
+#define __STORMVERSION__ "0.0.5"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
+#include <algorithm>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#define KEEPALIVE EMSCRIPTEN_KEEPALIVE
+#else
+#define KEEPALIVE
+#endif
+
 #include "common.h"
 
 namespace rainstorm {
@@ -184,7 +193,6 @@ namespace rainstorm {
   };
 
   template <uint32_t hashsize, bool bswap>
-  //void newnewhash(const void* in, const size_t len, const seed_t seed, void* out) {
   static void rainstorm(const void* in, const size_t len, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[16] = {
@@ -207,7 +215,7 @@ namespace rainstorm {
     };
 
     uint64_t temp[8];
-    size_t lenRemaining = len;
+    uint64_t lenRemaining = len;
 
     // Process 512-bit blocks
     while (lenRemaining >= 64) {
@@ -226,7 +234,7 @@ namespace rainstorm {
     // Pad and process any remaining data less than 64 bytes (512 bits)
     memset(temp, (0x80+lenRemaining) & 255, sizeof(temp));
     memcpy(temp, data, lenRemaining);
-    temp[lenRemaining >> 3] |= lenRemaining >> (lenRemaining - 56)*8;
+    temp[lenRemaining >> 3] |= (uint64_t)(lenRemaining << ((lenRemaining&7)*8));
 
     for( int i = 0; i < ROUNDS; i++) {
       weakfunc(h, temp, i&1);
@@ -247,3 +255,24 @@ namespace rainstorm {
     }
   }
 }
+
+#ifdef __EMSCRIPTEN__
+// Then outside the namespace, you declare the rainstorm function with C linkage.
+extern "C" {
+  KEEPALIVE void rainstormHash64(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm::rainstorm<64, false>(in, len, seed, out);
+  }
+
+  KEEPALIVE void rainstormHash128(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm::rainstorm<128, false>(in, len, seed, out);
+  }
+
+  KEEPALIVE void rainstormHash256(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm::rainstorm<256, false>(in, len, seed, out);
+  }
+
+  KEEPALIVE void rainstormHash512(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm::rainstorm<512, false>(in, len, seed, out);
+  }
+}
+#endif
