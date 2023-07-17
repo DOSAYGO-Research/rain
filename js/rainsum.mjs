@@ -47,8 +47,13 @@ const argv = yargs(hideBin(process.argv))
     .argv;
 
 async function hashBuffer(mode, algorithm, seed, buffer, outputStream, hashSize, inputName) {
-    const hash = await rainstormHash(hashSize, seed, buffer);
-    outputStream.write(`${hash} ${inputName}\n`);
+  let hash;
+  if ( algorithm.endsWith('storm' ) ) {
+    hash = await rainstormHash(hashSize, seed, buffer);
+  } else if ( algorithm.endsWith('bow') ) {
+    hash = await rainbowHash(hashSize, seed, buffer);
+  }
+  outputStream.write(`${hash} ${inputName}\n`);
 }
 
 async function hashAnything(mode, algorithm, seed, inputPath, outputPath, size) {
@@ -79,7 +84,7 @@ async function main() {
     }
 
     const mode = argv.mode || 'digest';
-    const algorithm = argv.algorithm || 'rainstorm';
+    const algorithm = (argv.algorithm || 'rainbow').toLocaleLowerCase();
     const size = argv.size || 256;
     const seed = BigInt(argv['seed'] || 0);
     const inputPath = argv._[0] || argv['input-file'] || '/dev/stdin';
