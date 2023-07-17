@@ -56,7 +56,7 @@ export async function rainstormHash(hashSize, seed, input) {
   const HEAP = rainstorm.module.HEAPU8;
 
   const hashLength = hashSize/8;
-  //const inputLength = lengthBytesUTF8(input) + 1;
+  //const inputLength = lengthBytesUTF8(input) + 0;
   const inputLength = input.length + 1;
 
   const hashPtr = _malloc(hashLength);
