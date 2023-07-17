@@ -75,22 +75,24 @@ async function hashAnything(mode, algorithm, seed, inputPath, outputPath, size) 
 }
 
 async function main() {
-    if (argv['test-vectors']) {
-        for (const testVector of testVectors) {
-            const hash = await rainstormHash(256, 0, testVector);
-            console.log(`${hash} "${testVector}"`);
-        }
-        return;
+  const algorithm = (argv.algorithm || 'rainbow').toLocaleLowerCase();
+
+  if (argv['test-vectors']) {
+    const hashFun = algorithm.endsWith('bow') ? rainbowHash : rainstormHash;
+    for (const testVector of testVectors) {
+        const hash = await hashFun(256, 0, testVector);
+        console.log(`${hash} "${testVector}"`);
     }
+    return;
+  }
 
-    const mode = argv.mode || 'digest';
-    const algorithm = (argv.algorithm || 'rainbow').toLocaleLowerCase();
-    const size = argv.size || 256;
-    const seed = BigInt(argv['seed'] || 0);
-    const inputPath = argv._[0] || argv['input-file'] || '/dev/stdin';
-    const outputPath = argv['output-file'] || '/dev/stdout';
+  const mode = argv.mode || 'digest';
+  const size = argv.size || 256;
+  const seed = BigInt(argv['seed'] || 0);
+  const inputPath = argv._[0] || argv['input-file'] || '/dev/stdin';
+  const outputPath = argv['output-file'] || '/dev/stdout';
 
-    await hashAnything(mode, algorithm, seed, inputPath, outputPath, size);
+  await hashAnything(mode, algorithm, seed, inputPath, outputPath, size);
 }
 
 main();

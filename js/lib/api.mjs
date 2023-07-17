@@ -96,7 +96,7 @@ export async function rainstormHash(hashSize, seed, input) {
     rainstorm.module.HEAPU8.set(input, inputPtr);
   }
 
-  //seed = BigInt(seed);
+  seed = BigInt(seed);
 
   // Choose the correct hash function based on the hash size
   let hashFunc;
@@ -154,7 +154,7 @@ export async function rainbowHash(hashSize, seed, input) {
     rainbow.module.HEAPU8.set(input, inputPtr);
   }
 
-  //seed = BigInt(seed);
+  seed = BigInt(seed);
 
   // Choose the correct hash function based on the hash size
   let hashFunc;
