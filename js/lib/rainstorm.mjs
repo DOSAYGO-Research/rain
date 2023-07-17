@@ -32,7 +32,7 @@ async function run() {
   }
 }
 
-async function testVectors() {
+export async function testVectors() {
   await rainstorm.untilLoaded;
   let comment;
 
@@ -56,14 +56,21 @@ export async function rainstormHash(hashSize, seed, input) {
   const HEAP = rainstorm.module.HEAPU8;
 
   const hashLength = hashSize/8;
-  //const inputLength = lengthBytesUTF8(input) + 1;
-  const inputLength = input.length + 1;
-
   const hashPtr = _malloc(hashLength);
-  const inputPtr = _malloc(inputLength);
 
-  //stringToUTF8(input, inputPtr, inputLength);
-  HEAP.set(input, inputPtr);
+  let inputPtr;
+  let inputLength;
+  
+  if ( typeof input == "string" ) {
+    inputLength = lengthBytesUTF8(input);
+    inputPtr = _malloc(inputLength);
+    stringToUTF8(input, inputPtr, inputLength + 1);
+  } else {
+    inputLength = input.length;
+    inputPtr = _malloc(inputLength);
+    HEAP.set(input, inputPtr);
+  }
+
   seed = BigInt(seed);
 
   // Choose the correct hash function based on the hash size
@@ -86,7 +93,7 @@ export async function rainstormHash(hashSize, seed, input) {
           throw new Error(`Unsupported hash size: ${hashSize}`);
   }
 
-  hashFunc(inputPtr, inputLength - 1, seed, hashPtr);
+  hashFunc(inputPtr, inputLength, seed, hashPtr);
 
   let hash = HEAP.subarray(hashPtr, hashPtr + hashLength);
 

@@ -5,6 +5,16 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { rainstormHash } from './lib/rainstorm.mjs';
 
+const testVectors = [
+    "",
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+    "The quick brown fox jumps over the lazy dog",
+    "The quick brown fox jumps over the lazy cog",
+    "The quick brown fox jumps over the lazy dog.",
+    "After the rainstorm comes the rainbow.",
+    "@".repeat(64),
+];
+
 const argv = yargs(hideBin(process.argv))
     .usage('Usage: $0 [options] [file]')
     .option('mode', {
@@ -60,6 +70,14 @@ async function hashAnything(mode, algorithm, seed, inputPath, outputPath, size) 
 }
 
 async function main() {
+    if (argv['test-vectors']) {
+        for (const testVector of testVectors) {
+            const hash = await rainstormHash(256, 0, testVector);
+            console.log(`${hash} "${testVector}"`);
+        }
+        return;
+    }
+
     const mode = argv.mode || 'digest';
     const algorithm = argv.algorithm || 'rainstorm';
     const size = argv.size || 256;
