@@ -115,7 +115,7 @@ export async function rainstormHash(hashSize, seed, input) {
           hashFunc = rainstorm.module._rainstormHash512;
           break;
       default:
-          throw new Error(`Unsupported hash size: ${hashSize}`);
+          throw new Error(`Unsupported hash size for rainstorm: ${hashSize}`);
   }
 
   hashFunc(inputPtr, inputLength, seed, hashPtr);
@@ -170,7 +170,7 @@ export async function rainbowHash(hashSize, seed, input) {
           hashFunc = rainbow.module._rainbowHash256;
           break;
       default:
-          throw new Error(`Unsupported hash size: ${hashSize}`);
+          throw new Error(`Unsupported hash size for rainbow: ${hashSize}`);
   }
 
   hashFunc(inputPtr, inputLength, seed, hashPtr);
