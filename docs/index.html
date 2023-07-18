@@ -1,3 +1,4 @@
+<title>Rain Hashes</title>
 <script src=rain.js></script>
 <script type=module>
   const STORM_TV = [
@@ -24,6 +25,10 @@
   const rainbow = {};
   rainstorm.module = globalThis;
   rainbow.module = globalThis;
+  window.onunhandledrejection = window.onerror = (...x) => {
+    alert(x[0].reason || x[0] + '\n\n\t' + JSON.stringify(x, null, 2));
+    return false;
+  };
 
   Object.assign(globalThis, {
     testVectors, 
