@@ -34,6 +34,38 @@ This repository houses the Rainbow and Rainstorm hash functions, developed by Cr
 | Rainbow | 13.2 GiB/sec | 64 to 256 bits | General-purpose non-cryptographic hashing | Multiplication, subtraction/addition, rotation, XOR | Not designed for cryptographic security |
 | Rainstorm | 4.7 GiB/sec (at 4 rounds) | 64 to 512 bits | Potential cryptographic hashing | Addition/subtraction, rotation, XOR | No formal security analysis yet |
 
+## Benchmark
+
+```text
+Rain hash functions C++ vs Node/WASM benchmark:
+
+Test Input & Size (bytes)         Run        C++ Version       WASM Version          Fastest
+input1 (10 bytes)                  1         4,790,708 ns     59,540,125 ns     12.00x (C++ wins!)
+input2 (100 bytes)                 1         3,881,917 ns     59,735,458 ns     15.00x (C++ wins!)
+input3 (1,000 bytes)               1         3,973,792 ns     60,026,667 ns     15.00x (C++ wins!)
+input4 (10,000 bytes)              1         4,231,250 ns     59,217,250 ns     13.00x (C++ wins!)
+input5 (100,000 bytes)             1         4,002,792 ns     61,180,500 ns     15.00x (C++ wins!)
+input6 (1,000,000 bytes)           1         4,387,500 ns     60,962,209 ns     13.00x (C++ wins!)
+input7 (10,000,000 bytes)          1         7,945,250 ns     66,440,416 ns      8.00x (C++ wins!)
+input8 (100,000,000 bytes)         1        43,348,167 ns    118,088,750 ns      2.00x (C++ wins!)
+input1 (10 bytes)                  2         3,835,875 ns     60,245,292 ns     15.00x (C++ wins!)
+input2 (100 bytes)                 2         3,794,541 ns     60,314,583 ns     15.00x (C++ wins!)
+input3 (1,000 bytes)               2         3,897,708 ns     59,611,417 ns     15.00x (C++ wins!)
+input4 (10,000 bytes)              2         3,881,916 ns     61,785,041 ns     15.00x (C++ wins!)
+input5 (100,000 bytes)             2         3,836,458 ns     60,081,083 ns     15.00x (C++ wins!)
+input6 (1,000,000 bytes)           2         4,218,959 ns     60,323,458 ns     14.00x (C++ wins!)
+input7 (10,000,000 bytes)          2         8,120,458 ns     65,705,458 ns      8.00x (C++ wins!)
+input8 (100,000,000 bytes)         2        42,743,958 ns    116,511,708 ns      2.00x (C++ wins!)
+input1 (10 bytes)                  3         4,075,750 ns     59,484,125 ns     14.00x (C++ wins!)
+input2 (100 bytes)                 3         3,811,750 ns     59,731,250 ns     15.00x (C++ wins!)
+input3 (1,000 bytes)               3         3,814,666 ns     59,546,625 ns     15.00x (C++ wins!)
+input4 (10,000 bytes)              3         3,785,791 ns     60,626,000 ns     16.00x (C++ wins!)
+input5 (100,000 bytes)             3         3,601,666 ns     59,802,625 ns     16.00x (C++ wins!)
+input6 (1,000,000 bytes)           3         4,191,166 ns     60,641,416 ns     14.00x (C++ wins!)
+input7 (10,000,000 bytes)          3         8,095,875 ns     68,071,500 ns      8.00x (C++ wins!)
+input8 (100,000,000 bytes)         3        43,222,708 ns    117,334,333 ns      2.00x (C++ wins!)
+```
+
 ## Rainbow 
 
 Rainbow is a fast hash function (13.2 GiB/sec, 4.61 bytes/cycle on long messages, 24.8 cycles/hash for short messages). It's intended for general-purpose, non-cryptographic hashing. The core mixing function utilizes multiplication, subtraction/addition, rotation, and XOR. 
