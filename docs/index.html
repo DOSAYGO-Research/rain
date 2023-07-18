@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<html lang=en>
 <title>Rain Hashes</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -106,6 +108,10 @@
     output {
       border-color: lime;
     }
+
+    body, form, input, select, output, button {
+      border: medium groove hotpink;
+    }
   }
 </style>
 <script src=rain.js></script>
@@ -160,9 +166,16 @@
       const hashValue = await globalThis[algo](size, seed, input);
       form.output.value = hashValue;
     }
-    form.input.focus();
+    if ( ! isMobileDevice() ) {
+      form.input.focus();
+    }
     return false;
   }
+
+  function isMobileDevice() {
+    return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
+  };
+
 
   async function testVectors() {
     //await rainstorm.untilLoaded;
