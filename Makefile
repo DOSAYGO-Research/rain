@@ -18,7 +18,7 @@ BOW_WASM_TARGET = wasm/rainbow.js
 STORM_EMCCFLAGS = -O3 -s ASSERTIONS=1 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT=1 -s ALLOW_MEMORY_GROWTH=1
 BOW_EMCCFLAGS = -O3 -s ASSERTIONS=1 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainbowHash64', '_rainbowHash128', '_rainbowHash256', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT=1 -s ALLOW_MEMORY_GROWTH=1
 
-all: directories node_modules rainsum link rainwasm
+all: directories node_modules rainsum link rainwasm wasmhtml
 
 directories: ${OBJDIR} ${BUILDDIR} ${WASMDIR}
 
@@ -46,8 +46,8 @@ rainstorm: $(STORM_WASM_TARGET)
 rainbow: $(BOW_WASM_TARGET)
 
 wasmhtml: $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
-	@[ -d wasm ] || mkdir -p wasm
-	emcc $(EMCCFLAGS) -o $(WASMDIR)/rainstorm.html $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
+	@[ -d web ] || mkdir -p web
+	emcc $(EMCCFLAGS) -o web/rain.html $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
 
 $(STORM_WASM_TARGET): $(STORM_WASM_SOURCE)
 	@[ -d wasm ] || mkdir -p wasm

@@ -21,9 +21,7 @@ const BOW_TV = [
 const rainstorm = {
   async _untilLoaded() {
     if ( this.module ) return;
-    const response = await fetch('./rainstorm.wasm');
-    const result = await WebAssembly.instantiateStreaming(response);
-    this.module = result.instance;
+    this.module = await import('./rainstorm.js');
   },
   get untilLoaded() {
     return this._untilLoaded();
@@ -33,9 +31,7 @@ const rainstorm = {
 const rainbow = {
   async _untilLoaded() {
     if ( this.module ) return;
-    const response = await fetch('./rainbow.wasm');
-    const result = await WebAssembly.instantiateStreaming(response);
-    this.module = result.instance;
+    this.module = await import('./rainbow.js');
   },
   get untilLoaded() {
     return this._untilLoaded();
@@ -74,10 +70,11 @@ export async function testVectors() {
 }
 
 export async function rainstormHash(hashSize, seed, input) {
-  await rainstorm.untilLoaded;
+  //await rainstorm.untilLoaded;
 
   // Convert the input to a bytes
   const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rainstorm.module;
+  console.log(rainstorm.module);
 
   const hashLength = hashSize/8;
   const hashPtr = _malloc(hashLength);
@@ -132,7 +129,7 @@ export async function rainstormHash(hashSize, seed, input) {
 }
 
 export async function rainbowHash(hashSize, seed, input) {
-  await rainbow.untilLoaded;
+  //await rainbow.untilLoaded;
 
   // Convert the input to a bytes
   const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rainbow.module;
