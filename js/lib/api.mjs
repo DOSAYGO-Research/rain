@@ -1,5 +1,4 @@
-import createRainstormModule from './../../wasm/rainstorm.js';
-import createRainbowModule from './../../wasm/rainbow.js';
+let rain = {loaded: false};
 
 const STORM_TV = [
   [ "e3ea5f8885f7bb16468d08c578f0e7cc15febd31c27e323a79ef87c35756ce1e", "" ], 
@@ -21,30 +20,10 @@ const BOW_TV = [
   [ "a46a9e5cba400ed3e1deec852fb0667e8acbbcfeb71cf0f3a1901396aaae6e19", "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" ]
 ];
 
-const rainstorm = {
-  async _untilLoaded() {
-    if ( this.module ) return;
-    const module = await createRainstormModule();
-    this.module = module;
-  },
-  get untilLoaded() {
-    return this._untilLoaded();
-  }
-}
-
-const rainbow = {
-  async _untilLoaded() {
-    if ( this.module ) return;
-    const module = await createRainbowModule();
-    this.module = module;
-  },
-  get untilLoaded() {
-    return this._untilLoaded();
-  }
-}
-
 export async function testVectors() {
-  await rainstorm.untilLoaded;
+  if ( ! rain.loaded ) {
+    await loadRain();
+  }
   let comment;
 
   console.log(`Rainstorm test vectors:`);
@@ -59,7 +38,6 @@ export async function testVectors() {
     console.log(`${calculatedHash} "${message}" ${comment}`);
   }
 
-  await rainbow.untilLoaded;
 
   console.log(`Rainbow test vectors:`);
   for( const [expectedHash, message] of BOW_TV ) {
@@ -75,10 +53,11 @@ export async function testVectors() {
 }
 
 export async function rainstormHash(hashSize, seed, input) {
-  await rainstorm.untilLoaded;
-
+  if ( ! rain.loaded ) {
+    await loadRain();
+  }
   // Convert the input to a bytes
-  const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rainstorm.module;
+  const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rain;
 
   const hashLength = hashSize/8;
   const hashPtr = _malloc(hashLength);
@@ -93,7 +72,7 @@ export async function rainstormHash(hashSize, seed, input) {
   } else {
     inputLength = input.length;
     inputPtr = _malloc(inputLength);
-    rainstorm.module.HEAPU8.set(input, inputPtr);
+    rain.HEAPU8.set(input, inputPtr);
   }
 
   seed = BigInt(seed);
@@ -103,16 +82,16 @@ export async function rainstormHash(hashSize, seed, input) {
 
   switch (hashSize) {
       case 64:
-          hashFunc = rainstorm.module._rainstormHash64;
+          hashFunc = rain._rainstormHash64;
           break;
       case 128:
-          hashFunc = rainstorm.module._rainstormHash128;
+          hashFunc = rain._rainstormHash128;
           break;
       case 256:
-          hashFunc = rainstorm.module._rainstormHash256;
+          hashFunc = rain._rainstormHash256;
           break;
       case 512:
-          hashFunc = rainstorm.module._rainstormHash512;
+          hashFunc = rain._rainstormHash512;
           break;
       default:
           throw new Error(`Unsupported hash size for rainstorm: ${hashSize}`);
@@ -120,7 +99,7 @@ export async function rainstormHash(hashSize, seed, input) {
 
   hashFunc(inputPtr, inputLength, seed, hashPtr);
 
-  let hash = rainstorm.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
+  let hash = rain.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
 
   // Return the hash as a Uint8Array
   const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
@@ -133,10 +112,11 @@ export async function rainstormHash(hashSize, seed, input) {
 }
 
 export async function rainbowHash(hashSize, seed, input) {
-  await rainbow.untilLoaded;
-
+  if ( ! rain.loaded ) {
+    await loadRain();
+  }
   // Convert the input to a bytes
-  const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rainbow.module;
+  const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rain;
 
   const hashLength = hashSize/8;
   const hashPtr = _malloc(hashLength);
@@ -151,7 +131,7 @@ export async function rainbowHash(hashSize, seed, input) {
   } else {
     inputLength = input.length;
     inputPtr = _malloc(inputLength);
-    rainbow.module.HEAPU8.set(input, inputPtr);
+    rain.HEAPU8.set(input, inputPtr);
   }
 
   seed = BigInt(seed);
@@ -161,13 +141,13 @@ export async function rainbowHash(hashSize, seed, input) {
 
   switch (hashSize) {
       case 64:
-          hashFunc = rainbow.module._rainbowHash64;
+          hashFunc = rain._rainbowHash64;
           break;
       case 128:
-          hashFunc = rainbow.module._rainbowHash128;
+          hashFunc = rain._rainbowHash128;
           break;
       case 256:
-          hashFunc = rainbow.module._rainbowHash256;
+          hashFunc = rain._rainbowHash256;
           break;
       default:
           throw new Error(`Unsupported hash size for rainbow: ${hashSize}`);
@@ -175,7 +155,7 @@ export async function rainbowHash(hashSize, seed, input) {
 
   hashFunc(inputPtr, inputLength, seed, hashPtr);
 
-  let hash = rainbow.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
+  let hash = rain.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
 
   // Return the hash as a Uint8Array
   const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
@@ -185,4 +165,56 @@ export async function rainbowHash(hashSize, seed, input) {
   _free(inputPtr);
 
   return hashHex;
+}
+
+async function loadRain() {
+  let resolve;
+  const pr = new Promise(res => resolve = res);
+  import('./../../wasm/rain.js').then(async x => {
+    await untilTrue(() => !!x?.default?.asm);
+    rain = x.default;
+    rain.loaded = true;
+    resolve();
+  });
+  return pr;
+}
+
+async function untilTrue(pred, MAX = 1000, MS_BETWEEN = 50) {
+  let resolve, reject, abort = false;
+  const oPred = pred;
+  pred = async () => {
+    try {
+      return await oPred();
+    } catch(e) {
+      console.log(`untilTrue predicate errored: ${e}`, oPred, e);
+      reject();
+      abort = true;
+    }
+  };
+  const pr = new Promise((res, rej) => (resolve = res, reject = () => {
+    rej();
+    abort = true;
+  }));
+  if ( await pred() ) {
+    return resolve();
+  } 
+  setTimeout(async () => {
+    let tries = 0;
+    while(tries++ < MAX) {
+      await sleep(MS_BETWEEN);
+      if ( await pred() ) {
+        return resolve();
+      }
+      if ( abort ) break;
+    }
+    return reject();
+  }, 0);
+  return pr;
+}
+
+async function sleep(ms) {
+  let resolve;
+  const pr = new Promise(res => resolve = res);
+  setTimeout(resolve, ms);
+  return pr;
 }
