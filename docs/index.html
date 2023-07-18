@@ -1,4 +1,113 @@
 <title>Rain Hashes</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta name="description" content="Rain Hashes on the Web: compiled using Wasm, interactive use of rainbow and rainstorm at all sizes right in your browser!">
+  <meta name="keywords" content="HTML, CSS, JavaScript, Hash functions, DOSYAGO, Cris Stringfellow, rainbow hash, rainstorm hash">
+  <meta name="author" content="DOSYAGO, Cris Stringfellow">
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    transition: background-color 0.5s ease, color 0.5s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 3em 1em;
+  }
+
+  body, textarea, select, button, input {
+    background-color: white;
+    color: black;
+  }
+
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 50%;
+    align-self: center;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  form label {
+    margin-right: 10px;
+  }
+
+  @media (max-width: 768px) {
+    form {
+      width: 80%;
+    }
+    
+    .form-group {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+
+  textarea {
+    resize: vertical;
+    flex-grow: 1;
+  }
+
+  button {
+    align-self: flex-start;
+    padding: 10px 20px;
+    border: none;
+    background-color: #4CAF50; 
+    color: white;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background-color: #45a049;
+  }
+
+  output {
+    font-size: x-large;
+    display: block;
+    font-family: monospace;
+    word-break: break-all;
+    white-space: pre-wrap;
+    width: 100%;
+    border: thin dotted lime;
+    margin: 0;
+    padding: 2px;
+    resize: horizontal;
+    overflow: auto;
+    min-width: 8ch;
+  }
+
+  output:empty {
+    display: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body, textarea, select, button, input {
+      background-color: #333;
+      color: white;
+    }
+    
+    button {
+      background-color: #555;
+    }
+
+    button:hover {
+      background-color: #444;
+    }
+
+    output {
+      border-color: lime;
+    }
+  }
+</style>
 <script src=rain.js></script>
 <script type=module>
   const STORM_TV = [
@@ -51,6 +160,7 @@
       const hashValue = await globalThis[algo](size, seed, input);
       form.output.value = hashValue;
     }
+    form.input.focus();
     return false;
   }
 
@@ -202,28 +312,31 @@
   }
 </script>
 <form method=GET action=# onsubmit="hash(event, this);">
-  <textarea name=input></textarea>
-  <input type=number value=0 min=0 name=seed>
-  <select name=algo>
-    <option value=rainstormHash>Rainstorm</option>
-    <option value=rainbowHash default selected>Rainbow</option>
-  </select>
-  <select name=size type=number>
-    <option value=64>64</option>
-    <option value=128>128</option>
-    <option value=256 default selected>256</option>
-    <option value=512>512</option>
-  </select>
+  <div class="form-group">
+    <label for="input">Input:</label>
+    <textarea id="input" name="input"></textarea>
+  </div>
+  <div class="form-group">
+    <label for="seed">Seed:</label>
+    <input type=number id="seed" value=0 min=0 name=seed>
+  </div>
+  <div class="form-group">
+    <label for="algo">Algorithm:</label>
+    <select id="algo" name=algo>
+      <option value=rainstormHash>Rainstorm</option>
+      <option value=rainbowHash default selected>Rainbow</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="size">Size:</label>
+    <select id="size" name=size type=number>
+      <option value=64>64</option>
+      <option value=128>128</option>
+      <option value=256 default selected>256</option>
+      <option value=512>512</option>
+    </select>
+  </div>
   <button name=do value=hash>Hash</button>
   <button name=do value=test>Test Vectors</button>
-  <output name=output style="
-    display: block;
-    font-family: monospace;
-    word-break: break-all;
-    white-space: pre-wrap;
-    width: 100%;
-    border: thin dotted lime;
-    margin: 0;
-    padding: 2px;
-  "></output>
+  <output name=output></output>
 </form>
