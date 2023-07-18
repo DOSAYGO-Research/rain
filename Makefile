@@ -46,8 +46,8 @@ rainstorm: $(STORM_WASM_TARGET)
 rainbow: $(BOW_WASM_TARGET)
 
 wasmhtml: $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
-	@[ -d web ] || mkdir -p web
-	emcc $(STORM_EMCCFLAGS) $(BOW_EMCCFLAGS) -o web/rain.html $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
+	@[ -d docs ] || mkdir -p docs
+	emcc $(STORM_EMCCFLAGS) $(BOW_EMCCFLAGS) -o docs/rain.html $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
 
 $(STORM_WASM_TARGET): $(STORM_WASM_SOURCE)
 	@[ -d wasm ] || mkdir -p wasm
