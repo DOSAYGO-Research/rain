@@ -44,6 +44,7 @@ rainwasm: $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
 	# -s MODULARIZE=1 -s 'EXPORT_NAME="createRainstormModule"' 
 	emcc $(EMCCFLAGS) -o docs/rain.html $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
 	cp {docs/rain.wasm,docs/rain.js} wasm/
+	rm docs/rain.html
 
 link:
 	ln -sf rain/bin/rainsum
