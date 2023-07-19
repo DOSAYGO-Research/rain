@@ -3,14 +3,36 @@
 <title>Rain Hashes</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <meta name="description" content="Rain Hashes on the Web: compiled using Wasm, interactive use of rainbow and rainstorm at all sizes right in your browser!">
   <meta name="keywords" content="HTML, CSS, JavaScript, Hash functions, DOSYAGO, Cris Stringfellow, rainbow hash, rainstorm hash">
   <meta name="author" content="DOSYAGO, Cris Stringfellow">
 <style>
+  :root {
+    --color-bg: #ffffff;
+    --color-text: #24292e;
+    --color-border: #e1e4e8;
+    --color-button: #0366d6;
+    --color-button-hover: #005cc5;
+    --color-button-text: #ffffff;
+    --color-output-border: #d0d7de;
+    --color-link: #0366d6;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-bg: #0d1117;
+      --color-text: #c9d1d9;
+      --color-border: #30363d;
+      --color-button: #58a6ff;
+      --color-button-hover: #1f6feb;
+      --color-button-text: #0d1117;
+      --color-output-border: #30363d;
+      --color-link: #58a6ff;
+    }
+  }
+
   body {
     font-family: Arial, sans-serif;
-    transition: background-color 0.5s ease, color 0.5s ease;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -18,322 +40,111 @@
     min-height: 100vh;
     margin: 0;
     padding: 3em 1em;
-  }
-
-  body, textarea, select, button, input {
-    background-color: white;
-    color: black;
+    transition: background-color 0.5s ease, color 0.5s ease;
+    background-color: var(--color-bg);
+    color: var(--color-text);
   }
 
   form {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    width: 50%;
-    align-self: center;
-    position: relative;
+    gap: 1em;
+    max-width: 600px;
+    width: 100%;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 1.5em;
   }
 
   .form-group {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    width: 100%;
   }
 
-  form label {
-    margin-right: 10px;
+  .form-group label {
+    font-weight: 600;
+    margin-bottom: 0.5em;
   }
 
-  @media (max-width: 768px) {
-    form {
-      width: 80%;
-    }
-    
-    .form-group {
-      flex-direction: column;
-      align-items: flex-start;
-    }
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 0.5em;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    background-color: var(--color-bg);
+    transition: border-color 0.2s ease;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    border-color: var(--color-button);
+    outline: none;
   }
 
   textarea {
     resize: vertical;
-    flex-grow: 1;
+    min-height: 100px;
   }
 
   button {
-    align-self: flex-start;
-    padding: 10px 20px;
-    border: none;
-    background-color: #4CAF50; 
-    color: white;
     cursor: pointer;
+    border: none;
+    color: var(--color-button-text);
+    background-color: var(--color-button);
+    padding: 0.5em 1em;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+    font-weight: bold;
+    margin: 1em 0;
   }
 
   button:hover {
-    background-color: #45a049;
+    background-color: var(--color-button-hover);
   }
 
   output {
-    font-size: x-large;
+    font-size: 1.33em;
     display: block;
     font-family: monospace;
     word-break: break-all;
     white-space: pre-wrap;
     width: 100%;
-    max-width: 97.5%;
     box-sizing: border-box;
-    border: thin dotted lime;
-    margin: 0;
-    padding: 2px;
+    border: 1px dotted var(--color-output-border);
+    margin-top: 1em;
+    padding: 0.5em;
     resize: horizontal;
     overflow: auto;
-    min-width: 8ch;
   }
 
   output:empty {
     display: none;
   }
 
-  @media (prefers-color-scheme: dark) {
-    body, textarea, select, button, input {
-      background-color: #333;
-      color: white;
-    }
-    
-    button {
-      background-color: #555;
-    }
+  p {
+    text-align: center;
+    margin-top: 1em;
+  }
 
-    button:hover {
-      background-color: #444;
-    }
+  p a {
+    color: var(--color-link);
+  }
 
-    output {
-      border-color: lime;
-    }
-
-    body, form, input, select, output, button, textarea {
-      border: medium groove hotpink;
-      margin: 0.5em;
-      padding: 0.5em;
-    }
+  p a:hover {
+    text-decoration: underline;
   }
 </style>
 <script src=rain.js></script>
-<script type=module>
-  const STORM_TV = [
-    [ "e3ea5f8885f7bb16468d08c578f0e7cc15febd31c27e323a79ef87c35756ce1e", "" ], 
-    [ "9e07ce365903116b62ac3ac0a033167853853074313f443d5b372f0225eede50", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" ],
-    [ "f88600f4b65211a95c6817d0840e0fc2d422883ddf310f29fa8d4cbfda962626", "The quick brown fox jumps over the lazy dog" ],
-    [ "ec05208dd1fbf47b9539a761af723612eaa810762ab7a77b715fcfb3bf44f04a", "The quick brown fox jumps over the lazy cog" ], 
-    [ "822578f80d46184a674a6069486b4594053490de8ddf343cc1706418e527bec8", "The quick brown fox jumps over the lazy dog." ], 
-    [ "410427b981efa6ef884cd1f3d812c880bc7a37abc7450dd62803a4098f28d0f1", "After the rainstorm comes the rainbow." ], 
-    [ "47b5d8cb1df8d81ed23689936d2edaa7bd5c48f5bc463600a4d7a56342ac80b9", "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" ],
-  ];
-
-  const BOW_TV = [
-    [ "b735f3165b474cf1a824a63ba18c7d087353e778b6d38bd1c26f7b027c6980d9", "" ], 
-    [ "c7343ac7ee1e4990b55227b0182c41e9a6bbc295a17e2194d4e0081124657c3c", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" ],
-    [ "53efdb8f046dba30523e9004fce7d194fdf6c79a59d6e3687907652e38e53123", "The quick brown fox jumps over the lazy dog" ], 
-    [ "95a3515641473aa3726bcc5f454c658bfc9b714736f3ffa8b347807775c2078e", "The quick brown fox jumps over the lazy cog" ], 
-    [ "f27c10f32ae243afea08dfb15e0c86c0b601792d1cd195ca651fe5394c56f200", "The quick brown fox jumps over the lazy dog." ], 
-    [ "e21780122142956ff99d560069a123b75d014f0b110d307d9b23d79f58ebeb29", "After the rainstorm comes the rainbow." ], 
-    [ "a46a9e5cba400ed3e1deec852fb0667e8acbbcfeb71cf0f3a1901396aaae6e19", "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" ]
-  ];
-
-  const rainstorm = {};
-  const rainbow = {};
-  rainstorm.module = globalThis;
-  rainbow.module = globalThis;
-  window.onunhandledrejection = window.onerror = (...x) => {
-    alert(x[0].reason || x[0] + '\n\n\t' + JSON.stringify(x, null, 2));
-    return false;
-  };
-
-  Object.assign(globalThis, {
-    testVectors, 
-    rainstormHash,
-    rainbowHash,
-    hash
-  });
-
-  async function hash(submission, form) {
-    submission.preventDefault();
-    submission.stopPropagation();
-    const task = submission.submitter.value;
-    if ( task == 'test' ) {
-      form.output.value = await testVectors();
-    } else {
-      const input = form.input.value;
-      const algo = form.algo.value;
-      const size = parseInt(form.size.value);
-      const seed = BigInt(form.seed.value);
-      const hashValue = await globalThis[algo](size, seed, input);
-      form.output.value = hashValue;
-    }
-    if ( ! isMobileDevice() ) {
-      form.input.focus();
-    }
-    return false;
-  }
-
-  function isMobileDevice() {
-    return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
-  };
-
-
-  async function testVectors() {
-    //await rainstorm.untilLoaded;
-    let comment;
-    let s = '';
-
-    s += (`Rainstorm test vectors:\n`);
-    for( const [expectedHash, message] of STORM_TV ) {
-      const calculatedHash = await rainstormHash(256, 0, message);
-      if ( calculatedHash !== expectedHash ) {
-        comment = "MISMATCH!";
-        console.error(`Expected: ${expectedHash}, but got: ${calculatedHash}`);
-      } else {
-        comment = "";
-      }
-      s += (`${calculatedHash} "${message}" ${comment}\n`);
-    }
-
-    await rainbow.untilLoaded;
-
-    s += (`Rainbow test vectors:\n`);
-    for( const [expectedHash, message] of BOW_TV ) {
-      const calculatedHash = await rainbowHash(256, 0, message);
-      if ( calculatedHash !== expectedHash ) {
-        comment = "MISMATCH!";
-        console.error(`Expected: ${expectedHash}, but got: ${calculatedHash}`);
-      } else {
-        comment = "";
-      }
-      s += (`${calculatedHash} "${message}" ${comment}\n`);
-    }
-
-    return s;
-  }
-
-  async function rainstormHash(hashSize, seed, input) {
-    //await rainstorm.untilLoaded;
-
-    // Convert the input to a bytes
-    const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rainstorm.module;
-
-    const hashLength = hashSize/8;
-    const hashPtr = _malloc(hashLength);
-
-    let inputPtr;
-    let inputLength;
-
-    if ( typeof input == "string" ) {
-      inputLength = lengthBytesUTF8(input);
-      inputPtr = _malloc(inputLength);
-      stringToUTF8(input, inputPtr, inputLength + 1);
-    } else {
-      inputLength = input.length;
-      inputPtr = _malloc(inputLength);
-      rainstorm.module.HEAPU8.set(input, inputPtr);
-    }
-
-    seed = BigInt(seed);
-
-    // Choose the correct hash function based on the hash size
-    let hashFunc;
-
-    switch (hashSize) {
-        case 64:
-            hashFunc = rainstorm.module._rainstormHash64;
-            break;
-        case 128:
-            hashFunc = rainstorm.module._rainstormHash128;
-            break;
-        case 256:
-            hashFunc = rainstorm.module._rainstormHash256;
-            break;
-        case 512:
-            hashFunc = rainstorm.module._rainstormHash512;
-            break;
-        default:
-            throw new Error(`Unsupported hash size for rainstorm: ${hashSize}`);
-    }
-
-    hashFunc(inputPtr, inputLength, seed, hashPtr);
-
-    let hash = rainstorm.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
-
-    // Return the hash as a Uint8Array
-    const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
-
-    // Free the memory after use
-    _free(hashPtr);
-    _free(inputPtr);
-
-    return hashHex;
-  }
-
-  async function rainbowHash(hashSize, seed, input) {
-    //await rainbow.untilLoaded;
-
-    // Convert the input to a bytes
-    const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rainbow.module;
-
-    const hashLength = hashSize/8;
-    const hashPtr = _malloc(hashLength);
-
-    let inputPtr;
-    let inputLength;
-
-    if ( typeof input == "string" ) {
-      inputLength = lengthBytesUTF8(input);
-      inputPtr = _malloc(inputLength);
-      stringToUTF8(input, inputPtr, inputLength + 1);
-    } else {
-      inputLength = input.length;
-      inputPtr = _malloc(inputLength);
-      rainbow.module.HEAPU8.set(input, inputPtr);
-    }
-
-    seed = BigInt(seed);
-
-    // Choose the correct hash function based on the hash size
-    let hashFunc;
-
-    switch (hashSize) {
-        case 64:
-            hashFunc = rainbow.module._rainbowHash64;
-            break;
-        case 128:
-            hashFunc = rainbow.module._rainbowHash128;
-            break;
-        case 256:
-            hashFunc = rainbow.module._rainbowHash256;
-            break;
-        default:
-            throw new Error(`Unsupported hash size for rainbow: ${hashSize}`);
-    }
-
-    hashFunc(inputPtr, inputLength, seed, hashPtr);
-
-    let hash = rainbow.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
-
-    // Return the hash as a Uint8Array
-    const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
-
-    // Free the memory after use
-    _free(hashPtr);
-    _free(inputPtr);
-
-    return hashHex;
-  }
-</script>
-<form method=GET action=# onsubmit="hash(event, this);">
+<script type=module src=app.js></script>
+<form method=GET action=# onsubmit="hash(event, this);" onchange="hash(event, this);" oninput="hash(event, this);">
   <div class="form-group">
     <label for="input">Input:</label>
-    <textarea id="input" name="input"></textarea>
+    <textarea autofocus id="input" name="input"></textarea>
   </div>
   <div class="form-group">
     <label for="seed">Seed:</label>
@@ -359,5 +170,5 @@
   <button name=do value=test>Test Vectors</button>
   <output name=output></output>
 </form>
-<p style="text-align: center;"><a href=https://github.com/dosyago/rain>Get the code</a></p>
-  
+<p><a href=https://github.com/dosyago/rain>Get the code</a></p>
+
