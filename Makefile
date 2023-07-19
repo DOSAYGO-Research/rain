@@ -3,6 +3,8 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O3
 DEPFLAGS = -MMD -MF $(@:.o=.d)
 LDFLAGS = 
 
+EMCCFLAGS = -O3 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_FUNCTIONS="['_rainbowHash64', '_rainbowHash128', '_rainbowHash256', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT=1 -s ALLOW_MEMORY_GROWTH=1
+
 OBJDIR = rain/obj
 BUILDDIR = rain/bin
 SRCS = $(wildcard src/*.cpp)
@@ -14,10 +16,6 @@ STORM_WASM_SOURCE = src/rainstorm.cpp
 BOW_WASM_SOURCE = src/rainbow.cpp
 WASM_OUTPUT = docs/rain.wasm
 JS_OUTPUT = docs/rain.js
-
-# we need to add stringToUTF8 to exported functions rather than runtime methods because of: https://github.com/emscripten-core/emscripten/blob/main/ChangeLog.md#3135---040323
-EMCCFLAGS = -O3 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_FUNCTIONS="['_rainbowHash64', '_rainbowHash128', '_rainbowHash256', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" -s WASM_BIGINT=1 -s ALLOW_MEMORY_GROWTH=1
-
 
 all: directories node_modules rainsum link rainwasm
 
