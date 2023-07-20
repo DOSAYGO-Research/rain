@@ -21,10 +21,11 @@
   class HashError extends Error {}
   let inHash = false;
 
-  window.onunhandledrejection = (...x) => {
-    if ( x[0].reason instanceof HashError ) {
+  window.onunhandledrejection = window.onerror = (...x) => {
+    inHash = false;
+    //if ( x[0].reason instanceof HashError ) {
       alert(x[0].reason || x[0] + '\n\n\t' + JSON.stringify(x, null, 2));
-    }
+    //}
     return false;
   };
 
@@ -38,8 +39,8 @@
   async function hash(submission, form) {
     if ( inHash ) return;
     inHash = true;
-    submission.preventDefault();
-    submission.stopPropagation();
+    submission?.preventDefault?.();
+    submission?.stopPropagation?.();
     const task = submission.type == 'submit' ? submission.submitter.value : 'hash';
     if ( task == 'test' ) {
       form.output.value = await testVectors();

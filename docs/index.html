@@ -139,7 +139,7 @@
     text-decoration: underline;
   }
 </style>
-<script src=rain.js></script>
+<script src=rain.js async></script>
 <script type=module src=app.js></script>
 <form method=GET action=# onsubmit="hash(event, this);" onchange="hash(event, this);" oninput="hash(event, this);">
   <div class="form-group">
@@ -170,5 +170,16 @@
   <button name=do value=test>Test Vectors</button>
   <output name=output></output>
 </form>
+<script>
+  // bootstrap with a hash just to show some content
+  const sleep = ms => new Promise(res => setTimeout(res, 50));
+  window.addEventListener('load', async load => {
+    // wait for wasm load
+    while(!globalThis.HEAPU8) { 
+      await sleep(50);
+    }
+    hash(load, document.querySelector('form'));
+  });
+</script>
 <p><a href=https://github.com/dosyago/rain>Get the code</a></p>
 
