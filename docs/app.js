@@ -18,12 +18,13 @@
     [ "a46a9e5cba400ed3e1deec852fb0667e8acbbcfeb71cf0f3a1901396aaae6e19", "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" ]
   ];
 
-  const rainstorm = {};
-  const rainbow = {};
-  rainstorm.module = globalThis;
-  rainbow.module = globalThis;
-  window.onunhandledrejection = window.onerror = (...x) => {
-    alert(x[0].reason || x[0] + '\n\n\t' + JSON.stringify(x, null, 2));
+  class HashError extends Error {}
+  let inHash = false;
+
+  window.onunhandledrejection = (...x) => {
+    if ( x[0].reason instanceof HashError ) {
+      alert(x[0].reason || x[0] + '\n\n\t' + JSON.stringify(x, null, 2));
+    }
     return false;
   };
 
@@ -35,6 +36,8 @@
   });
 
   async function hash(submission, form) {
+    if ( inHash ) return;
+    inHash = true;
     submission.preventDefault();
     submission.stopPropagation();
     const task = submission.type == 'submit' ? submission.submitter.value : 'hash';
@@ -48,6 +51,7 @@
       const hashValue = await globalThis[algo](size, seed, input);
       form.output.value = hashValue;
     }
+    inHash = false;
     return false;
   }
 
@@ -94,7 +98,7 @@
     //await rainstorm.untilLoaded;
 
     // Convert the input to a bytes
-    const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rainstorm.module;
+    const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = globalThis;
 
     const hashLength = hashSize/8;
     const hashPtr = _malloc(hashLength);
@@ -109,7 +113,7 @@
     } else {
       inputLength = input.length;
       inputPtr = _malloc(inputLength);
-      rainstorm.module.HEAPU8.set(input, inputPtr);
+      HEAPU8.set(input, inputPtr);
     }
 
     seed = BigInt(seed);
@@ -118,25 +122,25 @@
     let hashFunc;
 
     switch (hashSize) {
-        case 64:
-            hashFunc = rainstorm.module._rainstormHash64;
-            break;
-        case 128:
-            hashFunc = rainstorm.module._rainstormHash128;
-            break;
-        case 256:
-            hashFunc = rainstorm.module._rainstormHash256;
-            break;
-        case 512:
-            hashFunc = rainstorm.module._rainstormHash512;
-            break;
-        default:
-            throw new Error(`Unsupported hash size for rainstorm: ${hashSize}`);
+      case 64:
+          hashFunc = _rainstormHash64;
+          break;
+      case 128:
+          hashFunc = _rainstormHash128;
+          break;
+      case 256:
+          hashFunc = _rainstormHash256;
+          break;
+      case 512:
+          hashFunc = _rainstormHash512;
+          break;
+      default:
+          throw new Error(`Unsupported hash size for rainstorm: ${hashSize}`);
     }
 
     hashFunc(inputPtr, inputLength, seed, hashPtr);
 
-    let hash = rainstorm.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
+    let hash = HEAPU8.subarray(hashPtr, hashPtr + hashLength);
 
     // Return the hash as a Uint8Array
     const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
@@ -152,7 +156,7 @@
     //await rainbow.untilLoaded;
 
     // Convert the input to a bytes
-    const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rainbow.module;
+    const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = globalThis;
 
     const hashLength = hashSize/8;
     const hashPtr = _malloc(hashLength);
@@ -167,7 +171,7 @@
     } else {
       inputLength = input.length;
       inputPtr = _malloc(inputLength);
-      rainbow.module.HEAPU8.set(input, inputPtr);
+      HEAPU8.set(input, inputPtr);
     }
 
     seed = BigInt(seed);
@@ -177,21 +181,21 @@
 
     switch (hashSize) {
         case 64:
-            hashFunc = rainbow.module._rainbowHash64;
+            hashFunc = _rainbowHash64;
             break;
         case 128:
-            hashFunc = rainbow.module._rainbowHash128;
+            hashFunc = _rainbowHash128;
             break;
         case 256:
-            hashFunc = rainbow.module._rainbowHash256;
+            hashFunc = _rainbowHash256;
             break;
         default:
-            throw new Error(`Unsupported hash size for rainbow: ${hashSize}`);
+            throw new HashError(`Unsupported hash size for rainbow: ${hashSize}`);
     }
 
     hashFunc(inputPtr, inputLength, seed, hashPtr);
 
-    let hash = rainbow.module.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
+    let hash = HEAPU8.subarray(hashPtr, hashPtr + hashLength);
 
     // Return the hash as a Uint8Array
     const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
