@@ -62,7 +62,6 @@
 
 
   async function testVectors() {
-    //await rainstorm.untilLoaded;
     let comment;
     let s = '';
 
@@ -77,8 +76,6 @@
       }
       s += (`${calculatedHash} "${message}" ${comment}\n`);
     }
-
-    await rainbow.untilLoaded;
 
     s += (`Rainbow test vectors:\n`);
     for( const [expectedHash, message] of BOW_TV ) {
@@ -96,9 +93,6 @@
   }
 
   async function rainstormHash(hashSize, seed, input) {
-    //await rainstorm.untilLoaded;
-
-    // Convert the input to a bytes
     const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = globalThis;
 
     const hashLength = hashSize/8;
@@ -154,9 +148,6 @@
   }
 
   async function rainbowHash(hashSize, seed, input) {
-    //await rainbow.untilLoaded;
-
-    // Convert the input to a bytes
     const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = globalThis;
 
     const hashLength = hashSize/8;
