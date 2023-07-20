@@ -21,11 +21,11 @@
   class HashError extends Error {}
   let inHash = false;
 
-  window.onunhandledrejection = window.onerror = (...x) => {
+  window.onunhandledrejection = (...x) => {
     inHash = false;
-    //if ( x[0].reason instanceof HashError ) {
+    if ( x[0].reason instanceof HashError ) {
       alert(x[0].reason || x[0] + '\n\n\t' + JSON.stringify(x, null, 2));
-    //}
+    }
     return false;
   };
 
