@@ -45,12 +45,25 @@
     if ( task == 'test' ) {
       form.output.value = await testVectors();
     } else {
-      const input = form.input.value;
-      const algo = form.algo.value;
-      const size = parseInt(form.size.value);
-      const seed = BigInt(form.seed.value);
-      const hashValue = await globalThis[algo](size, seed, input);
-      form.output.value = hashValue;
+      const inputType = form.fileInput.files.length > 0 ? 'file' : 'text';
+      if ( inputType == 'file' ) {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const fileContent = event.target.result;
+          const hashValue = await globalThis[algo](size, seed, fileContent);
+          form.output.value = hashValue;
+          inHash = false;
+        };
+        reader.readAsText(fileInput);
+        return false;
+      } else {
+        const input = form.input.value;
+        const algo = form.algo.value;
+        const size = parseInt(form.size.value);
+        const seed = BigInt(form.seed.value);
+        const hashValue = await globalThis[algo](size, seed, input);
+        form.output.value = hashValue;
+      }
     }
     inHash = false;
     return false;
@@ -59,7 +72,6 @@
   function isMobileDevice() {
     return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
   };
-
 
   async function testVectors() {
     let comment;
@@ -198,3 +210,6 @@
 
     return hashHex;
   }
+
+
+
