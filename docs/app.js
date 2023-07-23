@@ -28,7 +28,7 @@
     if ( x[0].reason instanceof HashError ) {
       alert(x[0].reason || x[0] + '\n\n\t' + JSON.stringify(x, null, 2));
     }
-    //return false;
+    return false;
   };
 
   Object.assign(globalThis, {
@@ -51,9 +51,8 @@
       const size = parseInt(form.size.value);
       const seed = BigInt(form.seed.value);
       const inputType = submission.target === form.input ? 'text' : 
-        submission.target == form.fileInput ? 
-          form.fileInput.files.length > 0 ? 'file' : 'text'
-        : 'text';
+          form.fileInput.files.length > 0 ? 'file' : 
+      'text';
       if ( inputType == 'file' ) {
         const reader = new FileReader();
         reader.onload = async (event) => {
