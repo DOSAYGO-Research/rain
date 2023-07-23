@@ -1,3 +1,5 @@
+  const sleep = ms => new Promise(res => setTimeout(res, ms));
+
   const STORM_TV = [
     [ "e3ea5f8885f7bb16468d08c578f0e7cc15febd31c27e323a79ef87c35756ce1e", "" ], 
     [ "9e07ce365903116b62ac3ac0a033167853853074313f443d5b372f0225eede50", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" ],
@@ -26,7 +28,7 @@
     if ( x[0].reason instanceof HashError ) {
       alert(x[0].reason || x[0] + '\n\n\t' + JSON.stringify(x, null, 2));
     }
-    return false;
+    //return false;
   };
 
   Object.assign(globalThis, {
@@ -35,7 +37,7 @@
     rainbowHash,
     hash
   });
-
+  
   async function hash(submission, form) {
     if ( inHash ) return;
     inHash = true;
@@ -45,12 +47,42 @@
     if ( task == 'test' ) {
       form.output.value = await testVectors();
     } else {
-      const input = form.input.value;
       const algo = form.algo.value;
       const size = parseInt(form.size.value);
       const seed = BigInt(form.seed.value);
-      const hashValue = await globalThis[algo](size, seed, input);
-      form.output.value = hashValue;
+      const inputType = submission.target === form.input ? 'text' : 
+        submission.target == form.fileInput ? 
+          form.fileInput.files.length > 0 ? 'file' : 'text'
+        : 'text';
+      if ( inputType == 'file' ) {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          let fileContent = event.target.result;
+          if ( fileContent instanceof ArrayBuffer ) {
+            fileContent = new Uint8Array(fileContent);
+          }
+          const hashValue = await globalThis[algo](size, seed, fileContent);
+          form.output.value = hashValue;
+          if ( fileContent.length < 102400 ) {
+            setTimeout(async () => {
+              form.input.value = new TextDecoder().decode(fileContent);
+              await sleep(100);
+              inHash = false;
+            }, 500);
+          } else {
+            inHash = false;
+          }
+        };
+        reader.readAsArrayBuffer(form.fileInput.files[0]);
+        return false;
+      } else {
+        if ( form.fileInput.files.length > 0 ) {
+          form.fileInput.value = "";
+        }
+        const input = form.input.value;
+        const hashValue = await globalThis[algo](size, seed, input);
+        form.output.value = hashValue;
+      }
     }
     inHash = false;
     return false;
@@ -59,7 +91,6 @@
   function isMobileDevice() {
     return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
   };
-
 
   async function testVectors() {
     let comment;
@@ -198,3 +229,6 @@
 
     return hashHex;
   }
+
+
+

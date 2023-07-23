@@ -143,6 +143,10 @@
 <script type=module src=app.js></script>
 <form method=GET action=# onsubmit="hash(event, this);" onchange="hash(event, this);" oninput="hash(event, this);">
   <div class="form-group">
+    <label for="fileInput">Upload File:</label>
+    <input type="file" id="fileInput" name="fileInput">
+  </div>
+  <div class="form-group">
     <label for="input">Input:</label>
     <textarea autofocus id="input" name="input"></textarea>
   </div>
