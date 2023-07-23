@@ -54,6 +54,7 @@
           form.fileInput.files.length > 0 ? 'file' : 
       'text';
       if ( inputType == 'file' ) {
+        form.input.value = "";
         const reader = new FileReader();
         reader.onload = async (event) => {
           let fileContent = event.target.result;
@@ -228,6 +229,3 @@
 
     return hashHex;
   }
-
-
-
