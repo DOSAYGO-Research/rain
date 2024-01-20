@@ -57,7 +57,8 @@ export async function rainstormHash(hashSize, seed, input) {
     await loadRain();
   }
   // Convert the input to a bytes
-  const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rain;
+  const {stringToUTF8, lengthBytesUTF8} = rain;
+  const {wasmExports:{ malloc: _malloc, free:_free}} = rain;
 
   const hashLength = hashSize/8;
   const hashPtr = _malloc(hashLength);
@@ -116,7 +117,8 @@ export async function rainbowHash(hashSize, seed, input) {
     await loadRain();
   }
   // Convert the input to a bytes
-  const {stringToUTF8, lengthBytesUTF8, _malloc, _free} = rain;
+  const {stringToUTF8, lengthBytesUTF8} = rain;
+  const {wasmExports:{ malloc: _malloc, free:_free}} = rain;
 
   const hashLength = hashSize/8;
   const hashPtr = _malloc(hashLength);
@@ -170,8 +172,10 @@ export async function rainbowHash(hashSize, seed, input) {
 async function loadRain() {
   let resolve;
   const pr = new Promise(res => resolve = res);
-  import('./../../wasm/rain.js').then(async x => {
-    await untilTrue(() => !!x?.default?.asm);
+  import('./../wasm/rain.cjs').then(async x => {
+    await untilTrue(() => {
+      return !!x?.default?.wasmExports?.memory;
+    });
     rain = x.default;
     rain.loaded = true;
     resolve();

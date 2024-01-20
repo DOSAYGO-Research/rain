@@ -1,12 +1,16 @@
 {
-  "name": "rainsum",
-  "version": "0.0.1",
+  "name": "@dosyago/rainsum",
+  "version": "1.1.1",
   "module": true,
   "type": "module",
   "description": "Rain hashes in JavaScript via WASM",
-  "main": "rainsum.js",
+  "main": "./lib/api.mjs",
+  "bin": {
+    "jsrsum": "./rainsum.mjs"
+  },
   "scripts": {
-    "test": "node rainsum.js"
+    "prepublishOnly": "cp ../README.md .",
+    "test": "node rainsum.mjs"
   },
   "repository": {
     "type": "git",

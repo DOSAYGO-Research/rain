@@ -1,38 +1,142 @@
 # Rain
 
-- [Rain](#rain)
-  - [Repository structure](#repository-structure)
-  - [Rainbow](#rainbow)
-  - [Rainstorm - Unvetted for Security](#rainstorm---unvetted-for-security)
-  - [Note on Cryptographic Intent](#note-on-cryptographic-intent)
-  - [Genesis](#genesis)
-  - [License](#license)
-- [Rainsum Field Manual](#rainsum-field-manual)
-  - [1. Introduction](#1-introduction)
-  - [2. Basic Usage](#2-basic-usage)
-    - [2.1 Command Structure](#21-command-structure)
-    - [2.2 Options](#22-options)
-  - [3. Modes of Operation](#3-modes-of-operation)
-    - [3.1 Digest Mode](#31-digest-mode)
-    - [3.2 Stream Mode](#32-stream-mode)
-  - [4. Hash Algorithms and Sizes](#4-hash-algorithms-and-sizes)
-  - [5. Test Vectors](#5-test-vectors)
-  - [6. Seed Values](#6-seed-values)
-  - [7. Help and Version Information](#7-help-and-version-information)
-  - [8. Compilation](#8-compilation)
-  - [9. Conclusion](#9-conclusion)
-- [Developer Information](#developer-information)
-  - [Stability](#stability)
-  - [Test vectors](#test-vectors)
-  - [Building and Installing](#building-and-installing)
-  - [Contributions](#contributions)
+This repository houses the Rainbow and Rainstorm hash functions, developed by Cris at DOSYAGO and licensed under Apache-2.0. The 64-bit variants have passed all tests in the [SMHasher3](https://gitlab.com/fwojcik/smhasher3) suite. [Results](results) can be found in the `results/` subdirectory.
 
-This repository houses the Rainbow and Rainstorm hash functions, developed by Cris Stringfellow and licensed under Apache-2.0. The 64-bit variants have passed all tests in the [SMHasher3](https://gitlab.com/fwojcik/smhasher3) suite. [Results](results) can be found in the `results/` subdirectory.
+The code contains a reference implementation in C++, a port to WASM, and a Makefile for building everything.
 
 | Algorithm | Speed | Hash Size | Purpose | Core Mixing Function | Security |
 | :- | :- | :- | :- | :- | :- |
-| Rainbow | 13.2 GiB/sec | 64 to 256 bits | General-purpose non-cryptographic hashing | Multiplication, subtraction/addition, rotation, XOR | Not designed for cryptographic security |
-| Rainstorm | 4.7 GiB/sec (at 4 rounds) | 64 to 512 bits | Potential cryptographic hashing | Addition/subtraction, rotation, XOR | No formal security analysis yet |
+| Rainbow | 5.79 GiB/sec | 64 to 256 bits | General-purpose non-cryptographic hashing | Multiplication, subtraction/addition, rotation, XOR | Not designed for cryptographic security |
+| Rainstorm | 1.91 GiB/sec (at 4 rounds, tuneable) | 64 to 512 bits | Potential cryptographic hashing | Addition/subtraction, rotation, XOR | No formal security analysis yet |
+
+## Usage options
+
+**JavaScript channel:**
+
+1. As a Node.JS library, via:
+
+```shell
+npm i @dosyago/rainsum@latest
+```
+
+Then you can use as:
+
+```js
+import {rainbowHash, rainstormHash} from '@dosyago/rainsum';
+
+const seed = 0x0;
+const hash = await rainbowHash(256, seed, 'Hello there!');
+const intendedCryptoHash = await rainstormHash(512, seed, Buffer.from('Hello there!'));
+```
+
+2. As a NPM global binary, via:
+
+```shell
+npm i -g @dosyago/rainsum@latest
+jsrsum --help
+```
+
+**Native channel:**
+
+First, make everything:
+
+```shell
+make clean && make
+sudo make install # if you wish 
+```
+
+Then you can use either: 
+
+1. As object code, or a C library or by using the C++ files in `./src/`, specifically importing "tool.h" and using "rainsum.cpp"
+
+2. As a command line tool:
+
+```shell
+rainsum file.txt
+# will output a hash using the default values: Algorithm: rainbow, Hash size in bits: 256
+# see --help for other arguments
+rainsum --help
+Usage: rainsum [OPTIONS] [INFILE]
+Calculate a Rainbow or Rainstorm hash.
+
+Options:
+  -m, --mode [digest|stream]        Specifies the mode, where:
+                                    digest mode (the default) gives a fixed length hash in hex, or
+                                    stream mode gives a variable length binary feedback output
+  -a, --algorithm [bow|storm]       Specify the hash algorithm to use. Default: storm
+  -s, --size [64-256|64-512]        Specify the bit size of the hash. Default: 256
+  -o, --output-file FILE            Output file for the hash or stream
+  -t, --test-vectors                Calculate the hash of the standard test vectors
+  -l, --output-length HASHES        Set the output length in hash iterations (stream only)
+  -v, --version                     Print out the version
+  --seed                            Seed value (64-bit number or string). If string is used,
+                                    it is hashed with Rainstorm to a 64-bit number
+```
+
+Note: The `jsrsum` NPM binary (which uses wasm, and is installable via `npm i -g @dosyago/rainsum`) offers the same API and command-line options as the native C++ binary, but is slower.
+
+## Table of Contents
+
+- [Rain](#rain)
+  * [Usage options](#usage-options)
+  * [This table of contents](#table-of-contents)
+  * [Assets](#assets)
+  * [Building](#building)
+  * [Benchmark](#benchmark)
+  * [Repo structure](#repo-structure)
+  * [Rainbow](#rainbow)
+  * [Rainstorm - Unvetted for Security](#rainstorm---unvetted-for-security)
+  * [Note on Cryptographic Intent](#note-on-cryptographic-intent)
+  * [Genesis](#genesis)
+  * [License](#license)
+- [Rainsum Field Manual](#rainsum-field-manual)
+  * [1. Introduction](#1-introduction)
+  * [2. Basic Usage](#2-basic-usage)
+    + [2.1 Command Structure](#21-command-structure)
+    + [2.2 Options](#22-options)
+  * [3. Modes of Operation](#3-modes-of-operation)
+    + [3.1 Digest Mode](#31-digest-mode)
+    + [3.2 Stream Mode](#32-stream-mode)
+  * [4. Hash Algorithms and Sizes](#4-hash-algorithms-and-sizes)
+  * [5. Test Vectors](#5-test-vectors)
+  * [6. Seed Values](#6-seed-values)
+  * [7. Help and Version Information](#7-help-and-version-information)
+  * [8. Compilation](#8-compilation)
+  * [9. Conclusion](#9-conclusion)
+- [Developer Information](#developer-information)
+  * [Stability](#stability)
+  * [Test vectors](#test-vectors)
+  * [Building and Installing](#building-and-installing)
+  * [Contributions](#contributions)
+
+## Assets
+
+This repository produces:
+
+- rainsum CLI tool and rainstorm.o and rainbow.o object files
+- wasm binary
+- JavaScript CLI tool (API compat with C++ binary, but slower)
+- NPM package with `jsrsum` global (the JavaScript CLI tool), plus an importable ES Module library exporting `async rainbowHash(hashSize, seed, input)` and `async rainstormHash(hashSize, seed, input)` functions taking inputs as `string` or `Buffer`, backed by the wasm binary.
+- A collection of scripts:
+  - `./scripts/bench.mjs`: benchmark the speed between the JS WASM and C++ implementations
+  - `./scripts/verify.mjs`: verify the correctness of the implementations
+  - And other scripts.
+
+## Building
+
+Build with make:
+
+```shell
+make clean && make
+```
+
+Optionall to install rainsum into an executable path location, run:
+
+```
+make install
+```
+
+which may require `sudo` privileges.
 
 ## Benchmark
 
@@ -40,110 +144,111 @@ This repository houses the Rainbow and Rainstorm hash functions, developed by Cr
 Rain hash functions C++ vs Node/WASM benchmark:
 
 Test Input & Size (bytes)         Run        C++ Version       WASM Version          Fastest
-input1 (10 bytes)                  1         4,790,708 ns     59,540,125 ns     12.00x (C++ wins!)
-input2 (100 bytes)                 1         3,881,917 ns     59,735,458 ns     15.00x (C++ wins!)
-input3 (1,000 bytes)               1         3,973,792 ns     60,026,667 ns     15.00x (C++ wins!)
-input4 (10,000 bytes)              1         4,231,250 ns     59,217,250 ns     13.00x (C++ wins!)
-input5 (100,000 bytes)             1         4,002,792 ns     61,180,500 ns     15.00x (C++ wins!)
-input6 (1,000,000 bytes)           1         4,387,500 ns     60,962,209 ns     13.00x (C++ wins!)
-input7 (10,000,000 bytes)          1         7,945,250 ns     66,440,416 ns      8.00x (C++ wins!)
-input8 (100,000,000 bytes)         1        43,348,167 ns    118,088,750 ns      2.00x (C++ wins!)
-input1 (10 bytes)                  2         3,835,875 ns     60,245,292 ns     15.00x (C++ wins!)
-input2 (100 bytes)                 2         3,794,541 ns     60,314,583 ns     15.00x (C++ wins!)
-input3 (1,000 bytes)               2         3,897,708 ns     59,611,417 ns     15.00x (C++ wins!)
-input4 (10,000 bytes)              2         3,881,916 ns     61,785,041 ns     15.00x (C++ wins!)
-input5 (100,000 bytes)             2         3,836,458 ns     60,081,083 ns     15.00x (C++ wins!)
-input6 (1,000,000 bytes)           2         4,218,959 ns     60,323,458 ns     14.00x (C++ wins!)
-input7 (10,000,000 bytes)          2         8,120,458 ns     65,705,458 ns      8.00x (C++ wins!)
-input8 (100,000,000 bytes)         2        42,743,958 ns    116,511,708 ns      2.00x (C++ wins!)
-input1 (10 bytes)                  3         4,075,750 ns     59,484,125 ns     14.00x (C++ wins!)
-input2 (100 bytes)                 3         3,811,750 ns     59,731,250 ns     15.00x (C++ wins!)
-input3 (1,000 bytes)               3         3,814,666 ns     59,546,625 ns     15.00x (C++ wins!)
-input4 (10,000 bytes)              3         3,785,791 ns     60,626,000 ns     16.00x (C++ wins!)
-input5 (100,000 bytes)             3         3,601,666 ns     59,802,625 ns     16.00x (C++ wins!)
-input6 (1,000,000 bytes)           3         4,191,166 ns     60,641,416 ns     14.00x (C++ wins!)
-input7 (10,000,000 bytes)          3         8,095,875 ns     68,071,500 ns      8.00x (C++ wins!)
-input8 (100,000,000 bytes)         3        43,222,708 ns    117,334,333 ns      2.00x (C++ wins!)
+input1 (10 bytes)                  1         7,310,292 ns    122,337,000 ns     16.00x (C++ wins!)
+input2 (100 bytes)                 1         5,250,875 ns    113,674,500 ns     21.00x (C++ wins!)
+input3 (1,000 bytes)               1         5,341,625 ns    112,402,958 ns     21.00x (C++ wins!)
+input4 (10,000 bytes)              1         4,912,209 ns    113,795,750 ns     23.00x (C++ wins!)
+input5 (100,000 bytes)             1         5,247,208 ns    112,086,708 ns     21.00x (C++ wins!)
+input6 (1,000,000 bytes)           1         5,717,125 ns    112,697,792 ns     19.00x (C++ wins!)
+input7 (10,000,000 bytes)          1        10,700,834 ns    119,352,417 ns     11.00x (C++ wins!)
+input8 (100,000,000 bytes)         1        52,803,417 ns    191,939,500 ns      3.00x (C++ wins!)
+input1 (10 bytes)                  2         3,671,250 ns    107,211,375 ns     29.00x (C++ wins!)
+input2 (100 bytes)                 2         5,072,792 ns    112,407,625 ns     22.00x (C++ wins!)
+input3 (1,000 bytes)               2         4,668,833 ns    111,602,583 ns     23.00x (C++ wins!)
+input4 (10,000 bytes)              2         4,660,792 ns    112,008,292 ns     24.00x (C++ wins!)
+input5 (100,000 bytes)             2         4,675,875 ns    112,914,708 ns     24.00x (C++ wins!)
+input6 (1,000,000 bytes)           2         5,334,500 ns    114,160,917 ns     21.00x (C++ wins!)
+input7 (10,000,000 bytes)          2        11,232,792 ns    119,210,000 ns     10.00x (C++ wins!)
+input8 (100,000,000 bytes)         2        52,097,042 ns    181,990,375 ns      3.00x (C++ wins!)
+input1 (10 bytes)                  3         3,726,791 ns    106,394,125 ns     28.00x (C++ wins!)
+input2 (100 bytes)                 3         4,990,500 ns    113,719,291 ns     22.00x (C++ wins!)
+input3 (1,000 bytes)               3         4,882,792 ns    113,991,917 ns     23.00x (C++ wins!)
+input4 (10,000 bytes)              3         5,054,458 ns    112,881,500 ns     22.00x (C++ wins!)
+input5 (100,000 bytes)             3         5,180,958 ns    112,406,250 ns     21.00x (C++ wins!)
+input6 (1,000,000 bytes)           3         5,779,833 ns    113,486,834 ns     19.00x (C++ wins!)
+input7 (10,000,000 bytes)          3        10,747,875 ns    119,093,209 ns     11.00x (C++ wins!)
+input8 (100,000,000 bytes)         3        52,637,666 ns    170,915,917 ns      3.00x (C++ wins!)
+```
+
+## Repo structure
+
+```text
+  .
+  |-- LICENSE.txt
+  |-- Makefile
+  |-- PAPER.md
+  |-- README.md
+  |-- docs
+  |   |-- app.js
+  |   |-- index.html
+  |   |-- rain.cjs
+  |   `-- rain.wasm
+  |-- js
+  |   |-- lib
+  |   |   `-- api.mjs
+  |   |-- package-lock.json
+  |   |-- package.json
+  |   |-- rainsum.mjs
+  |   |-- test.mjs
+  |   `-- wasm
+  |       |-- rain.cjs
+  |       `-- rain.wasm
+  |-- rain
+  |   |-- bin
+  |   |   `-- rainsum
+  |   `-- obj
+  |       |-- rainbow.d
+  |       |-- rainbow.o
+  |       |-- rainstorm.d
+  |       |-- rainstorm.o
+  |       |-- rainsum.d
+  |       `-- rainsum.o
+  |-- rainsum -> rain/bin/rainsum
+  |-- results
+  |   |-- dieharder
+  |   |   |-- README.md
+  |   |   |-- rainbow-256.txt
+  |   |   |-- rainbow-64-infinite.txt
+  |   |   |-- rainstorm-256.txt
+  |   |   `-- rainstorm-64-infinite.txt
+  |   `-- smhasher3
+  |       |-- rainbow-128.txt
+  |       |-- rainbow-256.txt
+  |       |-- rainbow.txt
+  |       |-- rainstorm-128.txt
+  |       |-- rainstorm-256.txt
+  |       `-- rainstorm.txt
+  |-- scripts
+  |   |-- 1srain.sh
+  |   |-- bench.mjs
+  |   |-- blockchain.sh
+  |   |-- build.sh
+  |   |-- chain.mjs
+  |   |-- debug.sh
+  |   |-- package-lock.json
+  |   |-- package.json
+  |   |-- testjs.sh
+  |   |-- vectors.sh
+  |   `-- verify.sh
+  |-- src
+  |   |-- common.h
+  |   |-- cxxopts.hpp
+  |   |-- rainbow.cpp
+  |   |-- rainstorm.cpp
+  |   |-- rainsum.cpp
+  |   `-- tool.h
+  `-- verification
+      `-- vectors.txt
+14 directories, 52 files
 ```
 
 ## Rainbow 
 
-Rainbow is a fast hash function (13.2 GiB/sec, 4.61 bytes/cycle on long messages, 24.8 cycles/hash for short messages). It's intended for general-purpose, non-cryptographic hashing. The core mixing function utilizes multiplication, subtraction/addition, rotation, and XOR. 
-
-## Repository structure
-
-Below is the repo structure before running make (but after npm install in `js/` and `scripts/`. 
-
-```tree
-.
-|-- LICENSE.txt
-|-- Makefile
-|-- README.md
-|-- js
-|   |-- lib
-|   |   `-- api.mjs
-|   |-- node_modules
-|   |   |-- ansi-regex
-|   |   |-- ansi-styles
-|   |   |-- cliui
-|   |   |-- color-convert
-|   |   |-- color-name
-|   |   |-- emoji-regex
-|   |   |-- escalade
-|   |   |-- get-caller-file
-|   |   |-- is-fullwidth-code-point
-|   |   |-- require-directory
-|   |   |-- string-width
-|   |   |-- strip-ansi
-|   |   |-- wrap-ansi
-|   |   |-- y18n
-|   |   |-- yargs
-|   |   `-- yargs-parser
-|   |-- package-lock.json
-|   |-- package.json
-|   |-- rainsum.mjs
-|   `-- test.mjs
-|-- rain
-|-- results
-|   |-- dieharder
-|   |   |-- README.md
-|   |   |-- rainbow-256.txt
-|   |   |-- rainbow-64-infinite.txt
-|   |   |-- rainstorm-256.txt
-|   |   `-- rainstorm-64-infinite.txt
-|   `-- smhasher3
-|       |-- rainbow-064.txt
-|       |-- rainbow-128.txt
-|       |-- rainstorm-064.txt
-|       `-- rainstorm-128.txt
-|-- scripts
-|   |-- 1srain.sh
-|   |-- bench.mjs
-|   |-- blockchain.sh
-|   |-- build.sh
-|   |-- node_modules
-|   |   `-- chalk
-|   |-- package-lock.json
-|   |-- package.json
-|   |-- testjs.sh
-|   |-- vectors.sh
-|   `-- verify.sh
-|-- src
-|   |-- common.h
-|   |-- cxxopts.hpp
-|   |-- rainbow.cpp
-|   |-- rainstorm.cpp
-|   |-- rainsum.cpp
-|   `-- tool.h
-`-- verification
-    `-- vectors.txt
-
-29 directories, 33 files
-```
+Rainbow is a fast hash function. It's intended for general-purpose, non-cryptographic hashing. The core mixing function utilizes multiplication, subtraction/addition, rotation, and XOR. 
 
 ## Rainstorm - **Unvetted for Security**
 
-Rainstorm is a slower hash function with a tunable-round feature (with 4 rounds runs at 4.7 GiB/sec). It's designed with cryptographic hashing in mind, but it hasn't been formally analyzed for security, so we provide no guarantees. The core mixing function uses addition/subtraction, rotation, and XOR.
+Rainstorm is a slower hash function with a tunable-round feature. It's designed with cryptographic hashing in mind, but it hasn't been formally analyzed for security, so we provide no guarantees. The core mixing function uses addition/subtraction, rotation, and XOR.
 
 Rainstorm's round number is adjustable, potentially offering additional security. However, please note that this is hypothetical until rigorous security analysis is completed. 
 
@@ -159,7 +264,7 @@ The fundamental concept for the mixing functions derived from Discohash, but has
 
 ## License
 
-This repository and content is licensed under Apache-2.0 unless otherwise noted. It's copyright &copy; Cris Stringfellow and The Dosyago Corporation 2023. All rights reserved. 
+This repository and content is licensed under Apache-2.0 unless otherwise noted. It's copyright &copy; Cris and The Dosyago Corporation 2023. All rights reserved. 
 
 # Rainsum Field Manual
 
@@ -288,13 +393,11 @@ git clone https://github.com/dosyago/rain
 cd rain
 ```
 
-Then, build the utility with the helper script:
+Then, build the utility with make:
 
 ```sh
-./scripts/build.sh
+make
 ```
-
-This will create an executable file `rainsum` in the `rain/bin` directory, and also create a symbolic link in the project root directory for easy access.
 
 If you want to install `rainsum` globally, so it can be run from any directory, use the `make install` command:
 
@@ -311,7 +414,7 @@ sudo make install
 After installation, you can run `rainsum` from any directory:
 
 ```sh
-rainsum --test-vectors
+rainsum --help
 ```
 
 See the [Field Manual](#Rainsum-Field-Manual) for more information on usage. 
