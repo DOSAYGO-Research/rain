@@ -19,6 +19,16 @@ The code contains a reference implementation in C++, a port to WASM, and a Makef
 npm i @dosyago/rainsum@latest
 ```
 
+Then you can use as:
+
+```js
+import {rainbowHash, rainstormHash} from '@dosyago/rainsum';
+
+const seed = 0x0;
+const hash = await rainbowHash(256, seed, 'Hello there!');
+const intendedCryptoHash = await rainstormHash(512, seed, Buffer.from('Hello there!'));
+```
+
 2. As a NPM global binary, via:
 
 ```shell
