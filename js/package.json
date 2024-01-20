@@ -9,7 +9,8 @@
     "jsrsum": "./rainsum.mjs"
   },
   "scripts": {
-    "test": "node rainsum.js"
+    "prePublish": "cp ../README.md .",
+    "test": "node rainsum.mjs"
   },
   "repository": {
     "type": "git",
