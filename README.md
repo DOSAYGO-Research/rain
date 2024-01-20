@@ -7,9 +7,53 @@ This repository houses the Rainbow and Rainstorm hash functions, developed by Cr
 | Rainbow | 5.79 GiB/sec | 64 to 256 bits | General-purpose non-cryptographic hashing | Multiplication, subtraction/addition, rotation, XOR | Not designed for cryptographic security |
 | Rainstorm | 1.91 GiB/sec (at 4 rounds, tuneable) | 64 to 512 bits | Potential cryptographic hashing | Addition/subtraction, rotation, XOR | No formal security analysis yet |
 
+## Using
+
+As a Node.JS library, via:
+
+```shell
+npm i @dosyago/rainsum@latest
+```
+
+As a NPM global binary, via:
+
+```shell
+npm i -g @dosyago/rainsum@latest
+jsrsum --help
+```
+
+As a C library by using the C++ files in `./src/`, specifically importing "tool.h" and using "rainsum.cpp"
+
+As a command line tool:
+
+```shell
+rainsum file.txt
+# will output a hash using the default values: Algorithm: rainbow, Hash size in bits: 256
+# see --help for other arguments
+rainsum --help
+Usage: rainsum [OPTIONS] [INFILE]
+Calculate a Rainbow or Rainstorm hash.
+
+Options:
+  -m, --mode [digest|stream]        Specifies the mode, where:
+                                    digest mode (the default) gives a fixed length hash in hex, or
+                                    stream mode gives a variable length binary feedback output
+  -a, --algorithm [bow|storm]       Specify the hash algorithm to use. Default: storm
+  -s, --size [64-256|64-512]        Specify the bit size of the hash. Default: 256
+  -o, --output-file FILE            Output file for the hash or stream
+  -t, --test-vectors                Calculate the hash of the standard test vectors
+  -l, --output-length HASHES        Set the output length in hash iterations (stream only)
+  -v, --version                     Print out the version
+  --seed                            Seed value (64-bit number or string). If string is used,
+                                    it is hashed with Rainstorm to a 64-bit number
+```
+
+The `jsrsum` NPM binary (which uses wasm) offers the same API and command-line options as the native C++ binary, but is slower.
+
 ## Table of Contents
 
 - [Rain](#rain)
+  * [Using](#using)
   * [This table of contents](#table-of-contents)
   * [Assets](#assets)
   * [Building](#building)
