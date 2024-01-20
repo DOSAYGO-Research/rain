@@ -26,6 +26,7 @@ void invokeHash(HashAlgorithm algot, uint64_t seed, std::vector<uint8_t>& buffer
     switch(hash_size) {
       case 64:
         rainstorm::rainstorm<64, bswap>(buffer.data(), buffer.size(), seed, temp_out.data());
+        break;
       case 128:
         rainstorm::rainstorm<128, bswap>(buffer.data(), buffer.size(), seed, temp_out.data());
         break;
@@ -73,83 +74,83 @@ void hashBuffer(Mode mode, HashAlgorithm algot, std::vector<uint8_t>& buffer, ui
 }
 
 void hashAnything(Mode mode, HashAlgorithm algot, const std::string& inpath, std::ostream& outstream, uint32_t size, bool use_test_vectors, uint64_t seed, uint64_t output_length) {
-    std::vector<uint8_t> buffer;
-    std::vector<uint8_t> chunk(CHUNK_SIZE);
+  std::vector<uint8_t> buffer;
+  std::vector<uint8_t> chunk(CHUNK_SIZE);
 
-    if (use_test_vectors) {
-        for (const auto& test_vector : test_vectors) {
-            buffer.assign(test_vector.begin(), test_vector.end());
-            hashBuffer(mode, algot, buffer, seed, output_length, outstream, size);
-            outstream << ' ' << '"' << test_vector << '"' << '\n';
+  if (use_test_vectors) {
+    for (const auto& test_vector : test_vectors) {
+        buffer.assign(test_vector.begin(), test_vector.end());
+        hashBuffer(mode, algot, buffer, seed, output_length, outstream, size);
+        outstream << ' ' << '"' << test_vector << '"' << '\n';
+    }
+  } else {
+    std::istream* in_stream = nullptr;
+    std::ifstream infile;
+
+    uint64_t input_length = 0;
+
+    if (!inpath.empty()) {
+        infile.open(inpath, std::ios::binary);
+        if (infile.fail()) {
+          throw std::runtime_error("Cannot open file for reading: " + inpath);
+        }
+        in_stream = &infile;
+        input_length = getFileSize(inpath);
+
+        std::unique_ptr<IHashState> state;
+        if(algot == HashAlgorithm::Rainbow) {
+          state = std::make_unique<rainbow::HashState>(rainbow::HashState::initialize(seed, input_length, size));
+        } else if(algot == HashAlgorithm::Rainstorm) {
+          state = std::make_unique<rainstorm::HashState>(rainstorm::HashState::initialize(seed, input_length, size));
+        } else {
+          throw std::runtime_error("Invalid algorithm: " + hashAlgoToString(algot));
+        }
+
+        // Stream the file in 16384-byte chunks
+        while (*in_stream) {
+            in_stream->read(reinterpret_cast<char*>(chunk.data()), CHUNK_SIZE);
+            if (in_stream->fail() && !in_stream->eof()) {
+              throw std::runtime_error("Input file could not be read after " + std::to_string(state->len) + " bytes processed.");
+            }
+            std::streamsize bytes_read = in_stream->gcount();
+            if (bytes_read > 0 || input_length == 0) {
+                // Update the state with the new chunk of data
+                state->update(chunk.data(), bytes_read);
+            }
+        }
+
+        // Close the file if it's open
+        if (infile.is_open()) {
+            infile.close();
+        }
+
+        // Finalize the hash
+        std::vector<uint8_t> output(output_length);
+        state->finalize(output.data());
+
+        //std::cout << "Length : " << state.len << std::endl;
+        //std::cout << "File length : " << input_length << std::endl;
+
+
+        // Write the output to the outstream
+
+        if (mode == Mode::Digest) {
+          for (const auto& byte : output) {
+            outstream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+          }
+          outstream << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
+        } else {
+          outstream.write(reinterpret_cast<char*>(output.data()), output_length);
         }
     } else {
-        std::istream* in_stream = nullptr;
-        std::ifstream infile;
-
-        uint64_t input_length = 0;
-
-        if (!inpath.empty()) {
-            infile.open(inpath, std::ios::binary);
-            if (infile.fail()) {
-              throw std::runtime_error("Cannot open file for reading: " + inpath);
-            }
-            in_stream = &infile;
-            input_length = getFileSize(inpath);
-
-            std::unique_ptr<IHashState> state;
-            if(algot == HashAlgorithm::Rainbow) {
-              state = std::make_unique<rainbow::HashState>(rainbow::HashState::initialize(seed, input_length, size));
-            } else if(algot == HashAlgorithm::Rainstorm) {
-              state = std::make_unique<rainstorm::HashState>(rainstorm::HashState::initialize(seed, input_length, size));
-            } else {
-              throw std::runtime_error("Invalid algorithm: " + hashAlgoToString(algot));
-            }
-
-            // Stream the file in 16384-byte chunks
-            while (*in_stream) {
-                in_stream->read(reinterpret_cast<char*>(chunk.data()), CHUNK_SIZE);
-                if (in_stream->fail() && !in_stream->eof()) {
-                  throw std::runtime_error("Input file could not be read after " + std::to_string(state->len) + " bytes processed.");
-                }
-                std::streamsize bytes_read = in_stream->gcount();
-                if (bytes_read > 0 || input_length == 0) {
-                    // Update the state with the new chunk of data
-                    state->update(chunk.data(), bytes_read);
-                }
-            }
-
-            // Close the file if it's open
-            if (infile.is_open()) {
-                infile.close();
-            }
-
-            // Finalize the hash
-            std::vector<uint8_t> output(output_length);
-            state->finalize(output.data());
-
-            //std::cout << "Length : " << state.len << std::endl;
-            //std::cout << "File length : " << input_length << std::endl;
-
-
-            // Write the output to the outstream
-
-            if (mode == Mode::Digest) {
-              for (const auto& byte : output) {
-                outstream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
-              }
-              outstream << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
-            } else {
-              outstream.write(reinterpret_cast<char*>(output.data()), output_length);
-            }
-        } else {
-          in_stream = &getInputStream();
-          // Read all data into the buffer
-          buffer = std::vector<uint8_t>(std::istreambuf_iterator<char>(*in_stream), {});
-          input_length = buffer.size();
-          hashBuffer(mode, algot, buffer, seed, output_length, outstream, size);
-          outstream << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
-        }
+      in_stream = &getInputStream();
+      // Read all data into the buffer
+      buffer = std::vector<uint8_t>(std::istreambuf_iterator<char>(*in_stream), {});
+      input_length = buffer.size();
+      hashBuffer(mode, algot, buffer, seed, output_length, outstream, size);
+      outstream << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
     }
+  }
 }
 
 int main(int argc, char** argv) {
@@ -200,6 +201,27 @@ int main(int argc, char** argv) {
     HashAlgorithm algot = getHashAlgorithm(algorithm);
 
     uint32_t size = result["size"].as<uint32_t>();
+
+    if ( algot == HashAlgorithm::Rainbow ) {
+      switch (size) {
+        case 64:
+        case 128:
+        case 256:
+          break;
+        default:
+          throw std::runtime_error("Invalid hash_size for rainbow. Allowed sizes: 64, 128, 256");
+      }
+    } else if ( algot == HashAlgorithm::Rainstorm ) {
+      switch (size) {
+        case 64:
+        case 128:
+        case 256:
+        case 512:
+          break;
+        default:
+          throw std::runtime_error("Invalid hash_size for rainstorm. Allowed sizes: 64, 128, 256, 512");
+      }
+    }
     bool use_test_vectors = result["test-vectors"].as<bool>();
 
     uint64_t output_length = result["output-length"].as<uint64_t>();
