@@ -1,6 +1,6 @@
 {
   "name": "@dosyago/rainsum",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "module": true,
   "type": "module",
   "description": "Rain hashes in JavaScript via WASM",
@@ -9,7 +9,7 @@
     "jsrsum": "./rainsum.mjs"
   },
   "scripts": {
-    "prePublishOnly": "cp ../README.md .",
+    "prepublishOnly": "cp ../README.md .",
     "test": "node rainsum.mjs"
   },
   "repository": {
