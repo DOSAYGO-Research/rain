@@ -288,13 +288,11 @@ git clone https://github.com/dosyago/rain
 cd rain
 ```
 
-Then, build the utility with the helper script:
+Then, build the utility with make:
 
 ```sh
-./scripts/build.sh
+make
 ```
-
-This will create an executable file `rainsum` in the `rain/bin` directory, and also create a symbolic link in the project root directory for easy access.
 
 If you want to install `rainsum` globally, so it can be run from any directory, use the `make install` command:
 
@@ -311,7 +309,7 @@ sudo make install
 After installation, you can run `rainsum` from any directory:
 
 ```sh
-rainsum --test-vectors
+rainsum --help
 ```
 
 See the [Field Manual](#Rainsum-Field-Manual) for more information on usage. 
