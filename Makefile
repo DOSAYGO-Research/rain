@@ -11,11 +11,11 @@ SRCS = $(wildcard src/*.cpp)
 OBJS = $(addprefix $(OBJDIR)/,$(notdir $(SRCS:.cpp=.o)))
 DEPS = $(OBJS:.o=.d)
 
-WASMDIR = wasm
+WASMDIR = js/wasm
 STORM_WASM_SOURCE = src/rainstorm.cpp
 BOW_WASM_SOURCE = src/rainbow.cpp
 WASM_OUTPUT = docs/rain.wasm
-JS_OUTPUT = docs/rain.js
+JS_OUTPUT = docs/rain.cjs
 
 all: directories node_modules rainsum link rainwasm
 
@@ -44,9 +44,10 @@ rainwasm: $(WASM_OUTPUT) $(JS_OUTPUT)
 
 $(WASM_OUTPUT) $(JS_OUTPUT): $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
 	@[ -d docs ] || mkdir -p docs
-	@[ -d wasm ] || mkdir -p wasm
+	@[ -d ${WASMDIR} ] || mkdir -p ${WASMDIR}
 	emcc $(EMCCFLAGS) -o docs/rain.html $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
-	cp $(WASM_OUTPUT) $(JS_OUTPUT) wasm/
+	mv docs/rain.js $(JS_OUTPUT)
+	cp $(WASM_OUTPUT) $(JS_OUTPUT) ${WASMDIR}
 	rm docs/rain.html
 
 link: 
