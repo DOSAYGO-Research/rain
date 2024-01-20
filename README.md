@@ -2,29 +2,44 @@
 
 This repository houses the Rainbow and Rainstorm hash functions, developed by Cris at DOSYAGO and licensed under Apache-2.0. The 64-bit variants have passed all tests in the [SMHasher3](https://gitlab.com/fwojcik/smhasher3) suite. [Results](results) can be found in the `results/` subdirectory.
 
+The code contains a reference implementation in C++, a port to WASM, and a Makefile for building everything.
+
 | Algorithm | Speed | Hash Size | Purpose | Core Mixing Function | Security |
 | :- | :- | :- | :- | :- | :- |
 | Rainbow | 5.79 GiB/sec | 64 to 256 bits | General-purpose non-cryptographic hashing | Multiplication, subtraction/addition, rotation, XOR | Not designed for cryptographic security |
 | Rainstorm | 1.91 GiB/sec (at 4 rounds, tuneable) | 64 to 512 bits | Potential cryptographic hashing | Addition/subtraction, rotation, XOR | No formal security analysis yet |
 
-## Using
+## Usage options
 
-As a Node.JS library, via:
+**JavaScript channel:**
+
+1. As a Node.JS library, via:
 
 ```shell
 npm i @dosyago/rainsum@latest
 ```
 
-As a NPM global binary, via:
+2. As a NPM global binary, via:
 
 ```shell
 npm i -g @dosyago/rainsum@latest
 jsrsum --help
 ```
 
-As a C library by using the C++ files in `./src/`, specifically importing "tool.h" and using "rainsum.cpp"
+**Native channel:**
 
-As a command line tool:
+First, make everything:
+
+```shell
+make clean && make
+sudo make install # if you wish 
+```
+
+Then you can use either: 
+
+1. As object code, or a C library or by using the C++ files in `./src/`, specifically importing "tool.h" and using "rainsum.cpp"
+
+2. As a command line tool:
 
 ```shell
 rainsum file.txt
@@ -48,12 +63,12 @@ Options:
                                     it is hashed with Rainstorm to a 64-bit number
 ```
 
-The `jsrsum` NPM binary (which uses wasm) offers the same API and command-line options as the native C++ binary, but is slower.
+Note: The `jsrsum` NPM binary (which uses wasm, and is installable via `npm i -g @dosyago/rainsum`) offers the same API and command-line options as the native C++ binary, but is slower.
 
 ## Table of Contents
 
 - [Rain](#rain)
-  * [Using](#using)
+  * [Usage options](#usage-options)
   * [This table of contents](#table-of-contents)
   * [Assets](#assets)
   * [Building](#building)
