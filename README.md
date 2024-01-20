@@ -27,12 +27,12 @@
   - [Building and Installing](#building-and-installing)
   - [Contributions](#contributions)
 
-This repository houses the Rainbow and Rainstorm hash functions, developed by Cris Stringfellow and licensed under Apache-2.0. The 64-bit variants have passed all tests in the [SMHasher3](https://gitlab.com/fwojcik/smhasher3) suite. [Results](results) can be found in the `results/` subdirectory.
+This repository houses the Rainbow and Rainstorm hash functions, developed by Cris at DOSYAGO and licensed under Apache-2.0. The 64-bit variants have passed all tests in the [SMHasher3](https://gitlab.com/fwojcik/smhasher3) suite. [Results](results) can be found in the `results/` subdirectory.
 
 | Algorithm | Speed | Hash Size | Purpose | Core Mixing Function | Security |
 | :- | :- | :- | :- | :- | :- |
-| Rainbow | 13.2 GiB/sec | 64 to 256 bits | General-purpose non-cryptographic hashing | Multiplication, subtraction/addition, rotation, XOR | Not designed for cryptographic security |
-| Rainstorm | 4.7 GiB/sec (at 4 rounds) | 64 to 512 bits | Potential cryptographic hashing | Addition/subtraction, rotation, XOR | No formal security analysis yet |
+| Rainbow | 5.79 GiB/sec | 64 to 256 bits | General-purpose non-cryptographic hashing | Multiplication, subtraction/addition, rotation, XOR | Not designed for cryptographic security |
+| Rainstorm | 1.91 GiB/sec (at 4 rounds, tuneable) | 64 to 512 bits | Potential cryptographic hashing | Addition/subtraction, rotation, XOR | No formal security analysis yet |
 
 ## Benchmark
 
@@ -40,110 +40,110 @@ This repository houses the Rainbow and Rainstorm hash functions, developed by Cr
 Rain hash functions C++ vs Node/WASM benchmark:
 
 Test Input & Size (bytes)         Run        C++ Version       WASM Version          Fastest
-input1 (10 bytes)                  1         4,790,708 ns     59,540,125 ns     12.00x (C++ wins!)
-input2 (100 bytes)                 1         3,881,917 ns     59,735,458 ns     15.00x (C++ wins!)
-input3 (1,000 bytes)               1         3,973,792 ns     60,026,667 ns     15.00x (C++ wins!)
-input4 (10,000 bytes)              1         4,231,250 ns     59,217,250 ns     13.00x (C++ wins!)
-input5 (100,000 bytes)             1         4,002,792 ns     61,180,500 ns     15.00x (C++ wins!)
-input6 (1,000,000 bytes)           1         4,387,500 ns     60,962,209 ns     13.00x (C++ wins!)
-input7 (10,000,000 bytes)          1         7,945,250 ns     66,440,416 ns      8.00x (C++ wins!)
-input8 (100,000,000 bytes)         1        43,348,167 ns    118,088,750 ns      2.00x (C++ wins!)
-input1 (10 bytes)                  2         3,835,875 ns     60,245,292 ns     15.00x (C++ wins!)
-input2 (100 bytes)                 2         3,794,541 ns     60,314,583 ns     15.00x (C++ wins!)
-input3 (1,000 bytes)               2         3,897,708 ns     59,611,417 ns     15.00x (C++ wins!)
-input4 (10,000 bytes)              2         3,881,916 ns     61,785,041 ns     15.00x (C++ wins!)
-input5 (100,000 bytes)             2         3,836,458 ns     60,081,083 ns     15.00x (C++ wins!)
-input6 (1,000,000 bytes)           2         4,218,959 ns     60,323,458 ns     14.00x (C++ wins!)
-input7 (10,000,000 bytes)          2         8,120,458 ns     65,705,458 ns      8.00x (C++ wins!)
-input8 (100,000,000 bytes)         2        42,743,958 ns    116,511,708 ns      2.00x (C++ wins!)
-input1 (10 bytes)                  3         4,075,750 ns     59,484,125 ns     14.00x (C++ wins!)
-input2 (100 bytes)                 3         3,811,750 ns     59,731,250 ns     15.00x (C++ wins!)
-input3 (1,000 bytes)               3         3,814,666 ns     59,546,625 ns     15.00x (C++ wins!)
-input4 (10,000 bytes)              3         3,785,791 ns     60,626,000 ns     16.00x (C++ wins!)
-input5 (100,000 bytes)             3         3,601,666 ns     59,802,625 ns     16.00x (C++ wins!)
-input6 (1,000,000 bytes)           3         4,191,166 ns     60,641,416 ns     14.00x (C++ wins!)
-input7 (10,000,000 bytes)          3         8,095,875 ns     68,071,500 ns      8.00x (C++ wins!)
-input8 (100,000,000 bytes)         3        43,222,708 ns    117,334,333 ns      2.00x (C++ wins!)
+input1 (10 bytes)                  1         7,310,292 ns    122,337,000 ns     16.00x (C++ wins!)
+input2 (100 bytes)                 1         5,250,875 ns    113,674,500 ns     21.00x (C++ wins!)
+input3 (1,000 bytes)               1         5,341,625 ns    112,402,958 ns     21.00x (C++ wins!)
+input4 (10,000 bytes)              1         4,912,209 ns    113,795,750 ns     23.00x (C++ wins!)
+input5 (100,000 bytes)             1         5,247,208 ns    112,086,708 ns     21.00x (C++ wins!)
+input6 (1,000,000 bytes)           1         5,717,125 ns    112,697,792 ns     19.00x (C++ wins!)
+input7 (10,000,000 bytes)          1        10,700,834 ns    119,352,417 ns     11.00x (C++ wins!)
+input8 (100,000,000 bytes)         1        52,803,417 ns    191,939,500 ns      3.00x (C++ wins!)
+input1 (10 bytes)                  2         3,671,250 ns    107,211,375 ns     29.00x (C++ wins!)
+input2 (100 bytes)                 2         5,072,792 ns    112,407,625 ns     22.00x (C++ wins!)
+input3 (1,000 bytes)               2         4,668,833 ns    111,602,583 ns     23.00x (C++ wins!)
+input4 (10,000 bytes)              2         4,660,792 ns    112,008,292 ns     24.00x (C++ wins!)
+input5 (100,000 bytes)             2         4,675,875 ns    112,914,708 ns     24.00x (C++ wins!)
+input6 (1,000,000 bytes)           2         5,334,500 ns    114,160,917 ns     21.00x (C++ wins!)
+input7 (10,000,000 bytes)          2        11,232,792 ns    119,210,000 ns     10.00x (C++ wins!)
+input8 (100,000,000 bytes)         2        52,097,042 ns    181,990,375 ns      3.00x (C++ wins!)
+input1 (10 bytes)                  3         3,726,791 ns    106,394,125 ns     28.00x (C++ wins!)
+input2 (100 bytes)                 3         4,990,500 ns    113,719,291 ns     22.00x (C++ wins!)
+input3 (1,000 bytes)               3         4,882,792 ns    113,991,917 ns     23.00x (C++ wins!)
+input4 (10,000 bytes)              3         5,054,458 ns    112,881,500 ns     22.00x (C++ wins!)
+input5 (100,000 bytes)             3         5,180,958 ns    112,406,250 ns     21.00x (C++ wins!)
+input6 (1,000,000 bytes)           3         5,779,833 ns    113,486,834 ns     19.00x (C++ wins!)
+input7 (10,000,000 bytes)          3        10,747,875 ns    119,093,209 ns     11.00x (C++ wins!)
+input8 (100,000,000 bytes)         3        52,637,666 ns    170,915,917 ns      3.00x (C++ wins!)
+```
+
+## Repo structure
+
+```text
+  .
+  |-- LICENSE.txt
+  |-- Makefile
+  |-- PAPER.md
+  |-- README.md
+  |-- docs
+  |   |-- app.js
+  |   |-- index.html
+  |   |-- rain.js
+  |   `-- rain.wasm
+  |-- js
+  |   |-- lib
+  |   |   `-- api.mjs
+  |   |-- package-lock.json
+  |   |-- package.json
+  |   |-- rainsum.mjs
+  |   `-- test.mjs
+  |-- rain
+  |   |-- bin
+  |   |   `-- rainsum
+  |   `-- obj
+  |       |-- rainbow.d
+  |       |-- rainbow.o
+  |       |-- rainstorm.d
+  |       |-- rainstorm.o
+  |       |-- rainsum.d
+  |       `-- rainsum.o
+  |-- rainsum -> rain/bin/rainsum
+  |-- results
+  |   |-- dieharder
+  |   |   |-- README.md
+  |   |   |-- rainbow-256.txt
+  |   |   |-- rainbow-64-infinite.txt
+  |   |   |-- rainstorm-256.txt
+  |   |   `-- rainstorm-64-infinite.txt
+  |   `-- smhasher3
+  |       |-- rainbow-128.txt
+  |       |-- rainbow-256.txt
+  |       |-- rainbow.txt
+  |       |-- rainstorm-128.txt
+  |       |-- rainstorm-256.txt
+  |       `-- rainstorm.txt
+  |-- scripts
+  |   |-- 1srain.sh
+  |   |-- bench.mjs
+  |   |-- blockchain.sh
+  |   |-- build.sh
+  |   |-- chain.mjs
+  |   |-- package-lock.json
+  |   |-- package.json
+  |   |-- testjs.sh
+  |   |-- vectors.sh
+  |   `-- verify.sh
+  |-- src
+  |   |-- common.h
+  |   |-- cxxopts.hpp
+  |   |-- rainbow.cpp
+  |   |-- rainstorm.cpp
+  |   |-- rainsum.cpp
+  |   `-- tool.h
+  |-- verification
+  |   `-- vectors.txt
+  `-- wasm
+      |-- rain.js
+      `-- rain.wasm
+14 directories, 51 files
 ```
 
 ## Rainbow 
 
-Rainbow is a fast hash function (13.2 GiB/sec, 4.61 bytes/cycle on long messages, 24.8 cycles/hash for short messages). It's intended for general-purpose, non-cryptographic hashing. The core mixing function utilizes multiplication, subtraction/addition, rotation, and XOR. 
-
-## Repository structure
-
-Below is the repo structure before running make (but after npm install in `js/` and `scripts/`. 
-
-```tree
-.
-|-- LICENSE.txt
-|-- Makefile
-|-- README.md
-|-- js
-|   |-- lib
-|   |   `-- api.mjs
-|   |-- node_modules
-|   |   |-- ansi-regex
-|   |   |-- ansi-styles
-|   |   |-- cliui
-|   |   |-- color-convert
-|   |   |-- color-name
-|   |   |-- emoji-regex
-|   |   |-- escalade
-|   |   |-- get-caller-file
-|   |   |-- is-fullwidth-code-point
-|   |   |-- require-directory
-|   |   |-- string-width
-|   |   |-- strip-ansi
-|   |   |-- wrap-ansi
-|   |   |-- y18n
-|   |   |-- yargs
-|   |   `-- yargs-parser
-|   |-- package-lock.json
-|   |-- package.json
-|   |-- rainsum.mjs
-|   `-- test.mjs
-|-- rain
-|-- results
-|   |-- dieharder
-|   |   |-- README.md
-|   |   |-- rainbow-256.txt
-|   |   |-- rainbow-64-infinite.txt
-|   |   |-- rainstorm-256.txt
-|   |   `-- rainstorm-64-infinite.txt
-|   `-- smhasher3
-|       |-- rainbow-064.txt
-|       |-- rainbow-128.txt
-|       |-- rainstorm-064.txt
-|       `-- rainstorm-128.txt
-|-- scripts
-|   |-- 1srain.sh
-|   |-- bench.mjs
-|   |-- blockchain.sh
-|   |-- build.sh
-|   |-- node_modules
-|   |   `-- chalk
-|   |-- package-lock.json
-|   |-- package.json
-|   |-- testjs.sh
-|   |-- vectors.sh
-|   `-- verify.sh
-|-- src
-|   |-- common.h
-|   |-- cxxopts.hpp
-|   |-- rainbow.cpp
-|   |-- rainstorm.cpp
-|   |-- rainsum.cpp
-|   `-- tool.h
-`-- verification
-    `-- vectors.txt
-
-29 directories, 33 files
-```
+Rainbow is a fast hash function. It's intended for general-purpose, non-cryptographic hashing. The core mixing function utilizes multiplication, subtraction/addition, rotation, and XOR. 
 
 ## Rainstorm - **Unvetted for Security**
 
-Rainstorm is a slower hash function with a tunable-round feature (with 4 rounds runs at 4.7 GiB/sec). It's designed with cryptographic hashing in mind, but it hasn't been formally analyzed for security, so we provide no guarantees. The core mixing function uses addition/subtraction, rotation, and XOR.
+Rainstorm is a slower hash function with a tunable-round feature. It's designed with cryptographic hashing in mind, but it hasn't been formally analyzed for security, so we provide no guarantees. The core mixing function uses addition/subtraction, rotation, and XOR.
 
 Rainstorm's round number is adjustable, potentially offering additional security. However, please note that this is hypothetical until rigorous security analysis is completed. 
 
@@ -159,7 +159,7 @@ The fundamental concept for the mixing functions derived from Discohash, but has
 
 ## License
 
-This repository and content is licensed under Apache-2.0 unless otherwise noted. It's copyright &copy; Cris Stringfellow and The Dosyago Corporation 2023. All rights reserved. 
+This repository and content is licensed under Apache-2.0 unless otherwise noted. It's copyright &copy; Cris and The Dosyago Corporation 2023. All rights reserved. 
 
 # Rainsum Field Manual
 
