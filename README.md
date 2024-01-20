@@ -1,38 +1,73 @@
 # Rain
 
-- [Rain](#rain)
-  - [Repository structure](#repository-structure)
-  - [Rainbow](#rainbow)
-  - [Rainstorm - Unvetted for Security](#rainstorm---unvetted-for-security)
-  - [Note on Cryptographic Intent](#note-on-cryptographic-intent)
-  - [Genesis](#genesis)
-  - [License](#license)
-- [Rainsum Field Manual](#rainsum-field-manual)
-  - [1. Introduction](#1-introduction)
-  - [2. Basic Usage](#2-basic-usage)
-    - [2.1 Command Structure](#21-command-structure)
-    - [2.2 Options](#22-options)
-  - [3. Modes of Operation](#3-modes-of-operation)
-    - [3.1 Digest Mode](#31-digest-mode)
-    - [3.2 Stream Mode](#32-stream-mode)
-  - [4. Hash Algorithms and Sizes](#4-hash-algorithms-and-sizes)
-  - [5. Test Vectors](#5-test-vectors)
-  - [6. Seed Values](#6-seed-values)
-  - [7. Help and Version Information](#7-help-and-version-information)
-  - [8. Compilation](#8-compilation)
-  - [9. Conclusion](#9-conclusion)
-- [Developer Information](#developer-information)
-  - [Stability](#stability)
-  - [Test vectors](#test-vectors)
-  - [Building and Installing](#building-and-installing)
-  - [Contributions](#contributions)
-
 This repository houses the Rainbow and Rainstorm hash functions, developed by Cris at DOSYAGO and licensed under Apache-2.0. The 64-bit variants have passed all tests in the [SMHasher3](https://gitlab.com/fwojcik/smhasher3) suite. [Results](results) can be found in the `results/` subdirectory.
 
 | Algorithm | Speed | Hash Size | Purpose | Core Mixing Function | Security |
 | :- | :- | :- | :- | :- | :- |
 | Rainbow | 5.79 GiB/sec | 64 to 256 bits | General-purpose non-cryptographic hashing | Multiplication, subtraction/addition, rotation, XOR | Not designed for cryptographic security |
 | Rainstorm | 1.91 GiB/sec (at 4 rounds, tuneable) | 64 to 512 bits | Potential cryptographic hashing | Addition/subtraction, rotation, XOR | No formal security analysis yet |
+
+## Table of Contents
+
+- [Rain](#rain)
+  * [This table of contents](#table-of-contents)
+  * [Assets](#assets)
+  * [Building](#building)
+  * [Benchmark](#benchmark)
+  * [Repo structure](#repo-structure)
+  * [Rainbow](#rainbow)
+  * [Rainstorm - Unvetted for Security](#rainstorm---unvetted-for-security)
+  * [Note on Cryptographic Intent](#note-on-cryptographic-intent)
+  * [Genesis](#genesis)
+  * [License](#license)
+- [Rainsum Field Manual](#rainsum-field-manual)
+  * [1. Introduction](#1-introduction)
+  * [2. Basic Usage](#2-basic-usage)
+    + [2.1 Command Structure](#21-command-structure)
+    + [2.2 Options](#22-options)
+  * [3. Modes of Operation](#3-modes-of-operation)
+    + [3.1 Digest Mode](#31-digest-mode)
+    + [3.2 Stream Mode](#32-stream-mode)
+  * [4. Hash Algorithms and Sizes](#4-hash-algorithms-and-sizes)
+  * [5. Test Vectors](#5-test-vectors)
+  * [6. Seed Values](#6-seed-values)
+  * [7. Help and Version Information](#7-help-and-version-information)
+  * [8. Compilation](#8-compilation)
+  * [9. Conclusion](#9-conclusion)
+- [Developer Information](#developer-information)
+  * [Stability](#stability)
+  * [Test vectors](#test-vectors)
+  * [Building and Installing](#building-and-installing)
+  * [Contributions](#contributions)
+
+## Assets
+
+This repository produces:
+
+- rainsum CLI tool and rainstorm.o and rainbow.o object files
+- wasm binary
+- JavaScript CLI tool (API compat with C++ binary, but slower)
+- NPM package with `jsrsum` global (the JavaScript CLI tool), plus an importable ES Module library exporting `async rainbowHash(hashSize, seed, input)` and `async rainstormHash(hashSize, seed, input)` functions taking inputs as `string` or `Buffer`, backed by the wasm binary.
+- A collection of scripts:
+  - `./scripts/bench.mjs`: benchmark the speed between the JS WASM and C++ implementations
+  - `./scripts/verify.mjs`: verify the correctness of the implementations
+  - And other scripts.
+
+## Building
+
+Build with make:
+
+```shell
+make clean && make
+```
+
+Optionall to install rainsum into an executable path location, run:
+
+```
+make install
+```
+
+which may require `sudo` privileges.
 
 ## Benchmark
 
@@ -77,7 +112,7 @@ input8 (100,000,000 bytes)         3        52,637,666 ns    170,915,917 ns     
   |-- docs
   |   |-- app.js
   |   |-- index.html
-  |   |-- rain.js
+  |   |-- rain.cjs
   |   `-- rain.wasm
   |-- js
   |   |-- lib
@@ -85,7 +120,10 @@ input8 (100,000,000 bytes)         3        52,637,666 ns    170,915,917 ns     
   |   |-- package-lock.json
   |   |-- package.json
   |   |-- rainsum.mjs
-  |   `-- test.mjs
+  |   |-- test.mjs
+  |   `-- wasm
+  |       |-- rain.cjs
+  |       `-- rain.wasm
   |-- rain
   |   |-- bin
   |   |   `-- rainsum
@@ -117,6 +155,7 @@ input8 (100,000,000 bytes)         3        52,637,666 ns    170,915,917 ns     
   |   |-- blockchain.sh
   |   |-- build.sh
   |   |-- chain.mjs
+  |   |-- debug.sh
   |   |-- package-lock.json
   |   |-- package.json
   |   |-- testjs.sh
@@ -129,12 +168,9 @@ input8 (100,000,000 bytes)         3        52,637,666 ns    170,915,917 ns     
   |   |-- rainstorm.cpp
   |   |-- rainsum.cpp
   |   `-- tool.h
-  |-- verification
-  |   `-- vectors.txt
-  `-- wasm
-      |-- rain.js
-      `-- rain.wasm
-14 directories, 51 files
+  `-- verification
+      `-- vectors.txt
+14 directories, 52 files
 ```
 
 ## Rainbow 
