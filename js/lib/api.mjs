@@ -172,7 +172,7 @@ export async function rainbowHash(hashSize, seed, input) {
 async function loadRain() {
   let resolve;
   const pr = new Promise(res => resolve = res);
-  import('./../../wasm/rain.js').then(async x => {
+  import('./../wasm/rain.cjs').then(async x => {
     await untilTrue(() => {
       return !!x?.default?.wasmExports?.memory;
     });
