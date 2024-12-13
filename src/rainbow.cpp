@@ -118,20 +118,20 @@ namespace rainbow {
         mixB(h, seed);
 
         switch (chunk_len) {
-          case 15: h[0] += (uint64_t)chunk[14] << 56; [[fallthrough]];
-          case 14: h[1] += (uint64_t)chunk[13] << 48; [[fallthrough]]
-          case 13: h[2] += (uint64_t)chunk[12] << 40; [[fallthrough]]
-          case 12: h[3] += (uint64_t)chunk[11] << 32; [[fallthrough]]
-          case 11: h[0] += (uint64_t)chunk[10] << 24; [[fallthrough]]
-          case 10: h[1] += (uint64_t)chunk[9]  << 16; [[fallthrough]]
-          case  9: h[2] += (uint64_t)chunk[8]  << 8;  [[fallthrough]]
-          case  8: h[3] += chunk[7];                   [[fallthrough]]
-          case  7: h[0] += (uint64_t)chunk[6]  << 48; [[fallthrough]]
-          case  6: h[1] += (uint64_t)chunk[5]  << 40; [[fallthrough]]
-          case  5: h[2] += (uint64_t)chunk[4]  << 32; [[fallthrough]]
-          case  4: h[3] += (uint64_t)chunk[3]  << 24; [[fallthrough]]
-          case  3: h[0] += (uint64_t)chunk[2]  << 16; [[fallthrough]]
-          case  2: h[1] += (uint64_t)chunk[1]  <<  8; [[fallthrough]]
+          case 15: h[0] += (uint64_t)chunk[14] << 56; // [[fallthrough]];
+          case 14: h[1] += (uint64_t)chunk[13] << 48; // [[fallthrough]]
+          case 13: h[2] += (uint64_t)chunk[12] << 40; // [[fallthrough]]
+          case 12: h[3] += (uint64_t)chunk[11] << 32; // [[fallthrough]]
+          case 11: h[0] += (uint64_t)chunk[10] << 24; // [[fallthrough]]
+          case 10: h[1] += (uint64_t)chunk[9]  << 16; // [[fallthrough]]
+          case  9: h[2] += (uint64_t)chunk[8]  << 8;  // [[fallthrough]]
+          case  8: h[3] += chunk[7];                  //  [[fallthrough]]
+          case  7: h[0] += (uint64_t)chunk[6]  << 48; // [[fallthrough]]
+          case  6: h[1] += (uint64_t)chunk[5]  << 40; // [[fallthrough]]
+          case  5: h[2] += (uint64_t)chunk[4]  << 32; // [[fallthrough]]
+          case  4: h[3] += (uint64_t)chunk[3]  << 24; // [[fallthrough]]
+          case  3: h[0] += (uint64_t)chunk[2]  << 16; // [[fallthrough]]
+          case  2: h[1] += (uint64_t)chunk[1]  <<  8; // [[fallthrough]]
           case  1: h[2] += (uint64_t)chunk[0];
         }
 
@@ -220,20 +220,20 @@ namespace rainbow {
     mixB(h, seed);
 
     switch (len) {
-      case 15: h[0] += (uint64_t)data[14] << 56; [[fallthrough]];
-      case 14: h[1] += (uint64_t)data[13] << 48; [[fallthrough]]
-      case 13: h[2] += (uint64_t)data[12] << 40; [[fallthrough]]
-      case 12: h[3] += (uint64_t)data[11] << 32; [[fallthrough]]
-      case 11: h[0] += (uint64_t)data[10] << 24; [[fallthrough]]
-      case 10: h[1] += (uint64_t)data[9]  << 16; [[fallthrough]]
-      case  9: h[2] += (uint64_t)data[8]  << 8;  [[fallthrough]]
-      case  8: h[3] += data[7];                   [[fallthrough]]
-      case  7: h[0] += (uint64_t)data[6]  << 48; [[fallthrough]]
-      case  6: h[1] += (uint64_t)data[5]  << 40; [[fallthrough]]
-      case  5: h[2] += (uint64_t)data[4]  << 32; [[fallthrough]]
-      case  4: h[3] += (uint64_t)data[3]  << 24; [[fallthrough]]
-      case  3: h[0] += (uint64_t)data[2]  << 16; [[fallthrough]]
-      case  2: h[1] += (uint64_t)data[1]  <<  8; [[fallthrough]]
+      case 15: h[0] += (uint64_t)data[14] << 56; // [[fallthrough]];
+      case 14: h[1] += (uint64_t)data[13] << 48; // [[fallthrough]]
+      case 13: h[2] += (uint64_t)data[12] << 40; // [[fallthrough]]
+      case 12: h[3] += (uint64_t)data[11] << 32; // [[fallthrough]]
+      case 11: h[0] += (uint64_t)data[10] << 24; // [[fallthrough]]
+      case 10: h[1] += (uint64_t)data[9]  << 16; // [[fallthrough]]
+      case  9: h[2] += (uint64_t)data[8]  << 8;  // [[fallthrough]]
+      case  8: h[3] += data[7];                  //  [[fallthrough]]
+      case  7: h[0] += (uint64_t)data[6]  << 48; // [[fallthrough]]
+      case  6: h[1] += (uint64_t)data[5]  << 40; // [[fallthrough]]
+      case  5: h[2] += (uint64_t)data[4]  << 32; // [[fallthrough]]
+      case  4: h[3] += (uint64_t)data[3]  << 24; // [[fallthrough]]
+      case  3: h[0] += (uint64_t)data[2]  << 16; // [[fallthrough]]
+      case  2: h[1] += (uint64_t)data[1]  <<  8; // [[fallthrough]]
       case  1: h[2] += (uint64_t)data[0];
     }
 
