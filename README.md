@@ -4,7 +4,7 @@
 Rainsum v1.2.0 now includes improvements adapted from [Frank J. T. Wojcik's SMHasher3](https://gitlab.com/fwojcik/smhasher3), the gold standard for evaluating non-cryptographic hash functions. SMHasher3 provides extensive speedups, bug fixes, and enhancements over SMHasher and SMHasher2. From their repo:
 *"SMHasher3 is a test suite for evaluating non-cryptographic hash functions."*
 
-This repository features the **Rainbow** and **Rainstorm** hash functions, created by [Cris](https://github.com/o0101) at [DOSAYGO](https://github.com/dosyago) and licensed under Apache-2.0. The 64-bit variants pass all tests in SMHasher3. Relevant [results](results) are available in the `results/` directory.
+This repository features the **Rainbow** and **Rainstorm** hash functions, created by [Cris](https://github.com/o0101) at [DOSAYGO](https://github.com/dosyago) and licensed under Apache-2.0. All size variants of both hashes pass all tests in SMHasher3. Relevant [results](results) are available in the `results/` directory.
 
 The codebase includes:
 - A C++ reference implementation
@@ -180,13 +180,13 @@ Runs 2 and 3 show similar results, consistently demonstrating that the native C+
 
 ## Rainstorm - Unvetted for Security
 
-**Rainstorm** is a slower, more complex hash function inspired by cryptographic designs. It supports output sizes of 64 to 512 bits and adjustable rounds. While it uses operations reminiscent of cryptographic hashes, it **is not formally analyzed**. Consider it experimental.
+**Rainstorm** is a slower, more complex hash function inspired by cryptographic designs. It supports output sizes of 64 to 512 bits and adjustable rounds. While it uses operations reminiscent of cryptographic hashes, it **is not formally analyzed by any 3rd-party**. Consider it experimental, but designed to be secure. 
 
 ---
 
 ## Note on Cryptographic Intent
 
-Rainstorm’s design includes concepts from cryptographic hashing, but without formal analysis, it should not be considered secure. Feedback and analysis are welcome.
+Rainstorm's design includes concepts from cryptographic hashing, but without formal analysis, it should not be considered secure. Feedback and analysis are welcome.
 
 ---
 
@@ -198,7 +198,7 @@ The mixing functions were inspired by Discohash and refined iteratively using SM
 
 ## License
 
-Apache-2.0 © 2023 Cris & DOSAYGO Corporation.
+Apache-2.0 © 202 - 20243 Cris & DOSAYGO Corporation. With improvements &copy; Frank J. T. Wojcik 2023
 
 ---
 
