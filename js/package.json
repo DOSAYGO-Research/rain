@@ -10,7 +10,7 @@
   },
   "scripts": {
     "prepublishOnly": "cp ../README.md .",
-    "test": "node rainsum.mjs"
+    "test": "node test.mjs"
   },
   "repository": {
     "type": "git",

@@ -1,5 +1,7 @@
 CXX = clang++
 CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O3 
+CXXFLAGS += -isysroot $(shell xcrun --show-sdk-path)
+CXXFLAGS += -fuse-ld=ld
 DEPFLAGS = -MMD -MF $(@:.o=.d)
 LDFLAGS = 
 

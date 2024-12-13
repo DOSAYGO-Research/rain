@@ -38,7 +38,7 @@ jsrsum --help
 
 **Native channel:**
 
-First, make everything:
+First, make everything (if you want wasm, ensure you have [Emscripten installed](https://emscripten.org/docs/getting_started/downloads.html)):
 
 ```shell
 make clean && make
