@@ -14,7 +14,7 @@ The codebase includes:
 | Algorithm | Speed              | Hash Size        | Purpose                              | Core Mixing Function                              | Security                        |
 |-----------|--------------------|------------------|--------------------------------------|---------------------------------------------------|---------------------------------|
 | Rainbow   | ~5.79 GiB/s        | 64, 128, 256 bits| General-purpose, non-crypto hash      | Multiplication, addition/subtraction, rotation, XOR| Not designed as cryptographic   |
-| Rainstorm | ~1.91 GiB/s (4 rds)| 64 to 512 bits   | Experimental cryptographic-like hashing| Addition/subtraction, rotation, XOR                | Unvetted, no formal analysis    |
+| Rainstorm | ~1.91 GiB/s (4 rds)| 64 to 512 bits   | Proposed as a crypto-hash but requires analyses | Addition/subtraction, rotation, XOR                | Unvetted, no formal analysis    |
 
 ---
 
