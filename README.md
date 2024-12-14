@@ -3,7 +3,7 @@
 > [!TIP]
 > **Example usage (hash everything)**:
 > ```console
->  find . -print0 | xargs -0 -I{} rainsum {}
+>  find . -type f -print0 | xargs -0 -I{} rainsum {}
 > ```
 
 **News**
