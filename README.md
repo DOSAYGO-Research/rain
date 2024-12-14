@@ -1,5 +1,11 @@
 # Rain
 
+> [!TIP]
+> **Example usage (hash everything)**:
+> ```console
+>  find . -print0 | xargs -0 -I{} rainsum {}
+> ```
+
 **News**
 Rainsum v1.2.0 now includes improvements adapted from [Frank J. T. Wojcik's SMHasher3](https://gitlab.com/fwojcik/smhasher3), the gold standard for evaluating non-cryptographic hash functions. SMHasher3 provides extensive speedups, bug fixes, and enhancements over SMHasher and SMHasher2. From their repo:
 *"SMHasher3 is a test suite for evaluating non-cryptographic hash functions."*
