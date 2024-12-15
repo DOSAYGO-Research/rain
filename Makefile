@@ -1,3 +1,6 @@
+PATH := /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:$(PATH)
+SHELL := /bin/bash
+
 CXX = clang++
 CXXFLAGS = -std=c++17 -Wall -Wextra -pedantic -O3 
 CXXFLAGS += -isysroot $(shell xcrun --show-sdk-path)

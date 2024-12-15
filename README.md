@@ -91,6 +91,11 @@ The codebase includes:
    sudo make install  # optional, installs 'rainsum' globally
    ```
 
+   If you encounter troubles on macOS use the build script:
+   ```bash
+   ./scripts/build.sh
+   ```
+
 2. **Use as a library or CLI**:
    - Link `rainstorm.o` or `rainbow.o` into your project, or include `tool.h` and source files from `./src/`.
    - Use the `rainsum` CLI directly:
@@ -278,7 +283,7 @@ Use `--seed` to set a custom seed. String seeds are hashed to a 64-bit value.
 
 ## 8. Compilation
 
-A modern C++17 compiler is required. Run `make` to build. Ensure necessary build tools (like `xcode-select` on macOS) are installed.
+A modern C++17 compiler is required. Run `make` to build. Ensure necessary build tools (like `xcode-select` on macOS) are installed. On macOS you should use `./scripts/build.sh` to ensure that path to the correct compiler and SDK is accurate, modify that script if needed for your system.
 
 ## 9. Conclusion
 
