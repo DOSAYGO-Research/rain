@@ -3,7 +3,7 @@
   "version": "1.2.1",
   "module": true,
   "type": "module",
-  "description": "Rain hashes in JavaScript via WASM",
+  "description": "The fastest 128-bit and 256-bit hash, passes all tests, and under 140 source lines of code. API library and CLI tool in C++ and NodeJS/Wasm",
   "main": "./lib/api.mjs",
   "bin": {
     "jsrsum": "./rainsum.mjs"
@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dosyago/rain.git"
+    "url": "git+https://github.com/DOSAYGO-Research/rain.git"
   },
   "keywords": [
     "hash",
@@ -23,9 +23,9 @@
   "author": "@dosy",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/dosyago/rain/issues"
+    "url": "https://github.com/DOSAYGO-Research/rain/issues"
   },
-  "homepage": "https://github.com/dosyago/rain#readme",
+  "homepage": "https://github.com/DOSAYGO-Research/rain#readme",
   "dependencies": {
     "yargs": "latest"
   }
