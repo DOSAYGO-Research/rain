@@ -152,8 +152,26 @@ Process this final block with 4 rounds of $\text{weakfunc}$, then:
 
 If $N > 64$ bits, perform $\max(N/64, 2)$ additional calls of $\text{weakfunc}(h, temp, true)$ to further mix the state.
 
-\section*{Output}
-The final hash is derived from $h[0 \ldots 7]$ depending on the desired output length $N$:
+\section*{Output and Final Rounds}
+After processing the final padded block and performing the subtraction step
+\[
+\text{for } i=0 \text{ to } 7:\quad h[i] \leftarrow h[i] - h[i+8],
+\]
+an additional finalization step is applied if $N > 64$ bits. Define:
+\[
+\text{FINAL\_ROUNDS} = 2.
+\]
+
+If the desired output length $N$ is greater than 64 bits, apply $\max(N/64, \text{FINAL\_ROUNDS})$ additional calls to
+\[
+\text{weakfunc}(h, temp, \text{true})
+\]
+using the same $temp$ block (the final padded block).
+
+This ensures further mixing of the internal state before extraction of the final digest.
+
+\subsection*{Extracting the Output}
+The final hash is derived from the first $N/64$ 64-bit words of $h[0 \ldots 7]$ in little-endian format:
 
 \begin{itemize}
   \item $N=64$ bits: output $h[0]$
@@ -162,6 +180,11 @@ The final hash is derived from $h[0 \ldots 7]$ depending on the desired output l
   \item $N=512$ bits: output $(h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7])$
 \end{itemize}
 
+Each 64-bit word is written to the output buffer in little-endian byte order. No further transformations are performed.
+
+\medskip
+
+This finalization and extraction process ensures that for each supported output size, the resulting hash is fully defined by the preceding steps, including the additional final rounds for outputs greater than 64 bits.
 
 \section*{Empirical Results and Analysis Invitation}
 Rainstorm’s design choices were guided by empirical testing, including runs through \href{https://gitlab.com/fwojcik/smhasher3}{SMHasher3} (by Frank J. T. Wojcik). Tests indicate strong avalanche characteristics and minimal bias, suggesting that small changes in input bits produce large, unpredictable changes in output bits. Preliminary performance benchmarks show around 247 cycles per hash for small keys and bulk speeds of about 1.92 GiB/s at 3.5 GHz.
