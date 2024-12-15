@@ -153,11 +153,15 @@ Process this final block with 4 rounds of $\text{weakfunc}$, then:
 If $N > 64$ bits, perform $\max(N/64, 2)$ additional calls of $\text{weakfunc}(h, temp, true)$ to further mix the state.
 
 \section*{Output}
-The final hash is taken from $h[0..7]$ as follows:
-- $N=64$: output $h[0]$
-- $N=128$: output $(h[0], h[1])$
-- $N=256$: output $(h[0], h[1], h[2], h[3])$
-- $N=512$: output $(h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7])$
+The final hash is derived from $h[0 \ldots 7]$ depending on the desired output length $N$:
+
+\begin{itemize}
+  \item $N=64$ bits: output $h[0]$
+  \item $N=128$ bits: output $(h[0], h[1])$
+  \item $N=256$ bits: output $(h[0], h[1], h[2], h[3])$
+  \item $N=512$ bits: output $(h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7])$
+\end{itemize}
+
 
 \section*{Empirical Results and Analysis Invitation}
 Rainstorm’s design choices were guided by empirical testing, including runs through \href{https://gitlab.com/fwojcik/smhasher3}{SMHasher3} (by Frank J. T. Wojcik). Tests indicate strong avalanche characteristics and minimal bias, suggesting that small changes in input bits produce large, unpredictable changes in output bits. Preliminary performance benchmarks show around 247 cycles per hash for small keys and bulk speeds of about 1.92 GiB/s at 3.5 GHz.
