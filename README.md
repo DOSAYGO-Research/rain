@@ -197,6 +197,11 @@ Runs 2 and 3 show similar results, consistently demonstrating that the native C+
 
 **Rainstorm** is a slower, more complex hash function inspired by cryptographic designs. It supports output sizes of 64 to 512 bits and adjustable rounds. While it uses operations reminiscent of cryptographic hashes, it **is not formally analyzed by any 3rd-party**. Consider it experimental, but designed to be secure. 
 
+### Documents
+
+- **Rainstorm Formal Spec (Draft)**: [PDF](docs/paper/storm-spec.pdf)
+- **Rainstorm Crypto Note**: [PDF](docs/paper/crypto-note.pdf)
+
 ---
 
 ## Note on Cryptographic Intent
