@@ -1,4 +1,4 @@
-#define __RAINBNOWVERSION__ "1.2.0"
+#define __RAINBNOWVERSION__ "1.2.2"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
