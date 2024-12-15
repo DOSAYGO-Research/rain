@@ -213,7 +213,7 @@ The mixing functions were inspired by Discohash and refined iteratively using SM
 
 ## License
 
-Apache-2.0 © 202 - 20243 Cris & DOSAYGO Corporation. With improvements &copy; Frank J. T. Wojcik 2023
+Apache-2.0 © 2023 - 2024 Cris & DOSAYGO Corporation. With improvements &copy; Frank J. T. Wojcik 2023
 
 ---
 
