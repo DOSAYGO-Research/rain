@@ -1,5 +1,8 @@
 # Rain
 
+> *The fastest 128-bit and 256-bit non-crypto hash, passes all tests, and under 140 source lines of code. Nice!*
+>   &mdash; [mrbluecoat](https://news.ycombinator.com/item?id=42412040)
+
 > [!TIP]
 > **Example usage (hash everything)**:
 > ```console
@@ -10,7 +13,7 @@
 Rainsum v1.2.0 now includes improvements adapted from [Frank J. T. Wojcik's SMHasher3](https://gitlab.com/fwojcik/smhasher3), the gold standard for evaluating non-cryptographic hash functions. SMHasher3 provides extensive speedups, bug fixes, and enhancements over SMHasher and SMHasher2. From their repo:
 *"SMHasher3 is a test suite for evaluating non-cryptographic hash functions."*
 
-This repository features the **Rainbow** and **Rainstorm** hash functions, created by [Cris](https://github.com/o0101) at [DOSAYGO](https://github.com/dosyago) and licensed under Apache-2.0. All size variants of both hashes pass all tests in SMHasher3. Relevant [results](results) are available in the `results/` directory.
+This repository features the **Rainbow** and **Rainstorm** hash functions, created by [Cris](https://github.com/o0101) at [DOSAYGO](https://github.com/dosyago) and licensed under Apache-2.0. All size variants of both hashes pass **all tests in SMHasher3**. Relevant [results](results) are available in the `results/` directory, or at the [SMHasher3 GitLab repository](https://gitlab.com/fwojcik/smhasher3/-/blob/main/results/README.md)
 
 The codebase includes:
 - A C++ reference implementation
