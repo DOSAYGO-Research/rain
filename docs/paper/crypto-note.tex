@@ -53,14 +53,17 @@ Over decades of cryptographic research, different approaches to hashing and encr
 
 By blending these ideas, Rainstorm attempts a defense-in-depth strategy. Breaking it might require overcoming multiple structural hurdles simultaneously. While no single paradigm guarantees security—MD constructs were broken, DES is outdated, and ARX-only ciphers have known forms of analysis—the hope is that combining their “best” aspects and carefully chosen constants yields a more resistant design.
 
-**The Use of Iterated Weak Functions:**  
-Many well-known designs rely on repeating a relatively simple or “weak” round function multiple times to achieve cryptographic strength. For example:
+\section*{The Use of Iterated Weak Functions}
 
-- **Block Ciphers Like DES and Blowfish:** Each round’s transformation (the Feistel function) is not individually cryptographically strong. However, applying it repeatedly (16 rounds in DES, variable in Blowfish) compounds complexity and makes the final construction secure enough (for its era and key sizes).
+Many well-known designs rely on repeating a relatively simple or \textit{``weak''} round function multiple times to achieve cryptographic strength. For example:
+
+\begin{itemize}
+  \item \textbf{Block Ciphers Like DES and Blowfish:} Each round's transformation (the Feistel function) is not individually cryptographically strong. However, applying it repeatedly (16 rounds in DES, variable in Blowfish) compounds complexity and makes the final construction secure enough for its era and key sizes.
   
-- **Sponge-Based Functions (Keccak/SHA-3):** The Keccak permutation is a repeated application of a simple, “weak” round. A single round of Keccak is not considered secure by itself, but multiple rounds produce a strong permutation.
-
-- **ARX-Based Designs (e.g., ChaCha):** ChaCha’s quarter-round function is simple, but applying it many times in a structured way yields a strong stream cipher.
+  \item \textbf{Sponge-Based Functions (Keccak/SHA-3):} The Keccak permutation is a repeated application of a simple, \textit{``weak''} round. A single round of Keccak is not considered secure by itself, but multiple rounds produce a strong permutation.
+  
+  \item \textbf{ARX-Based Designs (e.g., ChaCha):} ChaCha's quarter-round function is simple, but applying it many times in a structured way yields a strong stream cipher.
+\end{itemize}
 
 Rainstorm follows this common pattern: it defines a simple mixing step (weakfunc) that is not individually secure, but repeated sufficiently many times—guided by empirical testing—results in a well-mixed, statistically strong output. By combining elements of MD iteration, Feistel mixing, sponge-like absorption, and XSR operations, Rainstorm aims to create complexity through iteration, much like these other established designs.
 
