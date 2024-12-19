@@ -1,6 +1,6 @@
 # Compiler and flags
-CXX = clang++
-CXXFLAGS = -O2 -std=c++17 -Xpreprocessor -fopenmp -lomp -stdlib=libc++ 
+CXX = g++
+CXXFLAGS = -O2 -std=c++17 -fopenmp
 
 # Target name
 TARGET = avalanche_program

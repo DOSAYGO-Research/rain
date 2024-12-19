@@ -41,6 +41,17 @@ namespace math_utils {
     return factors;
   }
 
+  inline __uint128_t random_uint128() {
+    std::random_device rd;
+    std::mt19937_64 gen(rd());
+    std::uniform_int_distribution<uint64_t> dist;
+
+    // Combine two 64-bit random numbers into a 128-bit number
+    __uint128_t high = dist(gen);
+    __uint128_t low = dist(gen);
+    return (high << 64) | low;
+  }
+
   inline __uint128_t mod_pow(__uint128_t base, __uint128_t exponent, __uint128_t modulus) {
     __uint128_t result = 1;
     base %= modulus;
@@ -82,11 +93,10 @@ namespace math_utils {
     }
 
     std::mt19937_64 rng(std::random_device{}());
-    std::uniform_int_distribution<__uint128_t> dist(2, n - 2);
 
     // Repeat k times
     for (int i = 0; i < k; i++) {
-      __uint128_t a = dist(rng);
+      __uint128_t a = random_uint128() % (n - 2) + 2;
       __uint128_t x = mod_pow(a, d, n);
 
       if (x == 1 || x == n - 1) continue;
