@@ -120,7 +120,7 @@ namespace math_utils {
     return mod_pow((__uint128_t)base, (__uint128_t)exp, (__uint128_t)mod);
   }
 
-  uint64_t find_generator(const std::vector<uint64_t>& factors, uint64_t p) {
+  uint64_t find_big_generator(const std::vector<uint64_t>& factors, uint64_t p) {
     std::cout << "Searching for a generator modulo " << p << "..." << std::endl;
 
     std::mt19937_64 rng(std::random_device{}());
@@ -138,6 +138,43 @@ namespace math_utils {
         uint64_t congruence = (uint64_t)mod_pow_wrapper(g, dividend, p);
 
         std::cout << "(" << g << ")^((" << p - 1 << ") / " << q << " = " << dividend << ") === " 
+                  << congruence << " (mod " << p << ")" << std::endl;
+
+        if (congruence == 1) {
+          std::cout << "Candidate " << g << " failed." << std::endl;
+          is_generator = false;
+          break;
+        }
+      }
+
+      if (is_generator) {
+        std::cout << "Candidate " << g << " is a successful generator!" << std::endl;
+        return g;
+      }
+    }
+  }
+
+  uint64_t find_generator(const std::vector<uint64_t>& factors, uint64_t p) {
+    std::cout << "Searching for a generator modulo " << p << " with small logarithmic spread..." << std::endl;
+
+    std::mt19937_64 rng(std::random_device{}());
+    std::uniform_int_distribution<int> bit_dist(1, 32); // Each bit length equally likely
+    uint64_t g;
+    bool is_generator;
+
+    while (true) {
+      int bits = bit_dist(rng);
+      std::uniform_int_distribution<uint64_t> gen_dist(1ULL << (bits - 1), (1ULL << bits) - 1);
+      g = gen_dist(rng);
+      std::cout << "Trying candidate: " << g << std::endl;
+
+      is_generator = true;
+
+      for (uint64_t q : factors) {
+        uint64_t dividend = (p - 1) / q;
+        uint64_t congruence = (uint64_t)mod_pow_wrapper(g, dividend, p);
+
+        std::cout << "(" << g << ")^((" << p - 1 << ") / " << q << " = " << dividend << ") === "
                   << congruence << " (mod " << p << ")" << std::endl;
 
         if (congruence == 1) {
