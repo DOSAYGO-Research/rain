@@ -10,6 +10,8 @@
 #include <sstream>
 #include <chrono>
 #include <omp.h>
+#include <cstring> // for strcmp
+#include <cstdlib> // for atoi
 #include "math_utils.h"
 
 struct AvalancheStatistics {
@@ -30,7 +32,7 @@ AvalancheStatistics avalanche_quality(uint64_t P, uint64_t G) {
     std::map<int, int> histogram;
     int sumBitChanges = 0;
     int zero_bits_count = 0;
-    
+
     for (int i = 1; i <= iterations; i++) {
         uint64_t state = dist(gen);
         uint64_t modified_state = state ^ (1ULL << (gen() % 64));
@@ -40,7 +42,7 @@ AvalancheStatistics avalanche_quality(uint64_t P, uint64_t G) {
 
         int bitsChanged = math_utils::hamming_distance(state_prime, modified_state_prime);
         histogram[bitsChanged]++;
-        
+
         if (bitsChanged == 0) {
             zero_bits_count++;
         }
@@ -50,18 +52,18 @@ AvalancheStatistics avalanche_quality(uint64_t P, uint64_t G) {
 
     double average = static_cast<double>(sumBitChanges) / iterations;
     double zero_bits_percentage = static_cast<double>(zero_bits_count) / iterations * 100;
-    
+
     double sumOfSquaredDifferences = 0;
     for (auto &entry : histogram) {
-        sumOfSquaredDifferences += (entry.first - average) * (entry.first - average) * entry.second;
+        double diff = entry.first - average;
+        sumOfSquaredDifferences += diff * diff * entry.second;
     }
     double stdev = std::sqrt(sumOfSquaredDifferences / iterations);
 
     return {P, G, zero_bits_percentage, average, stdev, histogram};
 }
 
-// Adjust the ranking function as desired. Here’s one example from the conversation:
-// Emphasizing stddev more than mean:
+// Emphasizing stddev more than mean in the ranking function
 bool ranking_function(const AvalancheStatistics& a, const AvalancheStatistics& b) {
     double score_a = 10 * std::abs(a.mean - 32) + 15 * a.stddev + 5 * a.zero_bits_percentage;
     double score_b = 10 * std::abs(b.mean - 32) + 15 * b.stddev + 5 * b.zero_bits_percentage;
@@ -80,12 +82,30 @@ std::string generate_histogram_string(const std::map<int, int>& histogram, int i
     return ss.str();
 }
 
-int main() {
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    std::uniform_int_distribution<uint64_t> dist(1ULL << 63, ((1ULL << 63) - 1) + (1ULL << 63));
+void print_usage() {
+    std::cout << "Usage: avalanche_program [num_samples]\n"
+              << "       avalanche_program -h\n\n"
+              << "num_samples: number of (P,G) pairs to test (default: 10)\n"
+              << "-h         : show this help message\n";
+}
 
-    const int num_samples = 10000;
+int main(int argc, char* argv[]) {
+    int num_samples = 10; // default number of samples
+
+    // Check for help flag
+    if (argc > 1 && std::strcmp(argv[1], "-h") == 0) {
+        print_usage();
+        return 0;
+    }
+
+    // If a numeric argument is provided, use it as num_samples
+    if (argc > 1) {
+        num_samples = std::atoi(argv[1]);
+        if (num_samples <= 0) {
+            std::cerr << "Error: num_samples must be a positive integer.\n";
+            return 1;
+        }
+    }
 
     std::vector<AvalancheStatistics> results;
 
@@ -102,7 +122,7 @@ int main() {
             results.push_back(stat);
         }
     }
-    
+
     // Sort the results based on the ranking function
     std::sort(results.begin(), results.end(), ranking_function);
 
