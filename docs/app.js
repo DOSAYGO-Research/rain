@@ -39,73 +39,78 @@
   });
   
   async function hash(submission, form) {
-    if ( inHash ) return;
-    inHash = true;
-    submission?.preventDefault?.();
-    submission?.stopPropagation?.();
-    const task = submission.type == 'submit' ? submission.submitter.value : 'hash';
-    submission.submitter.disabled = true;
-    if ( task == 'test' ) {
-      form.output.value = await testVectors();
-    } else if ( task == 'hash' ) {
-      const algo = form.algo.value;
-      const size = parseInt(form.size.value);
-      const seed = BigInt(form.seed.value);
-      const inputType = submission.target === form.input ? 'text' : 
-          form.fileInput.files.length > 0 ? 'file' : 
-      'text';
-      if ( inputType == 'file' ) {
-        form.input.value = "";
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          let fileContent = event.target.result;
-          if ( fileContent instanceof ArrayBuffer ) {
-            fileContent = new Uint8Array(fileContent);
-          }
-          const hashValue = await globalThis[algo](size, seed, fileContent);
-          form.output.value = hashValue;
-          if ( fileContent.length < 102400 ) {
-            setTimeout(async () => {
-              form.input.value = new TextDecoder().decode(fileContent);
-              await sleep(100);
+    try {
+      if ( inHash ) return;
+      inHash = true;
+      submission?.preventDefault?.();
+      submission?.stopPropagation?.();
+      const task = submission.type == 'submit' ? submission.submitter.value : 'hash';
+      submission.submitter.disabled = true;
+      if ( task == 'test' ) {
+        form.output.value = await testVectors();
+      } else if ( task == 'hash' ) {
+        const algo = form.algo.value;
+        const size = parseInt(form.size.value);
+        const seed = BigInt(form.seed.value);
+        const inputType = submission.target === form.input ? 'text' : 
+            form.fileInput.files.length > 0 ? 'file' : 
+        'text';
+        if ( inputType == 'file' ) {
+          form.input.value = "";
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            let fileContent = event.target.result;
+            if ( fileContent instanceof ArrayBuffer ) {
+              fileContent = new Uint8Array(fileContent);
+            }
+            const hashValue = await globalThis[algo](size, seed, fileContent);
+            form.output.value = hashValue;
+            if ( fileContent.length < 102400 ) {
+              setTimeout(async () => {
+                form.input.value = new TextDecoder().decode(fileContent);
+                await sleep(100);
+                inHash = false;
+              }, 500);
+            } else {
               inHash = false;
-            }, 500);
-          } else {
-            inHash = false;
+            }
+          };
+          reader.readAsArrayBuffer(form.fileInput.files[0]);
+          return false;
+        } else {
+          if ( form.fileInput.files.length > 0 ) {
+            form.fileInput.value = "";
           }
-        };
-        reader.readAsArrayBuffer(form.fileInput.files[0]);
-        return false;
-      } else {
-        if ( form.fileInput.files.length > 0 ) {
-          form.fileInput.value = "";
+          const input = form.input.value;
+          const hashValue = await globalThis[algo](size, seed, input);
+          form.output.value = hashValue;
         }
-        const input = form.input.value;
-        const hashValue = await globalThis[algo](size, seed, input);
-        form.output.value = hashValue;
+      } else if ( task == 'mine' ) {
+        const algo = form.algo.value;
+        const size = parseInt(form.size.value);
+        const seed = BigInt(form.seed.value);
+        submission.submitter.value = 'Mining...';
+        const start = Date.now();
+        let count = 0;
+        const mp = form.mp.value;
+        while ( !form.output.value.startsWith(mp) ) {
+          form.input.value += `${currentHash}\n`; 
+          form.output.value = await globalThis[algo](size, seed, form.input.value);
+          count++;
+        }
+        const end = Date.now();
+        const duration = end - start;
+        submission.submitter.value = `Found after ${count} hashes. In ${duration} seconds.`;
+      } else {
+        alert(`Unknown task: ${task}`);
       }
-    } else if ( task == 'mine' ) {
-      const algo = form.algo.value;
-      const size = parseInt(form.size.value);
-      const seed = BigInt(form.seed.value);
-      submission.submitter.value = 'Mining...';
-      const start = Date.now();
-      let count = 0;
-      const mp = form.mp.value;
-      while ( !form.output.value.startsWith(mp) ) {
-        form.input.value += `${currentHash}\n`; 
-        form.output.value = await globalThis[algo](size, seed, form.input.value);
-        count++;
-      }
-      const end = Date.now();
-      const duration = end - start;
-      submission.submitter.value = `Found after ${count} hashes. In ${duration} seconds.`;
-    } else {
-      alert(`Unknown task: ${task}`);
+      inHash = false;
+      submission.submitter.disabled = false;
+      return false;
+    } catch(e) {
+      console.error(e);
+      return false;
     }
-    inHash = false;
-    submission.submitter.disabled = false;
-    return false;
   }
 
   function isMobileDevice() {
