@@ -239,7 +239,7 @@
         let outputHex = "";
 
         // Helper to get random bytes as a hex string
-        function randomHex(len = 8) {
+        function randomHex(len = 128) {
           const buf = new Uint8Array(len);
           crypto.getRandomValues(buf);
           return Array.from(buf)
@@ -248,7 +248,7 @@
         }
 
         while (true) {
-          const randPart = randomHex(8); // 8 bytes => 16 hex chars
+          const randPart = randomHex(); 
           const thisInput = baseInput + randPart;
           outputHex = await globalThis[algo](size, seed, thisInput);
           count++;
