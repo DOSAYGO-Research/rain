@@ -1,4 +1,11 @@
+  const SPLIT = 50;
   const sleep = ms => new Promise(res => setTimeout(res, ms));
+  const nextAnimationFrame = () => new Promise(res => requestAnimationFrame(res));
+  const rapidTask = new Set([
+    'chain',
+    'nonceInc',
+    'nonceRand',
+  ]);
 
   const STORM_TV = [
     [ "e3ea5f8885f7bb16468d08c578f0e7cc15febd31c27e323a79ef87c35756ce1e", "" ], 
@@ -21,6 +28,7 @@
   ];
 
   class HashError extends Error {}
+  let lastTask;
   let inHash = false;
 
   window.onunhandledrejection = (...x) => {
@@ -44,11 +52,30 @@
       inHash = true;
       submission?.preventDefault?.();
       submission?.stopPropagation?.();
-      const task = submission.type == 'submit' ? submission.submitter.value : 'hash';
-      submission.submitter.disabled = true;
+      const task = submission.submitter ? submission.submitter.value : 'hash';
+      const hashrateEl = document.getElementById('hashrate');
+
+      if ( submission.submitter ) {
+        submission.submitter.disabled = true;
+      }
+
+      if (rapidTask.has(task)) {
+        setTimeout(() => {
+          scrollIntoView(form.fileInput);
+        }, 50);
+      }
+
       if ( task == 'test' ) {
+        if (rapidTask.has(lastTask)) {
+          form.input.value = '';
+        }
+        lastTask = task;
         form.output.value = await testVectors();
       } else if ( task == 'hash' ) {
+        if (rapidTask.has(lastTask)) {
+          form.input.value = '';
+        }
+        lastTask = task;
         const algo = form.algo.value;
         const size = parseInt(form.size.value);
         const seed = BigInt(form.seed.value);
@@ -85,27 +112,180 @@
           const hashValue = await globalThis[algo](size, seed, input);
           form.output.value = hashValue;
         }
-      } else if ( task == 'mine' ) {
+      } else if (task === 'chain') {
+        if (rapidTask.has(lastTask)) {
+          form.input.value = '';
+        }
+        lastTask = task;
         const algo = form.algo.value;
         const size = parseInt(form.size.value);
         const seed = BigInt(form.seed.value);
-        submission.submitter.value = 'Mining...';
-        const start = Date.now();
-        let count = 0;
+        submission.submitter.innerText = 'Chain Mining...';
+
+        await requestAnimationFrame(() => {}); // just to yield
+
         const mp = form.mp.value;
-        while ( !form.output.value.startsWith(mp) ) {
-          form.input.value += `${currentHash}\n`; 
-          form.output.value = await globalThis[algo](size, seed, form.input.value);
-          count++;
+        let count = 0;
+        const start = Date.now();
+        let lastTime = start;
+
+        // Convert existing input to bytes
+        let inputBytes = new Uint8Array();
+        if (form.input.value) {
+          inputBytes = new TextEncoder().encode(form.input.value);
         }
+
+        // Start hashing
+        let outputHex = await globalThis[algo](size, seed, inputBytes);
+        form.output.value = outputHex;
+
+        while (!outputHex.startsWith(mp)) {
+          // Convert outputHex -> bytes
+          const outputBytes = hexToU8Array(outputHex);
+          // Append
+          inputBytes = concatU8Arrays(inputBytes, outputBytes);
+
+          // Next hash
+          outputHex = await globalThis[algo](size, seed, inputBytes);
+          form.output.value = outputHex;
+          count++;
+
+          if (count % SPLIT === 0) {
+            const now = Date.now();
+            const elapsed = (now - lastTime) / 1000;
+            const hps = SPLIT / elapsed;
+            hashrateEl.innerText = formatHashRate(hps);
+            lastTime = now;
+            await nextAnimationFrame();
+          }
+        }
+
+        // Found
+        form.output.value = outputHex;
+        // Set input to the final chain (or just the final input bytes in hex, your call):
+        // For memory reasons, let's just put the final input in hex:
+        form.input.value = Array.from(inputBytes)
+          .map((x) => x.toString(16).padStart(2, '0'))
+          .join('');
+
         const end = Date.now();
-        const duration = end - start;
-        submission.submitter.value = `Found after ${count} hashes. In ${duration} seconds.`;
+        const duration = ((end - start) / 1000).toFixed(3);
+        submission.submitter.innerText = `Found after ${count} hashes in ${duration}s.`;
+      } else if (task === 'nonceInc') {
+        if (rapidTask.has(lastTask)) {
+          form.input.value = '';
+        }
+        lastTask = task;
+        const algo = form.algo.value;
+        const size = parseInt(form.size.value);
+        const seed = BigInt(form.seed.value);
+        submission.submitter.innerText = 'Nonce Inc...';
+          await nextAnimationFrame();
+
+        const mp = form.mp.value;
+        const baseInput = form.input.value || "";
+
+        let nonce = 0n;
+        let count = 0;
+        const start = Date.now();
+        let lastTime = start;
+        let outputHex = "";
+
+        while (true) {
+          const thisInput = baseInput + nonce.toString();
+          outputHex = await globalThis[algo](size, seed, thisInput);
+          count++;
+
+          if (outputHex.startsWith(mp)) {
+            form.output.value = outputHex;
+            // put final winning input in the form input
+            form.input.value = thisInput;
+            break;
+          }
+          nonce++;
+
+          if (count % SPLIT === 0) {
+            const now = Date.now();
+            const elapsed = (now - lastTime) / 1000;
+            const hps = SPLIT / elapsed;
+            hashrateEl.innerText = formatHashRate(hps);
+            lastTime = now;
+            // Show intermediate output
+            form.output.value = outputHex;
+            await nextAnimationFrame();
+          }
+        }
+
+        const end = Date.now();
+        const duration = ((end - start) / 1000).toFixed(3);
+        submission.submitter.innerText = `Found after ${count} hashes in ${duration}s. (Nonce = ${nonce - 1n})`;
+      } else if (task === 'nonceRand') {
+        if (rapidTask.has(lastTask)) {
+          form.input.value = '';
+        }
+        lastTask = task;
+        const algo = form.algo.value;
+        const size = parseInt(form.size.value);
+        const seed = BigInt(form.seed.value);
+        submission.submitter.innerText = 'Nonce Rand...';
+        await nextAnimationFrame();
+
+        const mp = form.mp.value;
+        const baseInput = form.input.value || "";
+
+        let count = 0;
+        const start = Date.now();
+        let lastTime = start;
+        let outputHex = "";
+
+        // Helper to get random bytes as a hex string
+        function randomHex(len = 8) {
+          const buf = new Uint8Array(len);
+          crypto.getRandomValues(buf);
+          return Array.from(buf)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+        }
+
+        while (true) {
+          const randPart = randomHex(8); // 8 bytes => 16 hex chars
+          const thisInput = baseInput + randPart;
+          outputHex = await globalThis[algo](size, seed, thisInput);
+          count++;
+
+          if (outputHex.startsWith(mp)) {
+            form.output.value = outputHex;
+            // put final input in the form input
+            form.input.value = thisInput;
+            break;
+          }
+
+          if (count % SPLIT === 0) {
+            const now = Date.now();
+            const elapsed = (now - lastTime) / 1000;
+            const hps = SPLIT / elapsed;
+            hashrateEl.innerText = formatHashRate(hps);
+            lastTime = now;
+            // show intermediate
+            form.output.value = outputHex;
+            await nextAnimationFrame();
+          }
+        }
+
+        const end = Date.now();
+        const duration = ((end - start) / 1000).toFixed(3);
+        submission.submitter.innerText = `Found after ${count} hashes in ${duration}s. (Random mode)`;
       } else {
+        if (rapidTask.has(lastTask)) {
+          form.input.value = '';
+        }
+        lastTask = task;
         alert(`Unknown task: ${task}`);
       }
       inHash = false;
-      submission.submitter.disabled = false;
+      if ( submission.submitter ) {
+        submission.submitter.disabled = false;
+      }
       return false;
     } catch(e) {
       console.error(e);
@@ -117,8 +297,38 @@
     return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
   };
 
-  async function mine() {
+  function formatHashRate(hps) {
+    if (hps >= 1e6) {
+      return (hps / 1e6).toFixed(2) + ' MH/s';
+    } else if (hps >= 1e3) {
+      return (hps / 1e3).toFixed(2) + ' KH/s';
+    } else {
+      return hps.toFixed(2) + ' H/s';
+    }
+  }
 
+  function concatU8Arrays(a, b) {
+    const c = new Uint8Array(a.length + b.length + 1);
+    c.set(a, 0);
+    c.set(b, a.length);
+    return c;
+  }
+
+  function hexToU8Array(hex) {
+    if (hex.length % 2 !== 0) {
+      throw new Error('Invalid hex string');
+    }
+    const out = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      out[i >> 1] = parseInt(hex.slice(i, i + 2), 16);
+    }
+    return out;
+  }
+
+  function scrollIntoView(el) {
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   async function testVectors() {
