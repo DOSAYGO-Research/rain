@@ -44,9 +44,10 @@
     submission?.preventDefault?.();
     submission?.stopPropagation?.();
     const task = submission.type == 'submit' ? submission.submitter.value : 'hash';
+    submission.submitter.disabled = true;
     if ( task == 'test' ) {
       form.output.value = await testVectors();
-    } else {
+    } else if ( task == 'hash' ) {
       const algo = form.algo.value;
       const size = parseInt(form.size.value);
       const seed = BigInt(form.seed.value);
@@ -83,14 +84,37 @@
         const hashValue = await globalThis[algo](size, seed, input);
         form.output.value = hashValue;
       }
+    } else if ( task == 'mine' ) {
+      const algo = form.algo.value;
+      const size = parseInt(form.size.value);
+      const seed = BigInt(form.seed.value);
+      submission.submitter.value = 'Mining...';
+      const start = Date.now();
+      let count = 0;
+      const mp = form.mp.value;
+      while ( !form.output.value.startsWith(mp) ) {
+        form.input.value += `${currentHash}\n`; 
+        form.output.value = await globalThis[algo](size, seed, form.input.value);
+        count++;
+      }
+      const end = Date.now();
+      const duration = end - start;
+      submission.submitter.value = `Found after ${count} hashes. In ${duration} seconds.`;
+    } else {
+      alert(`Unknown task: ${task}`);
     }
     inHash = false;
+    submission.submitter.disabled = false;
     return false;
   }
 
   function isMobileDevice() {
     return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
   };
+
+  async function mine() {
+
+  }
 
   async function testVectors() {
     let comment;

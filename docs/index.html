@@ -173,6 +173,11 @@
   </div>
   <button name=do value=hash>Hash</button>
   <button name=do value=test>Test Vectors</button>
+  <div class="form-group">
+    <label for="mp">Mining Prefix:</label>
+    <input id=mp type=text name=mp pattern="[0-9a-fA-F]{1,}" placeholder="prefix to mine for in hexadecimal"
+  </div>
+  <button name=do value=mine>Mine</button>
 </form>
 <script>
   // bootstrap with a hash just to show some content
