@@ -1,4 +1,6 @@
+  const SPLIT = 50;
   const sleep = ms => new Promise(res => setTimeout(res, ms));
+  const nextAnimationFrame = () => new Promise(res => requestAnimationFrame(res));
 
   const STORM_TV = [
     [ "e3ea5f8885f7bb16468d08c578f0e7cc15febd31c27e323a79ef87c35756ce1e", "" ], 
@@ -21,6 +23,7 @@
   ];
 
   class HashError extends Error {}
+  let lastTask;
   let inHash = false;
 
   window.onunhandledrejection = (...x) => {
@@ -44,11 +47,22 @@
       inHash = true;
       submission?.preventDefault?.();
       submission?.stopPropagation?.();
-      const task = submission.type == 'submit' ? submission.submitter.value : 'hash';
-      submission.submitter.disabled = true;
+      const task = submission.submitter ? submission.submitter.value : 'hash';
+      if ( submission.submitter ) {
+        console.log(submission.submitter);
+        submission.submitter.disabled = true;
+      }
       if ( task == 'test' ) {
+        if ( lastTask == 'mine' ) {
+          form.input.value = '';
+        }
+        lastTask = task;
         form.output.value = await testVectors();
       } else if ( task == 'hash' ) {
+        if ( lastTask == 'mine' ) {
+          form.input.value = '';
+        }
+        lastTask = task;
         const algo = form.algo.value;
         const size = parseInt(form.size.value);
         const seed = BigInt(form.seed.value);
@@ -85,27 +99,69 @@
           const hashValue = await globalThis[algo](size, seed, input);
           form.output.value = hashValue;
         }
-      } else if ( task == 'mine' ) {
+      } else if (task === 'mine') {
+        lastTask = task;
         const algo = form.algo.value;
         const size = parseInt(form.size.value);
         const seed = BigInt(form.seed.value);
-        submission.submitter.value = 'Mining...';
+        submission.submitter.innerText = 'Mining...';
+        await nextAnimationFrame();
+
         const start = Date.now();
         let count = 0;
         const mp = form.mp.value;
-        while ( !form.output.value.startsWith(mp) ) {
-          form.input.value += `${currentHash}\n`; 
-          form.output.value = await globalThis[algo](size, seed, form.input.value);
-          count++;
+
+        // Instead of storing a huge string, store a typed array for the input:
+        let inputBytes = new Uint8Array();
+
+        // Optionally, if form.input has an initial value,
+        // convert that to bytes too.
+        if (form.input.value) {
+          // If it’s text, you could do your own “text->Uint8Array”:
+          // (But if you want to allow both text or hex input, handle that too!)
+          const textEncoder = new TextEncoder();
+          inputBytes = textEncoder.encode(form.input.value);
         }
+
+        // Now do the iterative mining:
+        let outputHex = form.output.value;
+
+        while (!outputHex.startsWith(mp)) {
+          // 1. Convert outputHex -> bytes:
+          const outputBytes = hexToU8Array(outputHex);
+
+          // 2. Append them to inputBytes
+          inputBytes = concatU8Arrays(inputBytes, outputBytes);
+
+          // 3. Get next hash
+          outputHex = await globalThis[algo](size, seed, inputBytes);
+          form.output.value = outputHex;
+
+          count++;
+          if (count % SPLIT === 0) {
+            await nextAnimationFrame(); // keep UI responsive
+          }
+        }
+
         const end = Date.now();
-        const duration = end - start;
-        submission.submitter.value = `Found after ${count} hashes. In ${duration} seconds.`;
+        const duration = ((end - start)/1000).toFixed(3);
+
+        // If you truly want to see the entire chain, you can decode or represent it here,
+        // but careful — it could be huge! For demonstration only:
+        form.input.value = `Found after ${count} hashes in ${duration}s! Final output: ${outputHex}`;
+
+        submission.submitter.innerText = `Found after ${count} hashes. In ${duration} seconds.`;
       } else {
+        if ( lastTask == 'mine' ) {
+          form.input.value = '';
+        }
+        lastTask = task;
         alert(`Unknown task: ${task}`);
       }
       inHash = false;
-      submission.submitter.disabled = false;
+      if ( submission.submitter ) {
+        submission.submitter.disabled = false;
+      }
       return false;
     } catch(e) {
       console.error(e);
@@ -117,8 +173,23 @@
     return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
   };
 
-  async function mine() {
 
+  function concatU8Arrays(a, b) {
+    const c = new Uint8Array(a.length + b.length);
+    c.set(a, 0);
+    c.set(b, a.length);
+    return c;
+  }
+
+  function hexToU8Array(hex) {
+    if (hex.length % 2 !== 0) {
+      throw new Error('Invalid hex string');
+    }
+    const out = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      out[i >> 1] = parseInt(hex.slice(i, i + 2), 16);
+    }
+    return out;
   }
 
   async function testVectors() {
