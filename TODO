@@ -1,0 +1,7 @@
+cipher improvement
+
+- compress P
+- schedule K into block keys via XOF
+- spread indexing and parallelization for cipher mining efficiency
+
+
