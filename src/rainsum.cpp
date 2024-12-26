@@ -586,7 +586,7 @@ int main(int argc, char** argv) {
         cxxopts::value<Mode>()->default_value("digest"))
       ("v,version", "Print version")
       ("a,algorithm", "Specify the hash algorithm to use",
-        cxxopts::value<std::string>()->default_value("storm"))
+        cxxopts::value<std::string>()->default_value("bow"))
       ("s,size", "Specify the size of the hash",
         cxxopts::value<uint32_t>()->default_value("256"))
       ("o,output-file", "Output file", cxxopts::value<std::string>()->default_value("/dev/stdout"))
