@@ -17,8 +17,32 @@
 
 enum class Mode {
   Digest,
-  Stream
+  Stream,
+  Enc,   // added
+  Dec    // added
 };
+
+std::string modeToString(const Mode& mode) {
+  switch(mode) {
+    case Mode::Digest: return "Digest";
+    case Mode::Stream: return "Stream";
+    case Mode::Enc:    return "Enc";    // added
+    case Mode::Dec:    return "Dec";    // added
+    default: throw std::runtime_error("Unknown hash mode");
+  }
+}
+
+std::istream& operator>>(std::istream& in, Mode& mode) {
+  std::string token;
+  in >> token;
+  if (token == "digest")      mode = Mode::Digest;
+  else if (token == "stream") mode = Mode::Stream;
+  else if (token == "enc")    mode = Mode::Enc;   // added
+  else if (token == "dec")    mode = Mode::Dec;   // added
+  else                       in.setstate(std::ios_base::failbit);
+  return in;
+}
+
 
 // Mining mode enum
 enum class MineMode {
@@ -28,24 +52,14 @@ enum class MineMode {
   NonceRand
 };
 
-std::string modeToString(const Mode& mode) {
+std::string mineModeToString(const MineMode& mode) {
   switch(mode) {
-    case Mode::Digest: return "Digest";
-    case Mode::Stream: return "Stream";
-    default: throw std::runtime_error("Unknown hash mode (expected digest or stream)");
+    case MineMode::None:          return "None";
+    case MineMode::Chain:         return "Chain";
+    case MineMode::NonceInc:      return "NonceInc";    // added
+    case MineMode::NonceRand:     return "NonceRand";    // added
+    default: throw std::runtime_error("Unknown mine mode");
   }
-}
-
-std::istream& operator>>(std::istream& in, Mode& mode) {
-  std::string token;
-  in >> token;
-  if (token == "digest")
-    mode = Mode::Digest;
-  else if (token == "stream")
-    mode = Mode::Stream;
-  else
-    in.setstate(std::ios_base::failbit);
-  return in;
 }
 
 // ------------------------------------------------------------------
@@ -66,7 +80,6 @@ std::istream& operator>>(std::istream& in, MineMode& mode) {
   }
   return in;
 }
-
 // Stream retrieval (stdin vs file)
 std::istream& getInputStream() {
 #ifdef _WIN32
