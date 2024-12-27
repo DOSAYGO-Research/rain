@@ -31,6 +31,8 @@
 
 This note introduces a novel hash-based encryption primitive, leveraging the pre-image resistance of cryptographic hash functions. The scheme encrypts plaintext by mapping blocks into keyed hash digests, where the plaintext is constructed by selecting specific parts of the digest via a mapping function. By design, this approach ensures robustness against brute-force and timing attacks.
 
+Unlike a regular block cipher, the security of this system is not affected by the plaintext block size, but rather by the pre-image size mined to align with it.
+
 The encryption is flexible, operating in multiple modes (prefix, sequence, scatter) and supports optional compression for redundancy reduction. This document formalizes the construction, analyzes its tradeoffs, and outlines future directions.
 
 \section*{Encryption: Core Equation}
@@ -44,7 +46,7 @@ where:
   \item \( H \): A cryptographic hash function (e.g., SHA-256, BLAKE3).
   \item \( K \): A secret key with sufficient entropy (e.g., 128 bits).
   \item \( N \): A per-block random nonce (e.g., 64 bits).
-  \item \( P \): The plaintext block.
+  \item \( P \): The plaintext block (e.g., 3 bytes, but any length is permitted. Longer blocks increase enciphering (mining) time).
   \item \( \text{Map} \): A mapping function that selects specific parts of the digest \( H(K || N) \) to construct \( P \).
 \end{itemize}
 
@@ -125,7 +127,39 @@ Mining the nonce \( N \) involves a probabilistic search for a valid mapping \( 
 
 \section*{Proof of Concept}
 
-The repository contains a working toy example without a key schedule but implementing the different digest search modes (prefix, sequence, and series/scatter) that demonstrates the concept is at least feasible.  
+The repository contains a working proof-of-concept toy implementation demonstrating the feasibility of this hash-based encryption scheme. This toy is not attacked or analyzed and should not be used by 3rd-parties (ie, you!) for securing valuables. This toy cipher also does not use established cryptographic hash functions but instead uses the hashes defined in this repository (which nevertheless are high quality and fast hash functions that pass SMHasher3). The code in the toy supports all defined digest search modes (prefix, sequence, series/scatter) and uses a constant key per session, without a key schedule. It also incorporates compression for improved storage efficiency.
+
+The repository can be found at: \url{https://github.com/DOSAYGO-Research/rain}.
+
+If you encounter issues in the following, To build and run the example:
+\begin{verbatim}
+# Clone the repository
+git clone https://github.com/DOSAYGO-Research/rain
+cd rain
+
+# Build using make
+make
+
+# or if encountering problems, try
+./scripts/build.sh 
+
+# if that still fails you may need to consult the README or debug the build on your system.
+
+# Example usage
+# Encrypt a file with sequence mode
+./rain/bin/rainsum -m enc --search-mode sequence input_file.txt
+
+# Decrypt the file
+./rain/bin/rainsum -m dec encrypted_file.rc
+
+# Verify the decrypted file matches the original
+diff input_file.txt decrypted_file.txt
+\end{verbatim}
+
+The repository includes a suite of test scripts to validate the correctness of the implementation across various configurations, ensuring decrypted contents match the originals. These tests systematically evaluate different combinations of hash functions, digest sizes, nonce sizes, block sizes, and input files. The test suite can be executed as follows:
+\begin{verbatim}
+./scripts/test_cipher.sh
+\end{verbatim}
 
 \section*{Future Work}
 
