@@ -1,6 +1,6 @@
 #pragma once
 
-#define __ENDIAN_H_VERSION__ "1.0.1"
+#define __ENDIAN_H_VERSION__ "1.3.0"
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 constexpr bool bswap = false;

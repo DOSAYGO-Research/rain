@@ -1,3 +1,7 @@
+test_data
+TEST*
+*.rc
+*.rc.dec
 rain/**/*
 rainsum
 .*.swp
