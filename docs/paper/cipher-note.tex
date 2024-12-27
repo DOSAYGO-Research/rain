@@ -1,0 +1,145 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{hyperref}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue
+}
+
+\title{A Cryptographic Note on Hash-Based Encryption with Digest Indexing}
+\author{Cris, DOSAYGO}
+\date{\today}
+
+\setlength{\parskip}{6pt} 
+\setlength{\abovedisplayskip}{10pt}
+\setlength{\belowdisplayskip}{10pt}
+
+\begin{document}
+\maketitle
+
+\section*{Introduction}
+
+This note introduces a novel hash-based encryption primitive, leveraging the pre-image resistance of cryptographic hash functions. The scheme encrypts plaintext by mapping blocks into keyed hash digests, where the plaintext is constructed by selecting specific parts of the digest via a mapping function. By design, this approach ensures robustness against brute-force and timing attacks.
+
+The encryption is flexible, operating in multiple modes (prefix, sequence, scatter) and supports optional compression for redundancy reduction. This document formalizes the construction, analyzes its tradeoffs, and outlines future directions.
+
+\section*{Encryption: Core Equation}
+
+The encryption process solves the following equation:
+\[
+\text{Map}(H(K || N)) = P
+\]
+where:
+\begin{itemize}
+  \item \( H \): A cryptographic hash function (e.g., SHA-256, BLAKE3).
+  \item \( K \): A secret key with sufficient entropy (e.g., 128 bits).
+  \item \( N \): A per-block random nonce (e.g., 64 bits).
+  \item \( P \): The plaintext block.
+  \item \( \text{Map} \): A mapping function that selects specific parts of the digest \( H(K || N) \) to construct \( P \).
+\end{itemize}
+
+The plaintext block \( P \) is derived from the digest as:
+\[
+P = H(K || N) \otimes \text{Map}
+\]
+where \( \otimes \) denotes the selection operation defined by \( \text{Map} \), which determines which parts of the digest contribute to \( P \).
+
+\subsection*{Encryption Modes}
+
+The mapping \( \text{Map} \) can operate in several modes:
+\begin{itemize}
+  \item \textbf{Prefix Mode:} \( P \) matches the first \( n \)-bytes of the digest.
+  \item \textbf{Sequence Mode:} \( P \) matches a contiguous substring of the digest.
+  \item \textbf{Scatter Mode:} \( P \) matches bytes at arbitrary indices in the digest, with no duplicates.
+\end{itemize}
+
+Scatter mode ensures that each index is used only once, preventing patterns in the plaintext \( P \) from being exposed.
+
+\subsection*{Ciphertext Encoding}
+
+The ciphertext for each block \( P \) is:
+\[
+C = (N, \text{indices})
+\]
+where:
+\begin{itemize}
+  \item \( N \): The nonce used to generate the digest.
+  \item \( \text{indices} \): The mapping indices required to reconstruct \( P \) from \( H(K || N) \).
+\end{itemize}
+
+\section*{Decryption}
+
+Decryption reconstructs the plaintext block \( P \) as:
+\[
+P = H(K || N) \otimes \text{indices}
+\]
+The hash digest is computed with the provided \( N \) and \( K \), and the mapping defined by \( \text{indices} \) extracts the plaintext \( P \).
+
+\section*{Security Analysis}
+
+\subsection*{Pre-Image Security}
+
+The security of the scheme relies on the pre-image resistance of \( H \). Specifically, given \( P \), \( N \), and \( \text{indices} \), an attacker must solve:
+\[
+H(K || N) = P
+\]
+The effective brute-force effort is:
+\[
+2^{|K| + |\text{nonce}|}
+\]
+where \( |K| \) and \( |\text{nonce}| \) are the bit lengths of the key and nonce, respectively. 
+
+\subsection*{Preventing Redundancy Patterns}
+
+Scatter mode ensures that each index is unique, preventing repeated plaintext bytes from being mapped to the same digest index. This avoids revealing plaintext patterns and ensures uniform utilization of the digest.
+
+\subsection*{Ciphertext Expansion}
+
+Ciphertext expansion is determined by:
+\[
+\text{Overhead} = |\text{nonce}| + |\text{indices}|
+\]
+Scatter mode incurs higher overhead due to the need to store an index for each byte of \( P \). Optional compression reduces redundancy in the plaintext before encryption, offsetting this overhead.
+
+\subsection*{Timing Security}
+
+Mining the nonce \( N \) involves a probabilistic search for a valid mapping \( \text{Map}(H(K || N)) = P \). The stochastic runtime behavior ensures that timing attacks are mitigated, as the encryption time varies unpredictably.
+
+\section*{Tradeoffs}
+
+\begin{itemize}
+  \item \textbf{Efficiency vs. Expansion:} Prefix and sequence modes minimize ciphertext size but take longer to mine than the looser matching of Scatter mode. Scatter mode is faster to mine but increases expansion.
+  \item \textbf{Compression:} Reduces plaintext redundancy, often resulting in smaller effective ciphertext size despite normal expansion overhead.
+  \item \textbf{Mining Speed:} Smaller blocks are faster to mine encrypt, but larger blocks reduce the total number of blocks and nonces.
+\end{itemize}
+
+\section*{Proof of Concept}
+
+The repository contains a working toy example without a key schedule but implementing the different digest search modes (prefix, sequence, and series/scatter) that demonstrates the concept is at least feasible.  
+
+\section*{Future Work}
+
+Future enhancements include:
+\begin{itemize}
+  \item Introducing a key schedule to vary \( K \) across blocks, improving resistance against related-key attacks. Most likely using the hash function in an XOF mode.
+  \item Optimizing for parallelized mining to accelerate encryption.
+  \item Extending compatibility with alternative hash functions for performance tuning.
+  \item Formalizing security proofs under cryptographic assumptions.
+\end{itemize}
+
+\section*{Conclusion}
+
+This hash-based encryption primitive provides a secure and flexible mechanism for protecting data. By leveraging cryptographic hash functions and indexed digest selection, it ensures strong security against brute-force and timing attacks. While current limitations include ciphertext expansion and mining speed, future improvements aim to address these tradeoffs and expand its applicability.
+
+\end{document}
+
