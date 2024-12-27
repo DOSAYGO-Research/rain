@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.12.15)  27 DEC 2024 15:59
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.12.15)  27 DEC 2024 16:16
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -394,8 +394,7 @@ ef
 File: l3backend-pdftex.def 2024-02-20 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count301
 \l__pdf_internal_box=\box57
-)
-No file cipher-note.aux.
+) (./cipher-note.aux)
 \openout1 = `cipher-note.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 27.
@@ -416,6 +415,7 @@ LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 27.
 LaTeX Font Info:    ... okay on input line 27.
 LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 27.
 LaTeX Font Info:    ... okay on input line 27.
+
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
 *geometry* verbose mode - [ preamble ] result:
@@ -451,10 +451,12 @@ LaTeX Font Info:    ... okay on input line 27.
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
 Package hyperref Info: Link coloring ON on input line 27.
+(./cipher-note.out) (./cipher-note.out)
 \@outlinefile=\write3
 \openout3 = `cipher-note.out'.
 
 \c@lstlisting=\count302
+
 (/usr/local/texlive/2024basic/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
 \scratchcounter=\count303
@@ -509,55 +511,60 @@ LaTeX Font Info:    Trying to load font information for U+msb on input line 29.
 
 (/usr/local/texlive/2024basic/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
-)
-LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <10.95> on input line 46.
-LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 5
-1.
-
-(/usr/local/texlive/2024basic/texmf-dist/tex/latex/lm/ts1lmr.fd
-File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 ) [1
 
 {/usr/local/texlive/2024basic/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/us
-r/local/texlive/2024basic/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc}{/usr/local/t
-exlive/2024basic/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}{/usr/local/texlive/20
-24basic/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/local/texlive/2024bas
-ic/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}{/usr/local/texlive/2024basic/te
-xmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}] [2]
-Overfull \hbox (108.31354pt too wide) in paragraph at lines 136--145
+r/local/texlive/2024basic/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc}]
+LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 4
+8.
+
+(/usr/local/texlive/2024basic/texmf-dist/tex/latex/lm/ts1lmr.fd
+File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
+)
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <10.95> on input line 63.
+ [2{/usr/local/texlive/2024basic/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}{/usr
+/local/texlive/2024basic/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}{/usr/local/te
+xlive/2024basic/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}] [3{/usr/local/tex
+live/2024basic/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}]
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <10> on input line 152.
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <7> on input line 152.
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <5> on input line 152.
+
+Underfull \hbox (badness 1325) in paragraph at lines 157--158
+[]|\T1/lmr/m/n/10 Requires stor-ing an in-dex for ev-ery
+ []
+
+
+Overfull \hbox (19.10587pt too wide) in paragraph at lines 152--161
  [] 
  []
 
-[3]
+[4]
 LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 1
-51.
+66.
  (/usr/local/texlive/2024basic/texmf-dist/tex/latex/lm/t1lmtt.fd
 File: t1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
-) [4]
-[5] (./cipher-note.aux)
+) [5]
+[6] (./cipher-note.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-02-20>
  ***********
-
-
-Package rerunfilecheck Warning: File `cipher-note.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `cipher-note.out':
-(rerunfilecheck)             Before: <no file>
-(rerunfilecheck)             After:  D41D8CD98F00B204E9800998ECF8427E;0.
+Package rerunfilecheck Info: File `cipher-note.out' has not changed.
+(rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 12055 strings out of 475567
- 182039 string characters out of 5777888
- 1936187 words of memory out of 5000000
- 34031 multiletter control sequences out of 15000+600000
- 602300 words of font info for 69 fonts, out of 8000000 for 9000
+ 12100 strings out of 475567
+ 182597 string characters out of 5777888
+ 1937187 words of memory out of 5000000
+ 34054 multiletter control sequences out of 15000+600000
+ 624579 words of font info for 87 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 75i,6n,79p,720b,507s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,8n,79p,1015b,589s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2024basic/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></u
 sr/local/texlive/2024basic/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></usr/lo
 cal/texlive/2024basic/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></usr/local/t
@@ -566,13 +573,14 @@ exlive/2024basic/texmf-dist/fonts/type1/public/lm/lmmi8.pfb></usr/local/texlive
 asic/texmf-dist/fonts/type1/public/lm/lmr12.pfb></usr/local/texlive/2024basic/t
 exmf-dist/fonts/type1/public/lm/lmr17.pfb></usr/local/texlive/2024basic/texmf-d
 ist/fonts/type1/public/lm/lmr8.pfb></usr/local/texlive/2024basic/texmf-dist/fon
-ts/type1/public/lm/lmsy10.pfb></usr/local/texlive/2024basic/texmf-dist/fonts/ty
-pe1/public/lm/lmsy8.pfb></usr/local/texlive/2024basic/texmf-dist/fonts/type1/pu
-blic/lm/lmtt10.pfb>
-Output written on cipher-note.pdf (5 pages, 219437 bytes).
+ts/type1/public/lm/lmri10.pfb></usr/local/texlive/2024basic/texmf-dist/fonts/ty
+pe1/public/lm/lmsy10.pfb></usr/local/texlive/2024basic/texmf-dist/fonts/type1/p
+ublic/lm/lmsy8.pfb></usr/local/texlive/2024basic/texmf-dist/fonts/type1/public/
+lm/lmtt10.pfb>
+Output written on cipher-note.pdf (6 pages, 242052 bytes).
 PDF statistics:
- 119 PDF objects out of 1000 (max. 8388607)
- 86 compressed objects within 1 object stream
- 22 named destinations out of 1000 (max. 500000)
+ 135 PDF objects out of 1000 (max. 8388607)
+ 99 compressed objects within 1 object stream
+ 29 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
 
