@@ -552,14 +552,12 @@ static void puzzleEncryptFileWithHeader(
             }
             else if (searchModeEnum == 0x01) { // Sequence
                 // Search for block as a contiguous substring
-                bool seqFound = false;
                 uint8_t startIdx = 0;
                 for (size_t i = 0; i <= hashOut.size() - thisBlockSize; i++) {
                     if (std::equal(block.begin(), block.end(), hashOut.begin() + i)) {
                         startIdx = static_cast<uint8_t>(i); // Ensure it fits in uint8_t
                         scatterIndices.assign(thisBlockSize, startIdx); // All bytes share the same start index
                         found = true;
-                        seqFound = true;
                         break;
                     }
                 }
@@ -806,8 +804,8 @@ int main(int argc, char** argv) {
             ("match-prefix", "Hex prefix to match in mining tasks",
                 cxxopts::value<std::string>()->default_value(""))
             // Encrypt / Decrypt options
-            ("p,puzzle-len", "Number of bytes in the puzzle prefix [default: 3]",
-                cxxopts::value<size_t>()->default_value("3"))
+            ("P,password", "Encryption/Decryption password",
+                cxxopts::value<std::string>()->default_value(""))
             ("h,help", "Print usage");
 
         // Parse command-line options
@@ -825,9 +823,6 @@ int main(int argc, char** argv) {
         }
 
         // Access and validate options
-
-        // Puzzle Length
-        size_t puzzleLen = result["puzzle-len"].as<size_t>();
 
         // Hash Size
         uint32_t hash_size = result["size"].as<uint32_t>();
@@ -916,6 +911,9 @@ int main(int argc, char** argv) {
             inpath = result.unmatched().front();
         }
 
+        std::string password = result["password"].as<std::string>();
+
+
         // Handle Mining Modes
         if (mine_mode != MineMode::None) {
             if (prefixHex.empty()) {
@@ -989,7 +987,13 @@ int main(int argc, char** argv) {
             if (inpath.empty()) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
-            std::string key = promptForKey("Enter encryption key: ");
+            std::string key;
+            if (!password.empty()) {
+                key = password;
+            }
+            else {
+                key = promptForKey("Enter encryption key: ");
+            }
 
             // We'll write ciphertext to inpath + ".rc"
             std::string encFile = inpath + ".rc";
@@ -1001,7 +1005,13 @@ int main(int argc, char** argv) {
             if (inpath.empty()) {
                 throw std::runtime_error("No ciphertext file specified for decryption.");
             }
-            std::string key = promptForKey("Enter decryption key: ");
+            std::string key;
+            if (!password.empty()) {
+                key = password;
+            }
+            else {
+                key = promptForKey("Enter encryption key: ");
+            }
 
             // We'll write plaintext to inpath + ".dec"
             std::string decFile = inpath + ".dec";
