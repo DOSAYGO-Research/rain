@@ -13,9 +13,9 @@
 #include <algorithm>
 #include <stdexcept>
 #include <memory>
+#include <iterator>
+#include "tool.h" // for invokeHash, etc.
 
-
-#include "tool.h"
 
 // ------------------------------------------------------------------
 // Helper functions for mining
@@ -377,27 +377,18 @@ static std::string promptForKey(const std::string &prompt) {
 }
 #endif
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <algorithm>
-#include <random>
-#include <iterator>
-#include <cstdint>
-#include <stdexcept>
-#include <chrono>
-#include "tool.h" // for invokeHash, etc.
-
-static void puzzleEncryptFile(
+static void puzzleEncryptFileWithHeader(
   const std::string &inFilename,
   const std::string &outFilename,
   const std::string &key,
   HashAlgorithm algot,
   uint32_t hash_size,
   uint64_t seed,
-  size_t blockSize
+  size_t blockSize,
+  size_t nonceSize,
+  const std::string &searchMode
 ) {
-  // 1) Read input file
+  // Open input file
   std::ifstream fin(inFilename, std::ios::binary);
   if (!fin.is_open()) {
     throw std::runtime_error("Cannot open input file: " + inFilename);
@@ -406,165 +397,186 @@ static void puzzleEncryptFile(
                                  (std::istreambuf_iterator<char>()));
   fin.close();
 
-  // 2) Prepare output
+  // Open output file
   std::ofstream fout(outFilename, std::ios::binary);
   if (!fout.is_open()) {
     throw std::runtime_error("Cannot open output file: " + outFilename);
   }
 
-  // Write 8-byte original size
+  // Write header
+  uint32_t magicNumber = 0x52435259; // "RCRY"
+  uint8_t version = 0x01;
+  uint8_t blockSize8 = static_cast<uint8_t>(blockSize);
+  uint8_t nonceSize8 = static_cast<uint8_t>(nonceSize);
+  uint16_t digestSize16 = static_cast<uint16_t>(hash_size);
+  uint8_t searchModeEnum = 0x00; // Default to 'prefix'
+  if (searchMode == "prefix") searchModeEnum = 0x00;
+  else if (searchMode == "sequence") searchModeEnum = 0x01;
+  else if (searchMode == "series") searchModeEnum = 0x02;
+  else if (searchMode == "scatter") searchModeEnum = 0x03;
+
+  std::string hashName = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
+  uint8_t hashNameLength = static_cast<uint8_t>(hashName.size());
+
+  fout.write(reinterpret_cast<const char*>(&magicNumber), sizeof(magicNumber));
+  fout.write(reinterpret_cast<const char*>(&version), sizeof(version));
+  fout.write(reinterpret_cast<const char*>(&blockSize8), sizeof(blockSize8));
+  fout.write(reinterpret_cast<const char*>(&nonceSize8), sizeof(nonceSize8));
+  fout.write(reinterpret_cast<const char*>(&digestSize16), sizeof(digestSize16));
+  fout.write(reinterpret_cast<const char*>(&hashNameLength), sizeof(hashNameLength));
+  fout.write(hashName.data(), hashName.size());
+  fout.write(reinterpret_cast<const char*>(&searchModeEnum), sizeof(searchModeEnum));
+
   uint64_t originalSize = plainData.size();
   fout.write(reinterpret_cast<const char*>(&originalSize), sizeof(originalSize));
 
-  // 3) Partition into blocks
+  // Partition plaintext into blocks
   size_t totalBlocks = (plainData.size() + blockSize - 1) / blockSize;
   std::vector<uint8_t> hashOut(hash_size / 8);
   std::vector<uint8_t> keyBuf(key.begin(), key.end());
 
-  // Use a random 64-bit generator
+  // Prepare random generator for nonce
   std::mt19937_64 rng(std::random_device{}());
-  std::uniform_int_distribution<uint64_t> dist; // full 64-bit range
-
-  // Increase MAX_TRIES significantly for 3+ byte blocks
-  const uint64_t MAX_TRIES = 10'000'000'000; 
-  size_t offset = 0;
-
-  auto startTime = std::chrono::steady_clock::now();
+  std::uniform_int_distribution<uint64_t> dist;
 
   for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
-    size_t thisBlockSize = std::min(blockSize, plainData.size() - offset);
+    size_t thisBlockSize = std::min(blockSize, plainData.size() - blockIndex * blockSize);
     std::vector<uint8_t> block(
-      plainData.begin() + offset,
-      plainData.begin() + offset + thisBlockSize
+      plainData.begin() + blockIndex * blockSize,
+      plainData.begin() + blockIndex * blockSize + thisBlockSize
     );
-    offset += thisBlockSize;
 
     bool found = false;
-    uint64_t chosenNonce = 0;
+    std::vector<uint8_t> chosenNonce(nonceSize, 0);
+    uint8_t startIndex = 0;
 
-    for (uint64_t tries = 1; tries <= MAX_TRIES; tries++) {
-      uint64_t candidateNonce = dist(rng);
-
-      // Build trial = key || candidateNonce
-      std::vector<uint8_t> trial(keyBuf);
-      trial.reserve(keyBuf.size() + 8);  // small optimization
-      for (int i = 0; i < 8; i++) {
-        trial.push_back(static_cast<uint8_t>((candidateNonce >> (8 * i)) & 0xFF));
+    for (uint64_t tries = 0; ; tries++) { // No fixed MAX_TRIES
+      for (size_t i = 0; i < nonceSize; i++) {
+        chosenNonce[i] = static_cast<uint8_t>(dist(rng) & 0xFF);
       }
+
+      // Build trial buffer
+      std::vector<uint8_t> trial(keyBuf);
+      trial.insert(trial.end(), chosenNonce.begin(), chosenNonce.end());
 
       // Hash it
       invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
 
-      // Check prefix
-      if (thisBlockSize <= hashOut.size() &&
-          std::equal(block.begin(), block.end(), hashOut.begin())) {
-        chosenNonce = candidateNonce;
-        found = true;
-        break;
+      // Search block in digest (not just at start)
+      for (uint8_t i = 0; i <= hashOut.size() - thisBlockSize; i++) {
+        if (std::equal(block.begin(), block.end(), hashOut.begin() + i)) {
+          startIndex = i;
+          found = true;
+          break;
+        }
       }
+      if (found) break;
 
-      // Optional: show progress every so often
       if (tries % 1'000'000 == 0) {
-        auto now = std::chrono::steady_clock::now();
-        double elapsed = std::chrono::duration<double>(now - startTime).count();
-        double hps = tries / elapsed;
-        std::cerr << "\r[EncRand] Block " << blockIndex << ", "
-                  << tries << " tries, ~" << static_cast<int>(hps)
-                  << " H/s " << std::flush;
+        std::cerr << "\r[Enc] Block " << blockIndex << ", " << tries << " tries... " << std::flush;
       }
     }
 
-    if (!found) {
-      std::cerr << "\n[EncRand] WARNING: puzzle not solved for block " << blockIndex
-                << " within " << MAX_TRIES << " tries.\n";
-    }
-
-    // Write the chosen nonce (8 bytes)
-    for (int i = 0; i < 8; i++) {
-      uint8_t c = (chosenNonce >> (8 * i)) & 0xFF;
-      fout.write(reinterpret_cast<char*>(&c), 1);
-    }
-    std::cerr << "\n[EncRand] Block " << blockIndex << " done.\n";
+    // Write nonce + start index
+    fout.write(reinterpret_cast<const char*>(chosenNonce.data()), nonceSize);
+    fout.write(reinterpret_cast<const char*>(&startIndex), sizeof(startIndex));
   }
 
   fout.close();
-  std::cout << "[EncRand] Encryption finished: " << inFilename
-            << " => " << outFilename << "\n";
+  std::cout << "[Enc] Encryption complete: " << outFilename << "\n";
 }
 
-
-// puzzleDecryptFile: reads [8-byte originalSize][(N) x 8-byte nonces],
-// recovers each block via hash(key||nonce).
-static void puzzleDecryptFile(
+static void puzzleDecryptFileWithHeader(
   const std::string &inFilename,
   const std::string &outFilename,
   const std::string &key,
-  HashAlgorithm algot,
-  uint32_t hash_size,
-  uint64_t seed,
-  size_t blockSize
+  uint64_t seed
 ) {
-  // 1) Read entire ciphertext
+  // Open input file
   std::ifstream fin(inFilename, std::ios::binary);
   if (!fin.is_open()) {
-    throw std::runtime_error("Cannot open ciphertext for decryption: " + inFilename);
+    throw std::runtime_error("Cannot open ciphertext file: " + inFilename);
   }
-  // First 8 bytes = original size
-  uint64_t originalSize = 0;
+
+  // Read header
+  uint32_t magicNumber;
+  uint8_t version;
+  uint8_t blockSize;
+  uint8_t nonceSize;
+  uint16_t hash_size;
+  uint8_t hashNameLength;
+  std::string hashName;
+  uint8_t searchModeEnum;
+  uint64_t originalSize;
+
+  fin.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
+  fin.read(reinterpret_cast<char*>(&version), sizeof(version));
+  fin.read(reinterpret_cast<char*>(&blockSize), sizeof(blockSize));
+  fin.read(reinterpret_cast<char*>(&nonceSize), sizeof(nonceSize));
+  fin.read(reinterpret_cast<char*>(&hash_size), sizeof(hash_size));
+  fin.read(reinterpret_cast<char*>(&hashNameLength), sizeof(hashNameLength));
+
+  hashName.resize(hashNameLength);
+  fin.read(&hashName[0], hashNameLength);
+  fin.read(reinterpret_cast<char*>(&searchModeEnum), sizeof(searchModeEnum));
   fin.read(reinterpret_cast<char*>(&originalSize), sizeof(originalSize));
 
-  // The rest are 8-byte nonces
+  if (magicNumber != 0x52435259) {
+    throw std::runtime_error("Invalid magic number in header.");
+  }
+
+  HashAlgorithm algot = (hashName == "rainbow") ? HashAlgorithm::Rainbow : HashAlgorithm::Rainstorm;
+
+  // Read the rest of the file as cipher data
   std::vector<uint8_t> cipherData(
     (std::istreambuf_iterator<char>(fin)),
     (std::istreambuf_iterator<char>())
   );
   fin.close();
 
-  if (cipherData.size() % 8 != 0) {
-    throw std::runtime_error("[Dec] Cipher data not multiple of 8 bytes after header!");
+  // Each block consists of nonceSize bytes + 1 byte (startIndex)
+  size_t blockCipherSize = nonceSize + 1;
+  if (cipherData.size() % blockCipherSize != 0) {
+    throw std::runtime_error("[Dec] Cipher data not multiple of blockCipherSize bytes after header!");
   }
-  size_t totalBlocks = cipherData.size() / 8;
+  size_t totalBlocks = cipherData.size() / blockCipherSize;
 
-  // 2) Prepare output file
+  // Prepare output file
   std::ofstream fout(outFilename, std::ios::binary);
   if (!fout.is_open()) {
     throw std::runtime_error("Cannot open output file for plaintext: " + outFilename);
   }
 
-  // 3) Reconstruct each block
+  // Reconstruct plaintext blocks
   std::vector<uint8_t> keyBuf(key.begin(), key.end());
   std::vector<uint8_t> hashOut(hash_size / 8);
 
   size_t recoveredSoFar = 0;
 
   for (size_t i = 0; i < totalBlocks; i++) {
-    // Read the 8-byte nonce
-    uint64_t storedNonce = 0;
-    for (int j = 0; j < 8; j++) {
-      storedNonce |= (static_cast<uint64_t>(cipherData[i*8 + j]) << (8 * j));
-    }
+    // Extract nonce and startIndex for each block
+    std::vector<uint8_t> storedNonce(cipherData.begin() + i * blockCipherSize, 
+                                    cipherData.begin() + i * blockCipherSize + nonceSize);
+    uint8_t startIndex = cipherData[i * blockCipherSize + nonceSize];
 
     // Recompute the hash
     std::vector<uint8_t> trial(keyBuf);
-    for (int j = 0; j < 8; j++) {
-      trial.push_back((storedNonce >> (8 * j)) & 0xFF);
-    }
+    trial.insert(trial.end(), storedNonce.begin(), storedNonce.end());
     invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
 
-    // Figure out how many bytes remain vs. blockSize
+    // Determine the size of the current block
     size_t remaining = originalSize - recoveredSoFar;
-    size_t thisBlockSize = std::min(blockSize, remaining);
-    if (thisBlockSize > 0) {
-      if (thisBlockSize <= hashOut.size()) {
-        // Write that many bytes from hashOut
-        fout.write(reinterpret_cast<const char*>(hashOut.data()), thisBlockSize);
-        recoveredSoFar += thisBlockSize;
-      } else {
-        std::cerr << "[Dec] Unexpected error: hashOut smaller than blockSize.\n";
-        break;
-      }
+    size_t thisBlockSize = std::min<size_t>(blockSize, remaining);
+
+    if (startIndex + thisBlockSize > hashOut.size()) {
+      throw std::runtime_error("[Dec] Invalid start index or block size exceeds hash digest size.");
     }
-    // If recoveredSoFar == originalSize, we can break early if we want.
+
+    // Write the plaintext block
+    fout.write(reinterpret_cast<const char*>(hashOut.data() + startIndex), thisBlockSize);
+    recoveredSoFar += thisBlockSize;
+
+    // Early exit if all data is recovered
     if (recoveredSoFar >= originalSize) {
       break;
     }
@@ -574,201 +586,260 @@ static void puzzleDecryptFile(
   std::cout << "[Dec] Ciphertext " << inFilename << " decrypted successfully.\n";
 }
 
+
 // The main function
 int main(int argc, char** argv) {
-  try {
-    cxxopts::Options options("rainsum", "Calculate a Rainbow or Rainstorm hash, or do puzzle-based encryption.");
-    auto seed_option = cxxopts::value<std::string>()->default_value("0");
+    try {
+        // Initialize cxxopts with program name and description
+        cxxopts::Options options("rainsum", "Calculate a Rainbow or Rainstorm hash, or perform puzzle-based encryption/decryption.");
 
-    // Expand your mode description to include enc & dec
-    options.add_options()
-      ("m,mode", "Mode: digest, stream, enc, dec",
-        cxxopts::value<Mode>()->default_value("digest"))
-      ("v,version", "Print version")
-      ("a,algorithm", "Specify the hash algorithm to use",
-        cxxopts::value<std::string>()->default_value("bow"))
-      ("s,size", "Specify the size of the hash",
-        cxxopts::value<uint32_t>()->default_value("256"))
-      ("o,output-file", "Output file", cxxopts::value<std::string>()->default_value("/dev/stdout"))
-      ("t,test-vectors", "Calculate the hash of the standard test vectors",
-        cxxopts::value<bool>()->default_value("false"))
-      ("l,output-length", "Output length in hash iterations (stream mode)",
-        cxxopts::value<uint64_t>()->default_value("1000000"))
-      ("seed", "Seed value", seed_option)
-      // Mining
-      ("mine-mode", "Mining mode: chain, nonceInc, nonceRand",
-        cxxopts::value<MineMode>()->default_value("None"))
-      ("match-prefix", "Hex prefix to match in mining tasks",
-        cxxopts::value<std::string>()->default_value(""))
+        // Define command-line options
+        options.add_options()
+            ("m,mode", "Mode: digest, stream, enc, dec",
+                cxxopts::value<std::string>()->default_value("digest"))
+            ("v,version", "Print version")
+            ("a,algorithm", "Specify the hash algorithm to use (rainbow, rainstorm)",
+                cxxopts::value<std::string>()->default_value("bow"))
+            ("s,size", "Specify the size of the hash (e.g., 64, 128, 256, 512)",
+                cxxopts::value<uint32_t>()->default_value("256"))
+            ("block-size", "Block size in bytes for puzzle-based encryption (1-255)",
+                cxxopts::value<uint8_t>()->default_value("3"))
+            ("n,nonce-size", "Size of the nonce in bytes (1-255)",
+                cxxopts::value<size_t>()->default_value("8"))
+            ("search-mode", "Search mode: prefix, sequence, series, scatter",
+                cxxopts::value<std::string>()->default_value("prefix"))
+            ("o,output-file", "Output file",
+                cxxopts::value<std::string>()->default_value("/dev/stdout"))
+            ("t,test-vectors", "Calculate the hash of the standard test vectors",
+                cxxopts::value<bool>()->default_value("false"))
+            ("l,output-length", "Output length in hash iterations (stream mode)",
+                cxxopts::value<uint64_t>()->default_value("1000000"))
+            ("seed", "Seed value",
+                cxxopts::value<std::string>()->default_value("0"))
+            // Mining options
+            ("mine-mode", "Mining mode: chain, nonceInc, nonceRand",
+                cxxopts::value<std::string>()->default_value("None"))
+            ("match-prefix", "Hex prefix to match in mining tasks",
+                cxxopts::value<std::string>()->default_value(""))
+            // Encrypt / Decrypt options
+            ("p,puzzle-len", "Number of bytes in the puzzle prefix [default: 3]",
+                cxxopts::value<size_t>()->default_value("3"))
+            ("h,help", "Print usage");
 
-      // Encrypt / Decrypt
-       ("p,puzzle-len",
-   "Number of bytes in the puzzle prefix [default: 3]",
-   cxxopts::value<size_t>()->default_value("3"))
+        // Parse command-line options
+        auto result = options.parse(argc, argv);
 
-    // New block-size for puzzle-based enc/dec
-      ("block-size", "Block size in bytes for puzzle-based encryption",
-        cxxopts::value<size_t>()->default_value("3"))
-      ("h,help", "Print usage");
-
-    auto result = options.parse(argc, argv);
-
-    size_t puzzleLen = result["puzzle-len"].as<size_t>();
-
-    if (result.count("version")) {
-      std::cout << "rainsum version: " << VERSION << '\n';
-    }
-
-    if (result.count("help")) {
-      usage();
-      return 0;
-    }
-
-    // Convert seed (either numeric or hash string)
-    std::string seed_str = result["seed"].as<std::string>();
-    uint64_t seed;
-    if (!(std::istringstream(seed_str) >> seed)) {
-      seed = hash_string_to_64_bit(seed_str);
-    }
-
-    Mode mode = result["mode"].as<Mode>();
-
-    std::string algorithm = result["algorithm"].as<std::string>();
-    HashAlgorithm algot = getHashAlgorithm(algorithm);
-    if (algot == HashAlgorithm::Unknown) {
-      throw std::runtime_error("Unsupported algorithm string: " + algorithm);
-    }
-
-    uint32_t size = result["size"].as<uint32_t>();
-    // Validate sizes (similar checks from your code)
-    if (algot == HashAlgorithm::Rainbow) {
-      if (size != 64 && size != 128 && size != 256) {
-        throw std::runtime_error("Invalid size for Rainbow (must be 64,128,256).");
-      }
-    } else if (algot == HashAlgorithm::Rainstorm) {
-      if (size != 64 && size != 128 && size != 256 && size != 512) {
-        throw std::runtime_error("Invalid size for Rainstorm (must be 64,128,256,512).");
-      }
-    }
-
-    bool use_test_vectors = result["test-vectors"].as<bool>();
-    uint64_t output_length = result["output-length"].as<uint64_t>();
-
-    // In digest mode, final output is size/8
-    // In stream mode, you read 'output_length' times the hash
-    if (mode == Mode::Digest) {
-      output_length = size / 8;
-    } else if (mode == Mode::Stream) {
-      output_length *= size;
-    }
-
-    // Mining arguments
-    MineMode mine_mode = result["mine-mode"].as<MineMode>();
-    std::string prefixHex = result["match-prefix"].as<std::string>();
-
-    // Unmatched arguments might be input file
-    std::string inpath;
-    if (!result.unmatched().empty()) {
-      inpath = result.unmatched().front();
-    }
-
-    // If user selected a mining mode
-    if (mine_mode != MineMode::None) {
-      if (prefixHex.empty()) {
-        throw std::runtime_error("You must specify --match-prefix for mining modes.");
-      }
-      // Convert prefix from hex
-      auto hexToBytes = [&](const std::string &hexstr) {
-        if (hexstr.size() % 2 != 0) {
-          throw std::runtime_error("Hex prefix must have even length.");
+        // Handle help and version immediately
+        if (result.count("help")) {
+            std::cout << options.help() << "\n";
+            return 0;
         }
-        std::vector<uint8_t> bytes(hexstr.size() / 2);
-        for (size_t i = 0; i < bytes.size(); ++i) {
-          unsigned int val = 0;
-          std::stringstream ss;
-          ss << std::hex << hexstr.substr(i*2, 2);
-          ss >> val;
-          bytes[i] = static_cast<uint8_t>(val);
+
+        if (result.count("version")) {
+            std::cout << "rainsum version: 1.0.0\n"; // Replace with actual VERSION
+            return 0;
         }
-        return bytes;
-      };
-      std::vector<uint8_t> prefixBytes = hexToBytes(prefixHex);
 
-      switch (mine_mode) {
-        case MineMode::Chain:
-          mineChain(algot, seed, size, prefixBytes);
-          return 0;
-        case MineMode::NonceInc:
-          mineNonceInc(algot, seed, size, prefixBytes, inpath);
-          return 0;
-        case MineMode::NonceRand:
-          mineNonceRand(algot, seed, size, prefixBytes, inpath);
-          return 0;
-        default:
-          throw std::runtime_error("Invalid mine-mode encountered.");
-      }
-    }
+        // Access and validate options
 
-    size_t blockSize = result["block-size"].as<size_t>();
+        // Puzzle Length
+        size_t puzzleLen = result["puzzle-len"].as<size_t>();
 
-    // Normal hashing or encryption/decryption
-    std::string outpath = result["output-file"].as<std::string>();
+        // Hash Size
+        uint32_t hash_size = result["size"].as<uint32_t>();
 
-    if (mode == Mode::Digest) {
-      // Just a normal digest
-      if (outpath == "/dev/stdout") {
-        hashAnything(Mode::Digest, algot, inpath, std::cout, size, use_test_vectors, seed, output_length);
-      } else {
-        std::ofstream outfile(outpath, std::ios::binary);
-        if (!outfile.is_open()) {
-          std::cerr << "Failed to open output file: " << outpath << std::endl;
-          return 1;
+        // Block Size
+        uint8_t blockSize = result["block-size"].as<uint8_t>();
+        if (blockSize == 0 || blockSize > 255) {
+            throw std::runtime_error("Block size must be between 1 and 255 bytes.");
         }
-        hashAnything(Mode::Digest, algot, inpath, outfile, size, use_test_vectors, seed, output_length);
-      }
-    }
-    else if (mode == Mode::Stream) {
-      if (outpath == "/dev/stdout") {
-        hashAnything(Mode::Stream, algot, inpath, std::cout, size, use_test_vectors, seed, output_length);
-      } else {
-        std::ofstream outfile(outpath, std::ios::binary);
-        if (!outfile.is_open()) {
-          std::cerr << "Failed to open output file: " << outpath << std::endl;
-          return 1;
+
+        // Nonce Size
+        size_t nonceSize = result["nonce-size"].as<size_t>();
+        if (nonceSize == 0 || nonceSize > 255) {
+            throw std::runtime_error("Nonce size must be between 1 and 255 bytes.");
         }
-        hashAnything(Mode::Stream, algot, inpath, outfile, size, use_test_vectors, seed, output_length);
-      }
-    }
-    else if (mode == Mode::Enc) {
-      if (inpath.empty()) {
-        throw std::runtime_error("No input file specified for encryption.");
-      }
-      std::string key = promptForKey("Enter encryption key: ");
 
-      // We'll write ciphertext to inpath + ".rc"
-      std::string encFile = inpath + ".rc";
-      puzzleEncryptFile(inpath, encFile, key, algot, size, seed, blockSize);
-      std::cout << "[Enc] Wrote encrypted file to: " << encFile << "\n";
-    }
-    else if (mode == Mode::Dec) {
-      // Puzzle-based decryption (block-based)
-      if (inpath.empty()) {
-        throw std::runtime_error("No ciphertext file specified for decryption.");
-      }
-      std::string key = promptForKey("Enter decryption key: ");
+        // Search Mode
+        std::string searchMode = result["search-mode"].as<std::string>();
+        if (searchMode != "prefix" && searchMode != "sequence" &&
+            searchMode != "series" && searchMode != "scatter") {
+            throw std::runtime_error("Invalid search mode: " + searchMode);
+        }
 
-      // We'll write plaintext to inpath + ".dec"
-      std::string decFile = inpath + ".dec";
-      puzzleDecryptFile(inpath, decFile, key, algot, size, seed, blockSize);
-      std::cout << "[Dec] Wrote decrypted file to: " << decFile << "\n";
-    }
+        // Convert Seed (either numeric or hash string)
+        std::string seed_str = result["seed"].as<std::string>();
+        uint64_t seed;
+        if (!(std::istringstream(seed_str) >> seed)) {
+            seed = hash_string_to_64_bit(seed_str);
+        }
 
-    return 0;
-  }
-  catch (const std::runtime_error &e) {
-    std::cerr << "An error occurred: " << e.what() << std::endl;
-    return 1;
-  }
+        // Determine Mode
+        std::string modeStr = result["mode"].as<std::string>();
+        Mode mode;
+        if (modeStr == "digest") mode = Mode::Digest;
+        else if (modeStr == "stream") mode = Mode::Stream;
+        else if (modeStr == "enc") mode = Mode::Enc;
+        else if (modeStr == "dec") mode = Mode::Dec;
+        else throw std::runtime_error("Invalid mode: " + modeStr);
+
+        // Determine Hash Algorithm
+        std::string algorithm = result["algorithm"].as<std::string>();
+        HashAlgorithm algot = getHashAlgorithm(algorithm);
+        if (algot == HashAlgorithm::Unknown) {
+            throw std::runtime_error("Unsupported algorithm string: " + algorithm);
+        }
+
+        // Validate Hash Size based on Algorithm
+        if (algot == HashAlgorithm::Rainbow) {
+            if (hash_size != 64 && hash_size != 128 && hash_size != 256) {
+                throw std::runtime_error("Invalid size for Rainbow (must be 64, 128, or 256).");
+            }
+        }
+        else if (algot == HashAlgorithm::Rainstorm) {
+            if (hash_size != 64 && hash_size != 128 && hash_size != 256 && hash_size != 512) {
+                throw std::runtime_error("Invalid size for Rainstorm (must be 64, 128, 256, or 512).");
+            }
+        }
+
+        // Test Vectors
+        bool use_test_vectors = result["test-vectors"].as<bool>();
+
+        // Output Length
+        uint64_t output_length = result["output-length"].as<uint64_t>();
+
+        // Adjust output_length based on mode
+        if (mode == Mode::Digest) {
+            output_length = hash_size / 8;
+        }
+        else if (mode == Mode::Stream) {
+            output_length *= hash_size / 8;
+        }
+
+        // Mining arguments
+        std::string mine_mode_str = result["mine-mode"].as<std::string>();
+        MineMode mine_mode;
+        if (mine_mode_str == "chain") mine_mode = MineMode::Chain;
+        else if (mine_mode_str == "nonceInc") mine_mode = MineMode::NonceInc;
+        else if (mine_mode_str == "nonceRand") mine_mode = MineMode::NonceRand;
+        else mine_mode = MineMode::None;
+
+        std::string prefixHex = result["match-prefix"].as<std::string>();
+
+        // Unmatched arguments might be input file
+        std::string inpath;
+        if (!result.unmatched().empty()) {
+            inpath = result.unmatched().front();
+        }
+
+        // Handle Mining Modes
+        if (mine_mode != MineMode::None) {
+            if (prefixHex.empty()) {
+                throw std::runtime_error("You must specify --match-prefix for mining modes.");
+            }
+
+            // Convert prefix from hex
+            auto hexToBytes = [&](const std::string &hexstr) -> std::vector<uint8_t> {
+                if (hexstr.size() % 2 != 0) {
+                    throw std::runtime_error("Hex prefix must have even length.");
+                }
+                std::vector<uint8_t> bytes(hexstr.size() / 2);
+                for (size_t i = 0; i < bytes.size(); ++i) {
+                    unsigned int val = 0;
+                    std::stringstream ss;
+                    ss << std::hex << hexstr.substr(i*2, 2);
+                    ss >> val;
+                    bytes[i] = static_cast<uint8_t>(val);
+                }
+                return bytes;
+            };
+
+            std::vector<uint8_t> prefixBytes = hexToBytes(prefixHex);
+
+            switch (mine_mode) {
+                case MineMode::Chain:
+                    mineChain(algot, seed, hash_size, prefixBytes);
+                    return 0;
+                case MineMode::NonceInc:
+                    mineNonceInc(algot, seed, hash_size, prefixBytes, inpath);
+                    return 0;
+                case MineMode::NonceRand:
+                    mineNonceRand(algot, seed, hash_size, prefixBytes, inpath);
+                    return 0;
+                default:
+                    throw std::runtime_error("Invalid mine-mode encountered.");
+            }
+        }
+
+        // Normal Hashing or Encryption/Decryption
+        std::string outpath = result["output-file"].as<std::string>();
+
+        if (mode == Mode::Digest) {
+            // Just a normal digest
+            if (outpath == "/dev/stdout") {
+                hashAnything(Mode::Digest, algot, inpath, std::cout, hash_size, use_test_vectors, seed, output_length);
+            }
+            else {
+                std::ofstream outfile(outpath, std::ios::binary);
+                if (!outfile.is_open()) {
+                    std::cerr << "Failed to open output file: " << outpath << std::endl;
+                    return 1;
+                }
+                hashAnything(Mode::Digest, algot, inpath, outfile, hash_size, use_test_vectors, seed, output_length);
+            }
+        }
+        else if (mode == Mode::Stream) {
+            if (outpath == "/dev/stdout") {
+                hashAnything(Mode::Stream, algot, inpath, std::cout, hash_size, use_test_vectors, seed, output_length);
+            }
+            else {
+                std::ofstream outfile(outpath, std::ios::binary);
+                if (!outfile.is_open()) {
+                    std::cerr << "Failed to open output file: " << outpath << std::endl;
+                    return 1;
+                }
+                hashAnything(Mode::Stream, algot, inpath, outfile, hash_size, use_test_vectors, seed, output_length);
+            }
+        }
+        else if (mode == Mode::Enc) {
+            if (inpath.empty()) {
+                throw std::runtime_error("No input file specified for encryption.");
+            }
+            std::string key = promptForKey("Enter encryption key: ");
+
+            // We'll write ciphertext to inpath + ".rc"
+            std::string encFile = inpath + ".rc";
+            puzzleEncryptFileWithHeader(inpath, encFile, key, algot, hash_size, seed, blockSize, nonceSize, searchMode);
+            std::cout << "[Enc] Wrote encrypted file to: " << encFile << "\n";
+        }
+        else if (mode == Mode::Dec) {
+            // Puzzle-based decryption (block-based)
+            if (inpath.empty()) {
+                throw std::runtime_error("No ciphertext file specified for decryption.");
+            }
+            std::string key = promptForKey("Enter decryption key: ");
+
+            // We'll write plaintext to inpath + ".dec"
+            std::string decFile = inpath + ".dec";
+            puzzleDecryptFileWithHeader(inpath, decFile, key, seed);
+            std::cout << "[Dec] Wrote decrypted file to: " << decFile << "\n";
+        }
+
+        return 0;
+    }
+    catch (const cxxopts::exceptions::exception& e) {
+      std::cerr << "Error parsing options: " << e.what() << "\n";
+      return 1;
+    }
+    catch (const std::bad_cast &e) {
+        std::cerr << "Bad cast during option parsing: " << e.what() << "\n";
+        return 1;
+    }
+    catch (const std::runtime_error &e) {
+        std::cerr << "An error occurred: " << e.what() << std::endl;
+        return 1;
+    }
 }
+
 
 

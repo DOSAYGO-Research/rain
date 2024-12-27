@@ -80,6 +80,41 @@ std::istream& operator>>(std::istream& in, MineMode& mode) {
   }
   return in;
 }
+
+enum SearchMode {
+  Prefix,
+  Sequence, 
+  Series,
+  Scatter
+};
+
+std::string searchModeToString(const SearchMode& mode) {
+  switch(mode) {
+    case SearchMode::Prefix:      return "Prefix";
+    case SearchMode::Sequence:    return "Sequence";
+    case SearchMode::Series:      return "Series";      // added
+    case SearchMode::Scatter:     return "Scatter";     // added
+    default: throw std::runtime_error("Unknown search mode");
+  }
+}
+
+std::istream& operator>>(std::istream& in, SearchMode& mode) {
+  std::string token;
+  in >> token;
+  if (token == "prefix") {
+    mode = SearchMode::Prefix;
+  } else if (token == "Sequence") {
+    mode = SearchMode::Sequence;
+  } else if (token == "Series") {
+    mode = SearchMode::Series;
+  } else if (token == "Scatter" ) {
+    mode = SearchMode::Scatter;
+  } else {
+    in.setstate(std::ios_base::failbit);
+  }
+  return in;
+}
+
 // Stream retrieval (stdin vs file)
 std::istream& getInputStream() {
 #ifdef _WIN32
