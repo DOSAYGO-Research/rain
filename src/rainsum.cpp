@@ -10,6 +10,7 @@
 #include <random>
 #include <sstream>
 #include <iomanip>
+#include <bitset>
 #include <algorithm>
 #include <stdexcept>
 #include <memory>
@@ -444,6 +445,7 @@ static void puzzleEncryptFileWithHeader(
     size_t remaining = originalSize;
 
     for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
+        std::bitset<64> usedIndices;
         size_t thisBlockSize = std::min(blockSize, remaining);
         remaining -= thisBlockSize; // Corrected subtraction
         std::vector<uint8_t> block(
@@ -492,16 +494,36 @@ static void puzzleEncryptFileWithHeader(
             }
             else if (searchModeEnum == 0x02) { // Series/Scatter
                 bool allFound = true;
+                usedIndices.reset(); // Clear used indices for the current block
+
                 for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-                    auto it = std::find(hashOut.begin(), hashOut.end(), block[byteIdx]);
-                    if (it != hashOut.end()) {
-                        scatterIndices[byteIdx] = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                    auto it = hashOut.begin();
+
+                    // Loop to find a valid index for the current byte
+                    while (it != hashOut.end()) {
+                        // Find the next occurrence of block[byteIdx]
+                        it = std::find(it, hashOut.end(), block[byteIdx]);
+
+                        if (it != hashOut.end()) { // Found a match
+                            uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+
+                            if (!usedIndices.test(idx)) { // Ensure the index is not already used
+                                scatterIndices[byteIdx] = idx; // Store the index
+                                usedIndices.set(idx);         // Mark it as used
+                                break;                        // Exit loop for this byte
+                            }
+
+                            // Advance to the next position for further search
+                            ++it;
+                        }
                     }
-                    else {
+
+                    if (it == hashOut.end()) { // No valid index found for this byte
                         allFound = false;
                         break;
                     }
                 }
+
                 if (allFound) {
                     found = true;
                 }
