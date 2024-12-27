@@ -16,7 +16,7 @@
   citecolor=blue
 }
 
-\title{A Cryptographic Note on Hash-Based Encryption with Digest Indexing}
+\title{Hash-Based Encryption with Digest Selection: A Novel Pre-Image Security Primitive}
 \author{Cris, DOSAYGO}
 \date{\today}
 
@@ -27,6 +27,9 @@
 \begin{document}
 \maketitle
 
+\section*{Abstract}
+This note introduces a hash-based encryption scheme leveraging pre-image resistance and digest indexing for constructing plaintext blocks. Designed for flexibility, the scheme supports multiple digest selection modes (prefix, sequence, scatter) and optional plaintext compression. It offers strong resistance to brute-force and timing attacks, though challenges include ciphertext expansion and mining speed. A proof-of-concept implementation is provided for further exploration and analysis by the cryptographic community.
+
 \section*{Introduction}
 
 This note introduces a novel hash-based encryption primitive, leveraging the pre-image resistance of cryptographic hash functions. The scheme encrypts plaintext by mapping blocks into keyed hash digests, where the plaintext is constructed by selecting specific parts of the digest via a mapping function. By design, this approach ensures robustness against brute-force and timing attacks.
@@ -34,6 +37,8 @@ This note introduces a novel hash-based encryption primitive, leveraging the pre
 Unlike a regular block cipher, the security of this system is not affected by the plaintext block size, but rather by the pre-image size mined to align with it.
 
 The encryption is flexible, operating in multiple modes (prefix, sequence, scatter) and supports optional compression for redundancy reduction. This document formalizes the construction, analyzes its tradeoffs, and outlines future directions.
+
+\textbf{Disclaimer:} This document introduces an experimental concept intended for research and analysis by cryptographers. The scheme presented here has not been formally proven secure or subjected to rigorous cryptanalysis.
 
 \section*{Encryption: Core Equation}
 
@@ -125,13 +130,27 @@ Mining the nonce \( N \) involves a probabilistic search for a valid mapping \( 
   \item \textbf{Mining Speed:} Smaller blocks are faster to mine encrypt, but larger blocks reduce the total number of blocks and nonces.
 \end{itemize}
 
+\section*{Tradeoff Summary}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Aspect}          & \textbf{Advantage}                                 & \textbf{Limitation}                          \\ \midrule
+Block size               & Smaller blocks speed up mining                     & Larger ciphertext due to nonce overhead      \\
+Ciphertext expansion     & Mitigated by compression                           & Compression adds preprocessing complexity    \\
+Mining modes             & Scatter mode provides faster mining               & Requires storing index for every plaintext byte \\
+Timing security          & Stochastic runtime eliminates fixed patterns       & Mining is probabilistic and not constant time \\
+\bottomrule
+\end{tabular}
+\end{center}
+
 \section*{Proof of Concept}
 
 The repository contains a working proof-of-concept toy implementation demonstrating the feasibility of this hash-based encryption scheme. This toy is not attacked or analyzed and should not be used by 3rd-parties (ie, you!) for securing valuables. This toy cipher also does not use established cryptographic hash functions but instead uses the hashes defined in this repository (which nevertheless are high quality and fast hash functions that pass SMHasher3). The code in the toy supports all defined digest search modes (prefix, sequence, series/scatter) and uses a constant key per session, without a key schedule. It also incorporates compression for improved storage efficiency.
 
 The repository can be found at: \url{https://github.com/DOSAYGO-Research/rain}.
 
-If you encounter issues in the following, To build and run the example:
+To build and run the example:
 \begin{verbatim}
 # Clone the repository
 git clone https://github.com/DOSAYGO-Research/rain
@@ -142,8 +161,6 @@ make
 
 # or if encountering problems, try
 ./scripts/build.sh 
-
-# if that still fails you may need to consult the README or debug the build on your system.
 
 # Example usage
 # Encrypt a file with sequence mode
@@ -176,4 +193,3 @@ Future enhancements include:
 This hash-based encryption primitive provides a secure and flexible mechanism for protecting data. By leveraging cryptographic hash functions and indexed digest selection, it ensures strong security against brute-force and timing attacks. While current limitations include ciphertext expansion and mining speed, future improvements aim to address these tradeoffs and expand its applicability.
 
 \end{document}
-
