@@ -1,3 +1,5 @@
+*.rc
+*.rc.dec
 rain/**/*
 rainsum
 .*.swp
