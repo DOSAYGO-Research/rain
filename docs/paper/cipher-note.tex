@@ -16,7 +16,7 @@
   citecolor=blue
 }
 
-\title{Digest Mining Ciphers: Novel Hash-Based Pre-Image Security Primitives}
+\title{Digest Mining Encryption: A Novel Hash-Based Pre-Image Security Primitive}
 \author{Cris, DOSAYGO}
 \date{\today}
 
@@ -135,7 +135,7 @@ Ciphertext expansion is determined by:
 Scatter mode incurs higher overhead due to the need to store an index for each byte of \( P \). Optional compression reduces redundancy in the plaintext before encryption, offsetting this overhead.
 
 \subsection*{Timing Security}
-Mining the random nonce \( N \) involves a probabilistic search for a valid mapping \( \text{Map}(H(K \parallel N)) = P \). The stochastic runtime behavior ensures that timing attacks are mitigated, as the encryption time varies unpredictably due to secure randomness in the nonce.
+Mining the nonce \( N \) involves a probabilistic search for a valid mapping \( \text{Map}(H(K \parallel N)) = P \). The stochastic runtime behavior ensures that timing attacks are mitigated, as the encryption time varies unpredictably.
 
 \section*{Tradeoffs}
 \begin{itemize}
@@ -161,7 +161,7 @@ Timing security          & Stochastic runtime eliminates fixed patterns       & 
 \end{center}
 
 \section*{Proof of Concept}
-The repository contains a working proof-of-concept toy implementation demonstrating the feasibility of this hash-based encryption scheme. This toy is not attacked or analyzed and should not be used by third parties (i.e., you!) for securing valuables. The toy cipher does not use established cryptographic hash functions but instead utilizes the hashes defined in this repository, which are high quality and fast hash functions that pass SMHasher3. The code supports all defined digest search modes (prefix, sequence, scatter) and uses a constant key per session, without a key schedule. It also incorporates compression for improved storage efficiency.
+The repository contains a working proof-of-concept toy implementation demonstrating the feasibility of this hash-based encryption scheme. This toy is not attacked or analyzed and should not be used by third parties for securing valuables. The toy cipher does not use established cryptographic hash functions but instead utilizes the hashes defined in this repository, which are high quality and fast hash functions that pass SMHasher3. The code supports all defined digest search modes (prefix, sequence, scatter) and uses a constant key per session, without a key schedule. It also incorporates compression for improved storage efficiency.
 
 The repository can be found at: \url{https://github.com/DOSAYGO-Research/rain}.
 
