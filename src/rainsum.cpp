@@ -378,157 +378,165 @@ static std::string promptForKey(const std::string &prompt) {
 #endif
 
 static void puzzleEncryptFileWithHeader(
-  const std::string &inFilename,
-  const std::string &outFilename,
-  const std::string &key,
-  HashAlgorithm algot,
-  uint32_t hash_size,
-  uint64_t seed,
-  size_t blockSize,
-  size_t nonceSize,
-  const std::string &searchMode
+    const std::string &inFilename,
+    const std::string &outFilename,
+    const std::string &key,
+    HashAlgorithm algot,
+    uint32_t hash_size,
+    uint64_t seed,
+    size_t blockSize,
+    size_t nonceSize,
+    const std::string &searchMode
 ) {
-  // Open input file
-  std::ifstream fin(inFilename, std::ios::binary);
-  if (!fin.is_open()) {
-    throw std::runtime_error("Cannot open input file: " + inFilename);
-  }
-  std::vector<uint8_t> plainData((std::istreambuf_iterator<char>(fin)),
-                                 (std::istreambuf_iterator<char>()));
-  fin.close();
+    // Open input file
+    std::ifstream fin(inFilename, std::ios::binary);
+    if (!fin.is_open()) {
+        throw std::runtime_error("Cannot open input file: " + inFilename);
+    }
+    std::vector<uint8_t> plainData((std::istreambuf_iterator<char>(fin)),
+                                   (std::istreambuf_iterator<char>()));
+    fin.close();
 
-  // Open output file
-  std::ofstream fout(outFilename, std::ios::binary);
-  if (!fout.is_open()) {
-    throw std::runtime_error("Cannot open output file: " + outFilename);
-  }
+    // Open output file
+    std::ofstream fout(outFilename, std::ios::binary);
+    if (!fout.is_open()) {
+        throw std::runtime_error("Cannot open output file: " + outFilename);
+    }
 
-  // Write header
-  uint32_t magicNumber = 0x52435259; // "RCRY"
-  uint8_t version = 0x01;
-  uint8_t blockSize8 = static_cast<uint8_t>(blockSize);
-  uint8_t nonceSize8 = static_cast<uint8_t>(nonceSize);
-  uint16_t digestSize16 = static_cast<uint16_t>(hash_size);
-  uint8_t searchModeEnum = 0x00; // Default to 'prefix'
-  if (searchMode == "prefix") searchModeEnum = 0x00;
-  else if (searchMode == "sequence") searchModeEnum = 0x01;
-  else if (searchMode == "series") searchModeEnum = 0x02;
-  else if (searchMode == "scatter") searchModeEnum = 0x03;
+    // Write header
+    uint32_t magicNumber = 0x52435259; // "RCRY"
+    uint8_t version = 0x01;
+    uint8_t blockSize8 = static_cast<uint8_t>(blockSize);
+    uint8_t nonceSize8 = static_cast<uint8_t>(nonceSize);
+    uint16_t digestSize16 = static_cast<uint16_t>(hash_size);
+    uint8_t searchModeEnum = 0x00; // Default to 'prefix'
+    if (searchMode == "prefix") searchModeEnum = 0x00;
+    else if (searchMode == "sequence") searchModeEnum = 0x01;
+    else if (searchMode == "series" || searchMode == "scatter") searchModeEnum = 0x02; // Treat 'series' same as 'scatter'
+    else {
+        throw std::runtime_error("Invalid search mode: " + searchMode);
+    }
 
-  std::string hashName = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
-  uint8_t hashNameLength = static_cast<uint8_t>(hashName.size());
+    std::string hashName = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
+    uint8_t hashNameLength = static_cast<uint8_t>(hashName.size());
 
-  fout.write(reinterpret_cast<const char*>(&magicNumber), sizeof(magicNumber));
-  fout.write(reinterpret_cast<const char*>(&version), sizeof(version));
-  fout.write(reinterpret_cast<const char*>(&blockSize8), sizeof(blockSize8));
-  fout.write(reinterpret_cast<const char*>(&nonceSize8), sizeof(nonceSize8));
-  fout.write(reinterpret_cast<const char*>(&digestSize16), sizeof(digestSize16));
-  fout.write(reinterpret_cast<const char*>(&hashNameLength), sizeof(hashNameLength));
-  fout.write(hashName.data(), hashName.size());
-  fout.write(reinterpret_cast<const char*>(&searchModeEnum), sizeof(searchModeEnum));
+    fout.write(reinterpret_cast<const char*>(&magicNumber), sizeof(magicNumber));
+    fout.write(reinterpret_cast<const char*>(&version), sizeof(version));
+    fout.write(reinterpret_cast<const char*>(&blockSize8), sizeof(blockSize8));
+    fout.write(reinterpret_cast<const char*>(&nonceSize8), sizeof(nonceSize8));
+    fout.write(reinterpret_cast<const char*>(&digestSize16), sizeof(digestSize16));
+    fout.write(reinterpret_cast<const char*>(&hashNameLength), sizeof(hashNameLength));
+    fout.write(hashName.data(), hashName.size());
+    fout.write(reinterpret_cast<const char*>(&searchModeEnum), sizeof(searchModeEnum));
 
-  uint64_t originalSize = plainData.size();
-  fout.write(reinterpret_cast<const char*>(&originalSize), sizeof(originalSize));
+    uint64_t originalSize = plainData.size();
+    fout.write(reinterpret_cast<const char*>(&originalSize), sizeof(originalSize));
 
-  // Partition plaintext into blocks
-  size_t totalBlocks = (plainData.size() + blockSize - 1) / blockSize;
-  std::vector<uint8_t> hashOut(hash_size / 8);
-  std::vector<uint8_t> keyBuf(key.begin(), key.end());
+    // Partition plaintext into blocks
+    size_t totalBlocks = (plainData.size() + blockSize - 1) / blockSize;
+    std::vector<uint8_t> hashOut(hash_size / 8);
+    std::vector<uint8_t> keyBuf(key.begin(), key.end());
 
-  // Prepare random generator for nonce
-  std::mt19937_64 rng(std::random_device{}());
-  std::uniform_int_distribution<uint64_t> dist;
+    // Prepare random generator for nonce
+    std::mt19937_64 rng(std::random_device{}());
+    std::uniform_int_distribution<uint64_t> dist;
 
-  for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
-      size_t thisBlockSize = std::min(blockSize, remaining);
-      std::vector<uint8_t> block(
-          plainData.begin() + blockIndex * blockSize,
-          plainData.begin() + blockIndex * blockSize + thisBlockSize
-      );
+    size_t remaining = originalSize;
 
-      bool found = false;
-      std::vector<uint8_t> chosenNonce(nonceSize, 0);
-      // For 'scatter'/'series' mode, we need to store multiple indices
-      std::vector<size_t> scatterIndices(thisBlockSize, 0); // Initialize with zeros
+    for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
+        size_t thisBlockSize = std::min(blockSize, remaining);
+        remaining -= thisBlockSize; // Corrected subtraction
+        std::vector<uint8_t> block(
+            plainData.begin() + blockIndex * blockSize,
+            plainData.begin() + blockIndex * blockSize + thisBlockSize
+        );
 
-      for (uint64_t tries = 0; ; tries++) { // No fixed MAX_TRIES
-          // Generate random nonce
-          for (size_t i = 0; i < nonceSize; i++) {
-              chosenNonce[i] = static_cast<uint8_t>(dist(rng) & 0xFF);
-          }
+        bool found = false;
+        std::vector<uint8_t> chosenNonce(nonceSize, 0);
+        std::vector<uint8_t> scatterIndices(thisBlockSize, 0); // Changed to uint8_t
 
-          // Build trial buffer
-          std::vector<uint8_t> trial(keyBuf);
-          trial.insert(trial.end(), chosenNonce.begin(), chosenNonce.end());
+        for (uint64_t tries = 0; ; tries++) { // No fixed MAX_TRIES
+            // Generate random nonce
+            for (size_t i = 0; i < nonceSize; i++) {
+                chosenNonce[i] = static_cast<uint8_t>(dist(rng) & 0xFF);
+            }
 
-          // Hash it
-          invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
+            // Build trial buffer
+            std::vector<uint8_t> trial(keyBuf);
+            trial.insert(trial.end(), chosenNonce.begin(), chosenNonce.end());
 
-          if (searchModeEnum == 0x00) { // Prefix
-              if (hashOut.size() >= thisBlockSize &&
-                  std::equal(block.begin(), block.end(), hashOut.begin())) {
-                  // Found at the front
-                  scatterIndices.assign(thisBlockSize, 0); // All indices are 0
-                  found = true;
-              }
-          }
-          else if (searchModeEnum == 0x01) { // Sequence
-              // Search for block as a contiguous substring
-              for (size_t i = 0; i <= hashOut.size() - thisBlockSize; i++) {
-                  if (std::equal(block.begin(), block.end(), hashOut.begin() + i)) {
-                      scatterIndices.assign(thisBlockSize, i); // All bytes start at 'i'
-                      found = true;
-                      break;
-                  }
-              }
-          }
-          else if (searchModeEnum == 0x02) { // Series (same as Scatter)
-              bool allFound = true;
-              for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-                  auto it = std::find(hashOut.begin(), hashOut.end(), block[byteIdx]);
-                  if (it != hashOut.end()) {
-                      scatterIndices[byteIdx] = std::distance(hashOut.begin(), it);
-                  }
-                  else {
-                      allFound = false;
-                      break;
-                  }
-              }
-              if (allFound) {
-                  found = true;
-              }
-          }
+            // Hash it
+            invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
 
-          if (found) break;
+            if (searchModeEnum == 0x00) { // Prefix
+                if (hashOut.size() >= thisBlockSize &&
+                    std::equal(block.begin(), block.end(), hashOut.begin())) {
+                    // Found at the front
+                    scatterIndices.assign(thisBlockSize, 0); // All indices are 0
+                    found = true;
+                }
+            }
+            else if (searchModeEnum == 0x01) { // Sequence
+                // Search for block as a contiguous substring
+                bool seqFound = false;
+                uint8_t startIdx = 0;
+                for (size_t i = 0; i <= hashOut.size() - thisBlockSize; i++) {
+                    if (std::equal(block.begin(), block.end(), hashOut.begin() + i)) {
+                        startIdx = static_cast<uint8_t>(i); // Ensure it fits in uint8_t
+                        scatterIndices.assign(thisBlockSize, startIdx); // All bytes share the same start index
+                        found = true;
+                        seqFound = true;
+                        break;
+                    }
+                }
+            }
+            else if (searchModeEnum == 0x02) { // Series/Scatter
+                bool allFound = true;
+                for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+                    auto it = std::find(hashOut.begin(), hashOut.end(), block[byteIdx]);
+                    if (it != hashOut.end()) {
+                        scatterIndices[byteIdx] = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                    }
+                    else {
+                        allFound = false;
+                        break;
+                    }
+                }
+                if (allFound) {
+                    found = true;
+                }
+            }
 
-          // Optional: Implement a maximum number of tries to prevent infinite loops
-          // Example:
-          /*
-          if (tries > MAX_TRIES) {
-              throw std::runtime_error("Failed to find a suitable nonce for block " + std::to_string(blockIndex));
-          }
-          */
+            if (found) break;
 
-          if (tries % 1'000'000 == 0) {
-              std::cerr << "\r[Enc] Block " << blockIndex << ", " << tries << " tries... " << std::flush;
-          }
-      }
+            // Optional: Implement a maximum number of tries to prevent infinite loops
+            // Example:
+            /*
+            if (tries > MAX_TRIES) {
+                throw std::runtime_error("Failed to find a suitable nonce for block " + std::to_string(blockIndex));
+            }
+            */
 
-      // Write nonce and indices
-      fout.write(reinterpret_cast<const char*>(chosenNonce.data()), nonceSize);
-      if (searchModeEnum == 0x02) { // Series/Scatter
-          // Write each index as size_t
-          fout.write(reinterpret_cast<const char*>(scatterIndices.data()), scatterIndices.size() * sizeof(size_t));
-      }
-      else { // Prefix and Sequence
-          // Write single start index (uint8_t)
-          uint8_t startIndex = static_cast<uint8_t>(scatterIndices[0]);
-          fout.write(reinterpret_cast<const char*>(&startIndex), sizeof(startIndex));
-      }
-  }
+            if (tries % 1'000'000 == 0) {
+                std::cerr << "\r[Enc] Block " << blockIndex << ", " << tries << " tries... " << std::flush;
+            }
+        }
 
-  fout.close();
-  std::cout << "[Enc] Encryption complete: " << outFilename << "\n";
+        // Write nonce and indices
+        fout.write(reinterpret_cast<const char*>(chosenNonce.data()), nonceSize);
+        if (searchModeEnum == 0x02) { // Series/Scatter
+            // Write each index as uint8_t
+            fout.write(reinterpret_cast<const char*>(scatterIndices.data()), scatterIndices.size() * sizeof(uint8_t));
+        }
+        else { // Prefix/Sequence
+            // Write single start index
+            uint8_t startIndex = scatterIndices[0];
+            fout.write(reinterpret_cast<const char*>(&startIndex), sizeof(startIndex));
+        }
+    }
+
+    fout.close();
+    std::cout << "[Enc] Encryption complete: " << outFilename << "\n";
 }
 
 static void puzzleDecryptFileWithHeader(
@@ -566,7 +574,7 @@ static void puzzleDecryptFileWithHeader(
     fin.read(reinterpret_cast<char*>(&searchModeEnum), sizeof(searchModeEnum));
     fin.read(reinterpret_cast<char*>(&originalSize), sizeof(originalSize));
 
-    if (magicNumber != 0x52435259) { // Replace with your actual magic number
+    if (magicNumber != 0x52435259) { // "RCRY"
         throw std::runtime_error("Invalid magic number in header.");
     }
 
@@ -587,19 +595,29 @@ static void puzzleDecryptFileWithHeader(
 
     // Each block consists of:
     // - nonceSize bytes + 1 byte (prefix/sequence) OR
-    // - nonceSize bytes + (blockSize * sizeof(size_t)) bytes (series/scatter)
+    // - nonceSize bytes + (thisBlockSize * sizeof(uint8_t)) bytes (series/scatter)
     size_t blockCipherSize;
-    if (searchModeEnum == 0x02) { // Series/Scatter
-        blockCipherSize = nonceSize + (blockSize * sizeof(size_t));
-    }
-    else { // Prefix/Sequence
-        blockCipherSize = nonceSize + 1;
+    // Calculate maximum block size (all blocks except possibly the last)
+    size_t maxThisBlockSize = blockSize;
+    // For decryption, to handle partial blocks, we'll iterate based on the original size
+    // Calculate total blocks
+    size_t totalBlocks = (originalSize + blockSize - 1) / blockSize;
+
+    // Verify cipherData size
+    size_t expectedCipherDataSize = 0;
+    for (size_t blockIdx = 0; blockIdx < totalBlocks; blockIdx++) {
+        size_t thisBlockSize = std::min<size_t>(blockSize, originalSize - blockIdx * blockSize);
+        if (searchModeEnum == 0x02) { // Series/Scatter
+            expectedCipherDataSize += nonceSize + thisBlockSize * sizeof(uint8_t);
+        }
+        else { // Prefix/Sequence
+            expectedCipherDataSize += nonceSize + sizeof(uint8_t);
+        }
     }
 
-    if (cipherData.size() % blockCipherSize != 0) {
-        throw std::runtime_error("[Dec] Cipher data not multiple of blockCipherSize bytes after header!");
+    if (cipherData.size() != expectedCipherDataSize) {
+        throw std::runtime_error("[Dec] Cipher data size mismatch.");
     }
-    size_t totalBlocks = cipherData.size() / blockCipherSize;
 
     // Prepare output file
     std::ofstream fout(outFilename, std::ios::binary);
@@ -612,25 +630,28 @@ static void puzzleDecryptFileWithHeader(
     std::vector<uint8_t> hashOut(hash_size / 8);
 
     size_t recoveredSoFar = 0;
+    size_t cipherOffset = 0; // To track reading position in cipherData
 
-    for (size_t i = 0; i < totalBlocks; i++) {
+    for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
+        size_t thisBlockSize = std::min<size_t>(static_cast<size_t>(blockSize), originalSize - recoveredSoFar);
+        std::vector<uint8_t> block;
+
         // Extract nonce
-        std::vector<uint8_t> storedNonce(cipherData.begin() + i * blockCipherSize,
-                                        cipherData.begin() + i * blockCipherSize + nonceSize);
+        std::vector<uint8_t> storedNonce(cipherData.begin() + cipherOffset,
+                                        cipherData.begin() + cipherOffset + nonceSize);
+        cipherOffset += nonceSize;
 
         // Read indices based on search mode
-        std::vector<size_t> scatterIndices;
+        std::vector<uint8_t> scatterIndices; // For series/scatter
         uint8_t startIndex = 0;
         if (searchModeEnum == 0x02) { // Series/Scatter
-            scatterIndices.resize(blockSize);
-            for (size_t j = 0; j < blockSize; j++) {
-                size_t idx;
-                fin.read(reinterpret_cast<char*>(&idx), sizeof(idx));
-                scatterIndices[j] = idx;
-            }
+            scatterIndices.resize(thisBlockSize);
+            std::memcpy(scatterIndices.data(), &cipherData[cipherOffset], thisBlockSize * sizeof(uint8_t));
+            cipherOffset += thisBlockSize * sizeof(uint8_t);
         }
         else { // Prefix/Sequence
-            fin.read(reinterpret_cast<char*>(&startIndex), sizeof(startIndex));
+            std::memcpy(&startIndex, &cipherData[cipherOffset], sizeof(uint8_t));
+            cipherOffset += sizeof(uint8_t);
         }
 
         // Recompute the hash
@@ -638,46 +659,49 @@ static void puzzleDecryptFileWithHeader(
         trial.insert(trial.end(), storedNonce.begin(), storedNonce.end());
         invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
 
-        // Determine the size of the current block
-        size_t remaining = originalSize - recoveredSoFar;
-        size_t thisBlockSize = std::min(static_cast<size_t>(blockSize), remaining);
-
-        std::vector<uint8_t> plaintextBlock;
-
+        // Reconstruct plaintext block based on search mode
         if (searchModeEnum == 0x00) { // Prefix
-            plaintextBlock.assign(hashOut.begin(), hashOut.begin() + thisBlockSize);
+            // Take the first 'thisBlockSize' bytes from hashOut
+            block.assign(hashOut.begin(), hashOut.begin() + thisBlockSize);
         }
         else if (searchModeEnum == 0x01) { // Sequence
-            plaintextBlock.assign(hashOut.begin() + startIndex,
-                                  hashOut.begin() + startIndex + thisBlockSize);
+            // Take 'thisBlockSize' bytes starting from 'startIndex'
+            if (startIndex + thisBlockSize > hashOut.size()) {
+                throw std::runtime_error("[Dec] Start index out of bounds in sequence mode.");
+            }
+            block.assign(hashOut.begin() + startIndex, hashOut.begin() + startIndex + thisBlockSize);
         }
         else if (searchModeEnum == 0x02) { // Series/Scatter
-            plaintextBlock.reserve(thisBlockSize);
+            // Extract each byte from the specified indices
+            block.reserve(thisBlockSize);
             for (size_t j = 0; j < thisBlockSize; j++) {
-                if (scatterIndices[j] < hashOut.size()) {
-                    plaintextBlock.push_back(hashOut[scatterIndices[j]]);
-                }
-                else {
+                uint8_t idx = scatterIndices[j];
+                if (idx >= hashOut.size()) {
                     throw std::runtime_error("[Dec] Scatter index out of range.");
                 }
+                block.push_back(hashOut[idx]);
             }
+        }
+        else {
+            throw std::runtime_error("Invalid search mode enum in decryption.");
         }
 
         // Write the plaintext block
-        if (!plaintextBlock.empty()) {
-            fout.write(reinterpret_cast<const char*>(plaintextBlock.data()), thisBlockSize);
+        if (!block.empty()) {
+            fout.write(reinterpret_cast<const char*>(block.data()), thisBlockSize);
             recoveredSoFar += thisBlockSize;
         }
 
-        // Early exit if all data is recovered
-        if (recoveredSoFar >= originalSize) {
-            break;
+        // Optional: Progress reporting
+        if (blockIndex % 100 == 0) {
+            std::cerr << "\r[Dec] Processing block " << blockIndex << " / " << totalBlocks << std::flush;
         }
     }
 
     fout.close();
-    std::cout << "[Dec] Ciphertext " << inFilename << " decrypted successfully.\n";
+    std::cout << "\n[Dec] Ciphertext " << inFilename << " decrypted successfully.\n";
 }
+
 
 
 // The main function
