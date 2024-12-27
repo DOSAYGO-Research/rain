@@ -378,6 +378,72 @@ static std::string promptForKey(const std::string &prompt) {
 }
 #endif
 
+/* compression helpers */
+#include <zlib.h>
+#include <stdexcept>
+
+// Compress using zlib
+std::vector<uint8_t> compressData(const std::vector<uint8_t>& data) {
+  z_stream zs = {};
+  if (deflateInit(&zs, Z_BEST_COMPRESSION) != Z_OK) {
+    throw std::runtime_error("Failed to initialize zlib deflate.");
+  }
+
+  zs.next_in = const_cast<Bytef*>(data.data());
+  zs.avail_in = data.size();
+
+  std::vector<uint8_t> compressed;
+  uint8_t buffer[1024];
+
+  do {
+    zs.next_out = buffer;
+    zs.avail_out = sizeof(buffer);
+
+    if (deflate(&zs, Z_FINISH) == Z_STREAM_ERROR) {
+      deflateEnd(&zs);
+      throw std::runtime_error("zlib compression failed.");
+    }
+
+    compressed.insert(compressed.end(), buffer, buffer + (sizeof(buffer) - zs.avail_out));
+  } while (zs.avail_out == 0);
+
+  deflateEnd(&zs);
+  return compressed;
+}
+
+// Decompress using zlib
+std::vector<uint8_t> decompressData(const std::vector<uint8_t>& data) {
+  z_stream zs = {};
+  if (inflateInit(&zs) != Z_OK) {
+    throw std::runtime_error("Failed to initialize zlib inflate.");
+  }
+
+  zs.next_in = const_cast<Bytef*>(data.data());
+  zs.avail_in = data.size();
+
+  std::vector<uint8_t> decompressed;
+  uint8_t buffer[1024];
+
+  do {
+    zs.next_out = buffer;
+    zs.avail_out = sizeof(buffer);
+
+    int ret = inflate(&zs, Z_NO_FLUSH);
+    if (ret == Z_STREAM_ERROR || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR) {
+      inflateEnd(&zs);
+      throw std::runtime_error("zlib decompression failed.");
+    }
+
+    decompressed.insert(decompressed.end(), buffer, buffer + (sizeof(buffer) - zs.avail_out));
+
+    if (ret == Z_STREAM_END) break;
+  } while (zs.avail_out == 0);
+
+  inflateEnd(&zs);
+  return decompressed;
+}
+
+
 static void puzzleEncryptFileWithHeader(
     const std::string &inFilename,
     const std::string &outFilename,
@@ -430,6 +496,12 @@ static void puzzleEncryptFileWithHeader(
     fout.write(hashName.data(), hashName.size());
     fout.write(reinterpret_cast<const char*>(&searchModeEnum), sizeof(searchModeEnum));
 
+    // Compress plaintext
+    std::vector<uint8_t> compressedData = compressData(plainData);
+    // Replace plainData with compressedData
+    plainData = std::move(compressedData);
+
+    // Update original size in the header to match compressed size
     uint64_t originalSize = plainData.size();
     fout.write(reinterpret_cast<const char*>(&originalSize), sizeof(originalSize));
 
@@ -615,63 +687,34 @@ static void puzzleDecryptFileWithHeader(
     );
     fin.close();
 
-    // Each block consists of:
-    // - nonceSize bytes + 1 byte (prefix/sequence) OR
-    // - nonceSize bytes + (thisBlockSize * sizeof(uint8_t)) bytes (series/scatter)
-    size_t blockCipherSize;
-    // Calculate maximum block size (all blocks except possibly the last)
-    size_t maxThisBlockSize = blockSize;
-    // For decryption, to handle partial blocks, we'll iterate based on the original size
-    // Calculate total blocks
-    size_t totalBlocks = (originalSize + blockSize - 1) / blockSize;
-
     // Verify cipherData size
-    size_t expectedCipherDataSize = 0;
-    for (size_t blockIdx = 0; blockIdx < totalBlocks; blockIdx++) {
-        size_t thisBlockSize = std::min<size_t>(blockSize, originalSize - blockIdx * blockSize);
-        if (searchModeEnum == 0x02) { // Series/Scatter
-            expectedCipherDataSize += nonceSize + thisBlockSize * sizeof(uint8_t);
-        }
-        else { // Prefix/Sequence
-            expectedCipherDataSize += nonceSize + sizeof(uint8_t);
-        }
-    }
+    size_t totalBlocks = (originalSize + blockSize - 1) / blockSize;
+    size_t cipherOffset = 0;
 
-    if (cipherData.size() != expectedCipherDataSize) {
-        throw std::runtime_error("[Dec] Cipher data size mismatch.");
-    }
-
-    // Prepare output file
-    std::ofstream fout(outFilename, std::ios::binary);
-    if (!fout.is_open()) {
-        throw std::runtime_error("Cannot open output file for plaintext: " + outFilename);
-    }
-
-    // Reconstruct plaintext blocks
+    // Prepare to reconstruct plaintext
     std::vector<uint8_t> keyBuf(key.begin(), key.end());
     std::vector<uint8_t> hashOut(hash_size / 8);
+    std::vector<uint8_t> plaintextAccumulated; // Collect all decrypted blocks
 
     size_t recoveredSoFar = 0;
-    size_t cipherOffset = 0; // To track reading position in cipherData
 
     for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
-        size_t thisBlockSize = std::min<size_t>(static_cast<size_t>(blockSize), originalSize - recoveredSoFar);
+        size_t thisBlockSize = std::min<size_t>(blockSize, originalSize - recoveredSoFar);
         std::vector<uint8_t> block;
 
         // Extract nonce
         std::vector<uint8_t> storedNonce(cipherData.begin() + cipherOffset,
-                                        cipherData.begin() + cipherOffset + nonceSize);
+                                         cipherData.begin() + cipherOffset + nonceSize);
         cipherOffset += nonceSize;
 
         // Read indices based on search mode
-        std::vector<uint8_t> scatterIndices; // For series/scatter
+        std::vector<uint8_t> scatterIndices;
         uint8_t startIndex = 0;
         if (searchModeEnum == 0x02) { // Series/Scatter
             scatterIndices.resize(thisBlockSize);
             std::memcpy(scatterIndices.data(), &cipherData[cipherOffset], thisBlockSize * sizeof(uint8_t));
             cipherOffset += thisBlockSize * sizeof(uint8_t);
-        }
-        else { // Prefix/Sequence
+        } else { // Prefix/Sequence
             std::memcpy(&startIndex, &cipherData[cipherOffset], sizeof(uint8_t));
             cipherOffset += sizeof(uint8_t);
         }
@@ -683,18 +726,13 @@ static void puzzleDecryptFileWithHeader(
 
         // Reconstruct plaintext block based on search mode
         if (searchModeEnum == 0x00) { // Prefix
-            // Take the first 'thisBlockSize' bytes from hashOut
             block.assign(hashOut.begin(), hashOut.begin() + thisBlockSize);
-        }
-        else if (searchModeEnum == 0x01) { // Sequence
-            // Take 'thisBlockSize' bytes starting from 'startIndex'
+        } else if (searchModeEnum == 0x01) { // Sequence
             if (startIndex + thisBlockSize > hashOut.size()) {
                 throw std::runtime_error("[Dec] Start index out of bounds in sequence mode.");
             }
             block.assign(hashOut.begin() + startIndex, hashOut.begin() + startIndex + thisBlockSize);
-        }
-        else if (searchModeEnum == 0x02) { // Series/Scatter
-            // Extract each byte from the specified indices
+        } else if (searchModeEnum == 0x02) { // Series/Scatter
             block.reserve(thisBlockSize);
             for (size_t j = 0; j < thisBlockSize; j++) {
                 uint8_t idx = scatterIndices[j];
@@ -703,28 +741,35 @@ static void puzzleDecryptFileWithHeader(
                 }
                 block.push_back(hashOut[idx]);
             }
-        }
-        else {
+        } else {
             throw std::runtime_error("Invalid search mode enum in decryption.");
         }
 
-        // Write the plaintext block
-        if (!block.empty()) {
-            fout.write(reinterpret_cast<const char*>(block.data()), thisBlockSize);
-            recoveredSoFar += thisBlockSize;
-        }
+        // Append block to accumulated plaintext
+        plaintextAccumulated.insert(plaintextAccumulated.end(), block.begin(), block.end());
+        recoveredSoFar += thisBlockSize;
 
-        // Optional: Progress reporting
         if (blockIndex % 100 == 0) {
             std::cerr << "\r[Dec] Processing block " << blockIndex << " / " << totalBlocks << std::flush;
         }
     }
 
+    std::cout << "\n[Dec] Ciphertext blocks decrypted successfully.\n";
+
+    // Decompress accumulated plaintext
+    std::vector<uint8_t> decompressedData = decompressData(plaintextAccumulated);
+
+    // Write decompressed data to the output file
+    std::ofstream fout(outFilename, std::ios::binary);
+    if (!fout.is_open()) {
+        throw std::runtime_error("Cannot open output file for decompressed plaintext: " + outFilename);
+    }
+
+    fout.write(reinterpret_cast<const char*>(decompressedData.data()), decompressedData.size());
     fout.close();
-    std::cout << "\n[Dec] Ciphertext " << inFilename << " decrypted successfully.\n";
+
+    std::cout << "[Dec] Decompressed plaintext written to: " << outFilename << "\n";
 }
-
-
 
 // The main function
 int main(int argc, char** argv) {
