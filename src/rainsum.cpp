@@ -818,7 +818,7 @@ int main(int argc, char** argv) {
         }
 
         if (result.count("version")) {
-            std::cout << "rainsum version: 1.0.0\n"; // Replace with actual VERSION
+            std::cout << "rainsum version: " << VERSION << "\n"; // Replace with actual VERSION
             return 0;
         }
 
