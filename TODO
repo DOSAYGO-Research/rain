@@ -1,5 +1,9 @@
 cipher improvement
 
+- implement a js version of enc / dec
 - schedule K into block keys via XOF
+
+Later maybe
 - parallelization for cipher mining efficiency
+- ensure we output inc nonce for mining and rand nonce for mining (right now we just show the iter count, and lose the rand nonce)
 
