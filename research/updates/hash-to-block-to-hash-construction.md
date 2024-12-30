@@ -379,6 +379,4 @@ def collision_attack(G, H, K, message_pairs):
 
 *Explanation*: Generate hash outputs for different message pairs and check for collisions by comparing hash outputs.
 
----
 
-By incorporating detailed mathematical descriptions, pseudocode, and a thorough cryptographic analysis, this response aims to provide a comprehensive evaluation of your proposed construction. The analysis highlights significant vulnerabilities stemming from the use of a non-cryptographic hash function and underscores the importance of leveraging well-established cryptographic primitives to ensure security.
