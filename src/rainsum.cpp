@@ -565,6 +565,7 @@ static void puzzleEncryptFileWithHeader(
     uint8_t reverseMapOffsets[256] = {0};
 
     size_t remaining = originalSize;
+    int progressInterval = 1'000'000;
 
     // MAIN BLOCK LOOP
     for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
@@ -585,91 +586,87 @@ static void puzzleEncryptFileWithHeader(
             std::vector<uint8_t> bestNonce(nonceSize);         // Shared best nonce
             std::vector<uint8_t> bestScatter(thisBlockSize);   // Shared best scatter indices
 
-            // OpenMP parallel region
             #pragma omp parallel
             {
-                uint64_t localTries = 0;
-                std::vector<uint8_t> localNonce(nonceSize);
-                std::vector<uint8_t> localScatterIndices(thisBlockSize, 0);
-                std::bitset<64> localUsedIndices;
-                std::mt19937_64 local_rng(omp_get_thread_num() + seed);
-                std::uniform_int_distribution<uint8_t> local_dist(0, 255);
+              uint64_t localTries = 0;
+              std::vector<uint8_t> localNonce(nonceSize);
+              std::vector<uint8_t> localScatterIndices(thisBlockSize, 0); // Thread-local
+              std::vector<uint8_t> threadHashOut(hash_size / 8);
+              std::bitset<64> localUsedIndices;
+              std::mt19937_64 local_rng(std::random_device{}()); // Thread-local RNG
+              std::uniform_int_distribution<uint8_t> local_dist(0, 255);
 
-                while (!done.load(std::memory_order_relaxed)) {
-                    localTries++;
+              while (!done.load(std::memory_order_acquire)) {
+                // Generate nonce
+                if (deterministicNonce) {
+                  uint64_t current = omp_get_thread_num() + omp_get_num_threads() * (localTries + 1);
+                  for (size_t i = 0; i < nonceSize; i++) {
+                    localNonce[i] = static_cast<uint8_t>((current >> (i * 8)) & 0xFF);
+                  }
+                } else {
+                  for (size_t i = 0; i < nonceSize; i++) {
+                    localNonce[i] = local_dist(local_rng);
+                  }
+                }
 
-                    // Generate nonce
-                    if (deterministicNonce) {
-                        uint64_t current = omp_get_thread_num() + omp_get_num_threads() * (localTries - 1);
-                        for (size_t i = 0; i < nonceSize; i++) {
-                            localNonce[i] = static_cast<uint8_t>((current >> (i * 8)) & 0xFF);
-                        }
+                // Build trial buffer
+                std::vector<uint8_t> trial(keyBuf);
+                trial.insert(trial.end(), localNonce.begin(), localNonce.end());
+
+                // Hash it
+                invokeHash<bswap>(algot, seed, trial, threadHashOut, hash_size);
+
+                // Check scatter indices
+                bool allFound = true;
+                localUsedIndices.reset();
+                for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+                  auto it = threadHashOut.begin();
+                  while (it != threadHashOut.end()) {
+                    it = std::find(it, threadHashOut.end(), block[byteIdx]);
+                    if (it != threadHashOut.end()) {
+                      uint8_t idx = static_cast<uint8_t>(std::distance(threadHashOut.begin(), it));
+                      if (!localUsedIndices.test(idx)) {
+                        localScatterIndices[byteIdx] = idx;
+                        localUsedIndices.set(idx);
+                        break;
+                      }
+                      ++it;
                     } else {
-                        for (size_t i = 0; i < nonceSize; i++) {
-                            localNonce[i] = local_dist(local_rng);
-                        }
+                      allFound = false;
+                      break;
                     }
+                  }
+                  if (!allFound) break;
+                }
 
-                    // Build trial buffer
-                    std::vector<uint8_t> trial(keyBuf);
-                    trial.insert(trial.end(), localNonce.begin(), localNonce.end());
-
-                    // Hash it
-                    invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
-
-                    // Check if scatter indices can be uniquely mapped
-                    bool allFound = true;
-                    localUsedIndices.reset();
-                    for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-                        auto it = hashOut.begin();
-                        while (it != hashOut.end()) {
-                            it = std::find(it, hashOut.end(), block[byteIdx]);
-                            if (it != hashOut.end()) {
-                                uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
-                                if (!localUsedIndices.test(idx)) {
-                                    localScatterIndices[byteIdx] = idx;
-                                    localUsedIndices.set(idx);
-                                    break;
-                                }
-                                ++it;
-                            } else {
-                                allFound = false;
-                                break;
-                            }
-                        }
-                        if (!allFound) break;
+                if (allFound) {
+                  // Critical section to update shared variables
+                  #pragma omp critical
+                  {
+                    if (!done.load(std::memory_order_relaxed)) {
+                      bestNonce = localNonce;
+                      bestScatter = localScatterIndices;
+                      done.store(true, std::memory_order_release); // Synchronize with other threads
                     }
+                  }
+                }
 
-                    if (allFound) {
-                        // Critical section to write shared results
-                        #pragma omp critical
-                        {
-                            if (!done.load(std::memory_order_relaxed)) {
-                                bestNonce = localNonce;
-                                bestScatter = localScatterIndices;
-                                done.store(true, std::memory_order_relaxed);
-                                if (verbose) {
-                                    std::cout << "\n[Parascatter] Found after " << localTries
-                                              << " tries on thread " << omp_get_thread_num() << "\n";
-                                }
-                            }
-                        }
+                // Periodic progress reporting
+                if (localTries % progressInterval == 0 && !done.load(std::memory_order_relaxed)) {
+                  # pragma omp critical
+                  {
+                    if (!done.load(std::memory_order_relaxed)) {
+                      std::cerr << "\r[Parascatter] Block " << blockIndex + 1
+                                << "/" << totalBlocks << ", thread "
+                                << omp_get_thread_num() << ": "
+                                << localTries << " tries..." << std::flush;
                     }
+                  }
+                }
+                localTries++;
+              } // End while
+            } // End parallel
 
-                    // Thread progress reporting
-                    if (localTries % 100000 == 0 && !done.load(std::memory_order_relaxed)) {
-                        #pragma omp critical
-                        {
-                            if (!done.load(std::memory_order_relaxed)) {
-                                std::cerr << "\r[Parascatter] Block " << blockIndex + 1
-                                          << "/" << totalBlocks << ", thread "
-                                          << omp_get_thread_num() << ": "
-                                          << localTries << " tries..." << std::flush;
-                            }
-                        }
-                    }
-                } // End while
-            } // End parallel region
 
             // Write results after parallel region
             if (done.load(std::memory_order_relaxed)) {
@@ -870,11 +867,10 @@ static void puzzleEncryptFileWithHeader(
                 }
 
                 // Periodic progress for non-parallel tries
-                if (tries % 1000000 == 0 && searchModeEnum != 0x05) {
-                    if (verbose) {
-                        std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks 
-                                  << ", " << tries << " tries... " << std::flush;
-                    }
+                if (tries % progressInterval == 0) {
+                    std::cerr << "\r[Enc] Mode: " << searchMode
+                              << ", Block " << (blockIndex + 1) << "/" << totalBlocks
+                              << ", " << tries << " tries..." << std::flush;
                 }
             } // end tries loop
 
@@ -882,7 +878,9 @@ static void puzzleEncryptFileWithHeader(
             if (verbose) {
                 std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks << " processed.\n";
             }
+
         } // end else (other modes)
+
 
     } // end for(blockIndex)
 
