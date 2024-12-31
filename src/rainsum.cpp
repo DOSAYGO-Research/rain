@@ -454,6 +454,20 @@ std::vector<uint8_t> decompressData(const std::vector<uint8_t>& data) {
 
 // Assuming necessary includes and definitions, such as MagicNumber, HashAlgorithm, invokeHash, compressData
 
+#include <algorithm>
+#include <atomic>
+#include <bitset>
+#include <fstream>
+#include <iostream>
+#include <iterator>
+#include <random>
+#include <string>
+#include <vector>
+#include <omp.h>
+#include <iomanip> // for std::hex etc.
+
+// Assuming necessary includes and definitions, such as MagicNumber, HashAlgorithm, invokeHash, compressData
+
 static void puzzleEncryptFileWithHeader(
     const std::string &inFilename,
     const std::string &outFilename,
@@ -552,6 +566,7 @@ static void puzzleEncryptFileWithHeader(
 
     size_t remaining = originalSize;
 
+    // MAIN BLOCK LOOP
     for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
         size_t thisBlockSize = std::min(blockSize, remaining);
         remaining -= thisBlockSize;
@@ -562,10 +577,13 @@ static void puzzleEncryptFileWithHeader(
             plainData.begin() + blockIndex * blockSize + thisBlockSize
         );
 
-        if (searchModeEnum == 0x05) { // parascatter
+        // -----------------------
+        // parascatter branch
+        // -----------------------
+        if (searchModeEnum == 0x05) {
             std::atomic<bool> done(false);
             std::vector<uint8_t> bestNonce(nonceSize);         // Shared best nonce
-            std::vector<uint8_t> bestScatter(thisBlockSize);  // Shared best scatter indices
+            std::vector<uint8_t> bestScatter(thisBlockSize);   // Shared best scatter indices
 
             // OpenMP parallel region
             #pragma omp parallel
@@ -679,7 +697,10 @@ static void puzzleEncryptFileWithHeader(
                 throw std::runtime_error("[Parascatter] No solution found.");
             }
 
-        } else { // existing tries loop for other modes
+        // ------------------------------------------------------
+        // other modes in else branch
+        // ------------------------------------------------------
+        } else { 
             // We'll fill these once a solution is found
             bool found = false;
             std::vector<uint8_t> chosenNonce(nonceSize, 0);
@@ -792,7 +813,7 @@ static void puzzleEncryptFileWithHeader(
                     if (allFound) {
                         found = true;
                         if (verbose) {
-                            std::cout << "Scatter Indices: ";
+                            std::cout << "Series Indices: ";
                             for (auto idx : scatterIndices) {
                                 std::cout << static_cast<int>(idx) << " ";
                             }
@@ -851,7 +872,7 @@ static void puzzleEncryptFileWithHeader(
                 // Periodic progress for non-parallel tries
                 if (tries % 1000000 == 0 && searchModeEnum != 0x05) {
                     if (verbose) {
-                        std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks
+                        std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks 
                                   << ", " << tries << " tries... " << std::flush;
                     }
                 }
@@ -861,11 +882,13 @@ static void puzzleEncryptFileWithHeader(
             if (verbose) {
                 std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks << " processed.\n";
             }
-        } // end for(blockIndex)
+        } // end else (other modes)
+
+    } // end for(blockIndex)
 
     fout.close();
     std::cout << "[Enc] Encryption complete: " << outFilename << "\n";
-}
+} // end function
 
 static void puzzleDecryptFileWithHeader(
     const std::string &inFilename,
