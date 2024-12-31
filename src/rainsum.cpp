@@ -510,8 +510,8 @@ static void puzzleEncryptFileWithHeader(
     std::mt19937_64 rng(std::random_device{}());
     std::uniform_int_distribution<uint64_t> dist;
 
-    static uint8_t reverseMap[256][64];
-    static uint8_t reverseMapCount[256];
+    static uint8_t reverseMap[256 * 64];
+    static uint8_t reverseMapOffsets[256];
 
     size_t remaining = originalSize;
 
@@ -637,47 +637,45 @@ static void puzzleEncryptFileWithHeader(
                 }
             }
             else if (searchModeEnum == 0x04) { // MapScatter
-                for (int i = 0; i < 256; i++) {
-                  reverseMapCount[i] = 0;
+              // Reset offsets
+              std::fill(std::begin(reverseMapOffsets), std::end(reverseMapOffsets), 0);
+
+              // Fill the map with all positions of each byte in hashOut
+              for (uint8_t i = 0; i < hashOut.size(); i++) {
+                uint8_t b = hashOut[i];
+                reverseMap[b * 64 + reverseMapOffsets[b]] = i; // Store the index
+                reverseMapOffsets[b]++;
+              }
+
+              bool allFound = true;
+
+              // Match each byte in the plaintext block
+              for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
+                uint8_t targetByte = block[byteIdx];
+
+                // If reverseMapOffsets[targetByte] == 0, there are no more matches
+                if (reverseMapOffsets[targetByte] == 0) {
+                  allFound = false;
+                  break;
                 }
 
-                // Fill the map with all positions of each byte
-                for (uint8_t i = 0; i < hashOut.size(); i++) {
-                  uint8_t b = hashOut[i];
-                  // reverseMapCount[b] is how many times we've seen byte 'b' so far
-                  // store the index i in reverseMap[b] at position reverseMapCount[b], then increment
-                  reverseMap[b][ reverseMapCount[b] ] = i;
-                  reverseMapCount[b]++;
-                }
+                // Get the last match and decrement offset
+                reverseMapOffsets[targetByte]--;
+                scatterIndices[byteIdx] = (reverseMap[targetByte * 64 + reverseMapOffsets[targetByte]]);
+              }
 
-                bool allFound = true;
-                scatterIndices.resize(thisBlockSize);
+              if (allFound) {
+                found = true;
 
-                // For each byte in the plaintext block, pop an index from the “map”
-                for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
-                  uint8_t targetByte = block[byteIdx];
-
-                  // If reverseMapCount[targetByte] == 0, there's no more positions that match
-                  if (reverseMapCount[targetByte] == 0) {
-                    allFound = false;
-                    break;
+                // Optional: Print scatter indices if verbose
+                if (verbose) {
+                  std::cout << "Scatter Indices: ";
+                  for (auto idx : scatterIndices) {
+                    std::cout << static_cast<int>(idx) << " ";
                   }
-
-                  // ScatterIndices picks the “last” one from that bucket
-                  reverseMapCount[targetByte]--;
-                  scatterIndices[byteIdx] = reverseMap[targetByte][ reverseMapCount[targetByte] ];
+                  std::cout << std::endl;
                 }
-
-                if (allFound) {
-                  found = true;
-                  if (verbose) {
-                    std::cout << "Scatter Indices: ";
-                    for (auto idx : scatterIndices) {
-                      std::cout << (int)idx << " ";
-                    }
-                    std::cout << std::endl;
-                  }
-                }
+              }
             }
 
             if (found) break;
