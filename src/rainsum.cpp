@@ -1,3 +1,7 @@
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include <atomic> // for std::atomic
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -476,6 +480,7 @@ static void puzzleEncryptFileWithHeader(
     else if (searchMode == "series" ) searchModeEnum = 0x02; 
     else if (searchMode == "scatter") searchModeEnum = 0x03;
     else if (searchMode == "mapscatter") searchModeEnum = 0x04;
+    else if (searchMode == "parascatter") searchModeEnum = 0x05;
     else {
         throw std::runtime_error("Invalid search mode: " + searchMode);
     }
@@ -514,6 +519,7 @@ static void puzzleEncryptFileWithHeader(
 
     static uint8_t reverseMap[256 * 64];
     static uint8_t reverseMapOffsets[256];
+    std::atomic<bool> done(false); // Shared flag so threads can exit when one finds a solution
 
     size_t remaining = originalSize;
 
@@ -529,6 +535,11 @@ static void puzzleEncryptFileWithHeader(
         bool found = false;
         std::vector<uint8_t> chosenNonce(nonceSize, 0);
         std::vector<uint8_t> scatterIndices(thisBlockSize, 0);
+
+        // For parallel
+        // We'll store the result from whichever thread finds it first.
+        static std::vector<uint8_t> bestNonce(nonceSize);
+        static std::vector<uint8_t> bestScatter(thisBlockSize);
 
         for (uint64_t tries = 0; ; tries++) {
             if (deterministicNonce) {
@@ -687,6 +698,93 @@ static void puzzleEncryptFileWithHeader(
                 }
               }
             }
+            else if (searchModeEnum == 0x05) { // ParaScatter
+                // OpenMP parallel region
+                #pragma omp parallel
+                {
+                  // Each thread has its own local tries counter
+                  uint64_t localTries = 0;
+
+                  // Keep working while nobody has set done = true
+                  while (!done.load(std::memory_order_relaxed)) {
+                    localTries++;
+
+                    // Acquire a nonce (deterministic or random)
+                    std::vector<uint8_t> chosenNonce(nonceSize);
+                    if (deterministicNonce) {
+                      uint64_t current = (uint64_t)omp_get_thread_num() + (uint64_t)omp_get_num_threads() * (localTries - 1);
+                      for (size_t i = 0; i < nonceSize; i++) {
+                        chosenNonce[i] = static_cast<uint8_t>((current >> (i * 8)) & 0xFF);
+                      }
+                    } else {
+                      // random approach
+                      for (size_t i = 0; i < nonceSize; i++) {
+                        chosenNonce[i] = dist(rng);
+                      }
+                    }
+
+                    // Build trial buffer
+                    std::vector<uint8_t> trial(keyBuf);
+                    trial.insert(trial.end(), chosenNonce.begin(), chosenNonce.end());
+
+                    // Hash it
+                    invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
+
+                    bool allFound = true;
+                    usedIndices.reset();
+
+                    // Try to map each byte of our plaintext block to a unique index in hashOut
+                    std::vector<uint8_t> localScatterIndices(thisBlockSize, 0);
+                    for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+                      auto it = hashOut.begin();
+                      while (it != hashOut.end()) {
+                        it = std::find(it, hashOut.end(), block[byteIdx]);
+                        if (it != hashOut.end()) {
+                          uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                          if (!usedIndices.test(idx)) {
+                            localScatterIndices[byteIdx] = idx;
+                            usedIndices.set(idx);
+                            break;
+                          }
+                          ++it;
+                        } else {
+                          allFound = false;
+                          break;
+                        }
+                      }
+                      if (!allFound) break;
+                    }
+
+                    if (allFound) {
+                      // We found a valid nonce — record and set done = true
+                      #pragma omp critical
+                      {
+                        if (!done.load(std::memory_order_relaxed)) {
+                          bestNonce = chosenNonce;
+                          bestScatter = localScatterIndices;
+                          done.store(true, std::memory_order_relaxed);
+                          // Print info if verbose
+                          if (verbose) {
+                            std::cout << "\n[Enc] Found after " << localTries
+                                      << " tries on thread " << omp_get_thread_num() << "\n";
+                          }
+                        }
+                      }
+                    }
+
+                    // Print progress every so often
+                    if (localTries % 100000 == 0 && !done.load(std::memory_order_relaxed)) {
+                      #pragma omp critical
+                      {
+                        if (!done.load(std::memory_order_relaxed)) {
+                          std::cerr << "\r[Enc] Block " << blockIndex << ", " << localTries
+                                    << " tries (thread " << omp_get_thread_num() << ")..." << std::flush;
+                        }
+                      }
+                    }
+                  } // end while
+                } // end parallel
+            }
 
             if (found) break;
 
@@ -699,6 +797,9 @@ static void puzzleEncryptFileWithHeader(
         fout.write(reinterpret_cast<const char*>(chosenNonce.data()), nonceSize);
         if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) {
             fout.write(reinterpret_cast<const char*>(scatterIndices.data()), scatterIndices.size());
+        } else if ( searchModeEnum == 0x05 ) {
+            fout.write(reinterpret_cast<const char*>(bestNonce.data()), nonceSize);
+            fout.write(reinterpret_cast<const char*>(bestScatter.data()), bestScatter.size());
         } else {
             uint8_t startIndex = scatterIndices[0];
             fout.write(reinterpret_cast<const char*>(&startIndex), sizeof(startIndex));
@@ -786,7 +887,7 @@ static void puzzleDecryptFileWithHeader(
         // Read indices based on search mode
         std::vector<uint8_t> scatterIndices;
         uint8_t startIndex = 0;
-        if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) {
+        if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04 || searchModeEnum == 0x05) {
             scatterIndices.resize(thisBlockSize);
             std::memcpy(scatterIndices.data(), &cipherData[cipherOffset], thisBlockSize);
             cipherOffset += thisBlockSize;
@@ -892,6 +993,7 @@ static void puzzleShowFileInfo(const std::string &inFilename) {
     case 0x02: searchMode = "series"; break;
     case 0x03: searchMode = "scatter"; break;
     case 0x04: searchMode = "mapscatter"; break;
+    case 0x05: searchMode = "parascatter"; break;
     default:   searchMode = "unknown"; break;
   }
 
@@ -931,7 +1033,7 @@ int main(int argc, char** argv) {
                 cxxopts::value<size_t>()->default_value("14"))
             ("deterministic-nonce", "Use a deterministic counter for nonce generation",
                 cxxopts::value<bool>()->default_value("false"))
-            ("search-mode", "Search mode: prefix, sequence, series, scatter, mapscatter",
+            ("search-mode", "Search mode: prefix, sequence, series, scatter, mapscatter, parascatter",
                 cxxopts::value<std::string>()->default_value("scatter"))
             ("o,output-file", "Output file",
                 cxxopts::value<std::string>()->default_value("/dev/stdout"))
@@ -991,7 +1093,7 @@ int main(int argc, char** argv) {
         // Search Mode
         std::string searchMode = result["search-mode"].as<std::string>();
         if (searchMode != "prefix" && searchMode != "sequence" &&
-            searchMode != "series" && searchMode != "scatter" && searchMode != "mapscatter") {
+            searchMode != "series" && searchMode != "scatter" && searchMode != "mapscatter" && searchMode != "parascatter") {
             throw std::runtime_error("Invalid search mode: " + searchMode);
         }
 
