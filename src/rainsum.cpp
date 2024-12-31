@@ -446,7 +446,8 @@ static void puzzleEncryptFileWithHeader(
     size_t blockSize,
     size_t nonceSize,
     const std::string &searchMode,
-    bool verbose // NEW: pass this flag in
+    bool verbose, // NEW: pass this flag in
+    bool deterministicNonce
 ) {
     // Open input file
     std::ifstream fin(inFilename, std::ios::binary);
@@ -509,6 +510,7 @@ static void puzzleEncryptFileWithHeader(
     // Prepare random generator for nonce
     std::mt19937_64 rng(std::random_device{}());
     std::uniform_int_distribution<uint64_t> dist;
+    uint64_t nonceCounter = 0; // Counter for deterministic nonce
 
     static uint8_t reverseMap[256 * 64];
     static uint8_t reverseMapOffsets[256];
@@ -529,9 +531,17 @@ static void puzzleEncryptFileWithHeader(
         std::vector<uint8_t> scatterIndices(thisBlockSize, 0);
 
         for (uint64_t tries = 0; ; tries++) {
-            // Generate random nonce
-            for (size_t i = 0; i < nonceSize; i++) {
-                chosenNonce[i] = static_cast<uint8_t>(dist(rng) & 0xFF);
+            if (deterministicNonce) {
+                // Incremental counter for nonce
+                for (size_t i = 0; i < nonceSize; i++) {
+                    chosenNonce[i] = static_cast<uint8_t>((nonceCounter >> (i * 8)) & 0xFF);
+                }
+                nonceCounter++;
+            } else {
+                // Random bytes for nonce
+                for (size_t i = 0; i < nonceSize; i++) {
+                    chosenNonce[i] = dist(rng);
+                }
             }
 
             // Build trial buffer
@@ -919,6 +929,8 @@ int main(int argc, char** argv) {
                 cxxopts::value<uint8_t>()->default_value("3"))
             ("n,nonce-size", "Size of the nonce in bytes (1-255)",
                 cxxopts::value<size_t>()->default_value("14"))
+            ("deterministic-nonce", "Use a deterministic counter for nonce generation",
+                cxxopts::value<bool>()->default_value("false"))
             ("search-mode", "Search mode: prefix, sequence, series, scatter, mapscatter",
                 cxxopts::value<std::string>()->default_value("scatter"))
             ("o,output-file", "Output file",
@@ -972,6 +984,9 @@ int main(int argc, char** argv) {
         if (nonceSize == 0 || nonceSize > 255) {
             throw std::runtime_error("Nonce size must be between 1 and 255 bytes.");
         }
+
+        // Nonce nature
+        bool deterministicNonce = result["deterministic-nonce"].as<bool>();
 
         // Search Mode
         std::string searchMode = result["search-mode"].as<std::string>();
@@ -1146,7 +1161,7 @@ int main(int argc, char** argv) {
 
             // We'll write ciphertext to inpath + ".rc"
             std::string encFile = inpath + ".rc";
-            puzzleEncryptFileWithHeader(inpath, encFile, key, algot, hash_size, seed, blockSize, nonceSize, searchMode, verbose);
+            puzzleEncryptFileWithHeader(inpath, encFile, key, algot, hash_size, seed, blockSize, nonceSize, searchMode, verbose, deterministicNonce);
             std::cout << "[Enc] Wrote encrypted file to: " << encFile << "\n";
         }
         else if (mode == Mode::Dec) {
