@@ -1,6 +1,5 @@
 cipher improvement
 
-- add true scatter (P can be in any order). 
 - schedule K into block keys via XOF
 - implement a js version of enc / dec
 - test research construct
