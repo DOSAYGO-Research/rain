@@ -440,34 +440,6 @@ std::vector<uint8_t> decompressData(const std::vector<uint8_t>& data) {
   return decompressed;
 }
 
-#include <algorithm>
-#include <atomic>
-#include <bitset>
-#include <fstream>
-#include <iostream>
-#include <iterator>
-#include <random>
-#include <string>
-#include <vector>
-#include <omp.h>
-#include <iomanip> // for std::hex etc.
-
-// Assuming necessary includes and definitions, such as MagicNumber, HashAlgorithm, invokeHash, compressData
-
-#include <algorithm>
-#include <atomic>
-#include <bitset>
-#include <fstream>
-#include <iostream>
-#include <iterator>
-#include <random>
-#include <string>
-#include <vector>
-#include <omp.h>
-#include <iomanip> // for std::hex etc.
-
-// Assuming necessary includes and definitions, such as MagicNumber, HashAlgorithm, invokeHash, compressData
-
 static void puzzleEncryptFileWithHeader(
     const std::string &inFilename,
     const std::string &outFilename,
@@ -585,8 +557,9 @@ static void puzzleEncryptFileWithHeader(
             std::atomic<bool> done(false);
             std::vector<uint8_t> bestNonce(nonceSize);         // Shared best nonce
             std::vector<uint8_t> bestScatter(thisBlockSize);   // Shared best scatter indices
-
+#ifdef _OPENMP
             #pragma omp parallel
+#endif
             {
               uint64_t localTries = 0;
               std::vector<uint8_t> localNonce(nonceSize);
@@ -599,7 +572,11 @@ static void puzzleEncryptFileWithHeader(
               while (!done.load(std::memory_order_acquire)) {
                 // Generate nonce
                 if (deterministicNonce) {
+#ifdef _OPENMP
                   uint64_t current = omp_get_thread_num() + omp_get_num_threads() * (localTries + 1);
+#else
+                  uint64_t current = (localTries + 1);
+#endif                 
                   for (size_t i = 0; i < nonceSize; i++) {
                     localNonce[i] = static_cast<uint8_t>((current >> (i * 8)) & 0xFF);
                   }
@@ -641,7 +618,9 @@ static void puzzleEncryptFileWithHeader(
 
                 if (allFound) {
                   // Critical section to update shared variables
+#ifdef _OPENMP
                   #pragma omp critical
+#endif
                   {
                     if (!done.load(std::memory_order_relaxed)) {
                       bestNonce = localNonce;
@@ -653,12 +632,19 @@ static void puzzleEncryptFileWithHeader(
 
                 // Periodic progress reporting
                 if (localTries % progressInterval == 0 && !done.load(std::memory_order_relaxed)) {
+#ifdef _OPENMP
                   # pragma omp critical
+#endif
+
                   {
                     if (!done.load(std::memory_order_relaxed)) {
                       std::cerr << "\r[Parascatter] Block " << blockIndex + 1
                                 << "/" << totalBlocks << ", thread "
+#ifdef _OPENMP
                                 << omp_get_thread_num() << ": "
+#else
+                                << "Non-parallel: "
+#endif
                                 << localTries << " tries..." << std::flush;
                     }
                   }
