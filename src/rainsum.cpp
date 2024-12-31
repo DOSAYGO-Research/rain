@@ -1,3 +1,7 @@
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include <atomic> // for std::atomic
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -446,7 +450,7 @@ static void puzzleEncryptFileWithHeader(
     size_t blockSize,
     size_t nonceSize,
     const std::string &searchMode,
-    bool verbose, // NEW: pass this flag in
+    bool verbose,
     bool deterministicNonce
 ) {
     // Open input file
@@ -454,8 +458,10 @@ static void puzzleEncryptFileWithHeader(
     if (!fin.is_open()) {
         throw std::runtime_error("Cannot open input file: " + inFilename);
     }
-    std::vector<uint8_t> plainData((std::istreambuf_iterator<char>(fin)),
-                                   (std::istreambuf_iterator<char>()));
+    std::vector<uint8_t> plainData(
+        (std::istreambuf_iterator<char>(fin)),
+        (std::istreambuf_iterator<char>())
+    );
     fin.close();
 
     // Open output file
@@ -470,12 +476,27 @@ static void puzzleEncryptFileWithHeader(
     uint8_t blockSize8 = static_cast<uint8_t>(blockSize);
     uint8_t nonceSize8 = static_cast<uint8_t>(nonceSize);
     uint16_t digestSize16 = static_cast<uint16_t>(hash_size);
+
+    // Determine searchModeEnum
     uint8_t searchModeEnum = 0x00; // Default to 'prefix'
-    if (searchMode == "prefix") searchModeEnum = 0x00;
-    else if (searchMode == "sequence") searchModeEnum = 0x01;
-    else if (searchMode == "series" ) searchModeEnum = 0x02; 
-    else if (searchMode == "scatter") searchModeEnum = 0x03;
-    else if (searchMode == "mapscatter") searchModeEnum = 0x04;
+    if (searchMode == "prefix") {
+        searchModeEnum = 0x00;
+    }
+    else if (searchMode == "sequence") {
+        searchModeEnum = 0x01;
+    }
+    else if (searchMode == "series") {
+        searchModeEnum = 0x02;
+    }
+    else if (searchMode == "scatter") {
+        searchModeEnum = 0x03;
+    }
+    else if (searchMode == "mapscatter") {
+        searchModeEnum = 0x04;
+    }
+    else if (searchMode == "parascatter") {
+        searchModeEnum = 0x05;
+    }
     else {
         throw std::runtime_error("Invalid search mode: " + searchMode);
     }
@@ -494,7 +515,6 @@ static void puzzleEncryptFileWithHeader(
 
     // Compress plaintext
     std::vector<uint8_t> compressedData = compressData(plainData);
-    // Replace plainData with compressedData
     plainData = std::move(compressedData);
 
     // Update original size in the header to match compressed size
@@ -502,212 +522,357 @@ static void puzzleEncryptFileWithHeader(
     fout.write(reinterpret_cast<const char*>(&originalSize), sizeof(originalSize));
 
     // Partition plaintext into blocks
-    size_t totalBlocks = (plainData.size() + blockSize - 1) / blockSize;
+    size_t totalBlocks = (originalSize + blockSize - 1) / blockSize;
     uint8_t hashBytes = hash_size / 8;
     std::vector<uint8_t> hashOut(hashBytes);
     std::vector<uint8_t> keyBuf(key.begin(), key.end());
 
-    // Prepare random generator for nonce
+    // Prepare RNG for nonce
     std::mt19937_64 rng(std::random_device{}());
-    std::uniform_int_distribution<uint64_t> dist;
+    std::uniform_int_distribution<uint8_t> dist(0, 255); // Corrected to uint8_t
     uint64_t nonceCounter = 0; // Counter for deterministic nonce
 
-    static uint8_t reverseMap[256 * 64];
-    static uint8_t reverseMapOffsets[256];
+    // For mapscatter
+    uint8_t reverseMap[256 * 64] = {0}; // Initialize to zero
+    uint8_t reverseMapOffsets[256] = {0};
 
     size_t remaining = originalSize;
+    int progressInterval = 1'000'000;
 
+    // MAIN BLOCK LOOP
     for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
-        std::bitset<64> usedIndices;
         size_t thisBlockSize = std::min(blockSize, remaining);
         remaining -= thisBlockSize;
+
+        // Extract this block from the compressed plaintext
         std::vector<uint8_t> block(
             plainData.begin() + blockIndex * blockSize,
             plainData.begin() + blockIndex * blockSize + thisBlockSize
         );
 
-        bool found = false;
-        std::vector<uint8_t> chosenNonce(nonceSize, 0);
-        std::vector<uint8_t> scatterIndices(thisBlockSize, 0);
+        // -----------------------
+        // parascatter branch
+        // -----------------------
+        if (searchModeEnum == 0x05) {
+            std::atomic<bool> done(false);
+            std::vector<uint8_t> bestNonce(nonceSize);         // Shared best nonce
+            std::vector<uint8_t> bestScatter(thisBlockSize);   // Shared best scatter indices
+#ifdef _OPENMP
+            #pragma omp parallel
+#endif
+            {
+              uint64_t localTries = 0;
+              std::vector<uint8_t> localNonce(nonceSize);
+              std::vector<uint8_t> localScatterIndices(thisBlockSize, 0); // Thread-local
+              std::vector<uint8_t> threadHashOut(hash_size / 8);
+              std::bitset<64> localUsedIndices;
+              std::mt19937_64 local_rng(std::random_device{}()); // Thread-local RNG
+              std::uniform_int_distribution<uint8_t> local_dist(0, 255);
 
-        for (uint64_t tries = 0; ; tries++) {
-            if (deterministicNonce) {
-                // Incremental counter for nonce
-                for (size_t i = 0; i < nonceSize; i++) {
-                    chosenNonce[i] = static_cast<uint8_t>((nonceCounter >> (i * 8)) & 0xFF);
-                }
-                nonceCounter++;
-            } else {
-                // Random bytes for nonce
-                for (size_t i = 0; i < nonceSize; i++) {
-                    chosenNonce[i] = dist(rng);
-                }
-            }
-
-            // Build trial buffer
-            std::vector<uint8_t> trial(keyBuf);
-            trial.insert(trial.end(), chosenNonce.begin(), chosenNonce.end());
-
-            // Hash it
-            invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
-
-            if (searchModeEnum == 0x00) { // Prefix
-                if (hashOut.size() >= thisBlockSize &&
-                    std::equal(block.begin(), block.end(), hashOut.begin())) {
-                    scatterIndices.assign(thisBlockSize, 0);
-                    found = true;
-                }
-            }
-            else if (searchModeEnum == 0x01) { // Sequence
-                for (size_t i = 0; i <= hashOut.size() - thisBlockSize; i++) {
-                    if (std::equal(block.begin(), block.end(), hashOut.begin() + i)) {
-                        uint8_t startIdx = static_cast<uint8_t>(i);
-                        scatterIndices.assign(thisBlockSize, startIdx);
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            else if (searchModeEnum == 0x02) { // Series
-                bool allFound = true;
-                usedIndices.reset();
-                auto it = hashOut.begin();
-
-                for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-                    while (it != hashOut.end()) {
-                        it = std::find(it, hashOut.end(), block[byteIdx]);
-                        if (it != hashOut.end()) {
-                            uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
-                            if (!usedIndices.test(idx)) {
-                                scatterIndices[byteIdx] = idx;
-                                usedIndices.set(idx);
-                                break;
-                            }
-                            ++it;
-                        } else {
-                            allFound = false;
-                            break;
-                        }
-                    }
-                    if (it == hashOut.end()) { // No valid index found for this byte
-                        allFound = false;
-                        break;
-                    }
-                }
-
-                if (allFound) {
-                    found = true;
-                    // Only print if verbose
-                    if (verbose) {
-                      std::cout << "Series Indices: ";
-                      for (const auto& idx : scatterIndices) {
-                        std::cout << static_cast<int>(idx) << " ";
-                      }
-                      std::cout << std::endl;
-                    }
-                }
-            }
-            else if (searchModeEnum == 0x03) { // Scatter
-                bool allFound = true;
-                usedIndices.reset();
-
-                for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-                    auto it = hashOut.begin();
-                    while (it != hashOut.end()) {
-                        it = std::find(it, hashOut.end(), block[byteIdx]);
-                        if (it != hashOut.end()) {
-                            uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
-                            if (!usedIndices.test(idx)) {
-                                scatterIndices[byteIdx] = idx;
-                                usedIndices.set(idx);
-                                break;
-                            }
-                            ++it;
-                        } else {
-                            allFound = false;
-                            break;
-                        }
-                    }
-                    if (it == hashOut.end()) { // No valid index found for this byte
-                        allFound = false;
-                        break;
-                    }
-                }
-
-                if (allFound) {
-                    found = true;
-                    // Only print if verbose
-                    if (verbose) {
-                      std::cout << "Series Indices: ";
-                      for (const auto& idx : scatterIndices) {
-                        std::cout << static_cast<int>(idx) << " ";
-                      }
-                      std::cout << std::endl;
-                    }
-                }
-            }
-            else if (searchModeEnum == 0x04) { // MapScatter
-              // Reset offsets
-              std::fill(std::begin(reverseMapOffsets), std::end(reverseMapOffsets), 0);
-
-              // Fill the map with all positions of each byte in hashOut
-              for (uint8_t i = 0; i < hashOut.size(); i++) {
-                uint8_t b = hashOut[i];
-                reverseMap[b * 64 + reverseMapOffsets[b]] = i; // Store the index
-                reverseMapOffsets[b]++;
-              }
-
-              bool allFound = true;
-
-              // Match each byte in the plaintext block
-              for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
-                uint8_t targetByte = block[byteIdx];
-
-                // If reverseMapOffsets[targetByte] == 0, there are no more matches
-                if (reverseMapOffsets[targetByte] == 0) {
-                  allFound = false;
-                  break;
-                }
-
-                // Get the last match and decrement offset
-                reverseMapOffsets[targetByte]--;
-                scatterIndices[byteIdx] = (reverseMap[targetByte * 64 + reverseMapOffsets[targetByte]]);
-              }
-
-              if (allFound) {
-                found = true;
-
-                // Optional: Print scatter indices if verbose
-                if (verbose) {
-                  std::cout << "Scatter Indices: ";
-                  for (auto idx : scatterIndices) {
-                    std::cout << static_cast<int>(idx) << " ";
+              while (!done.load(std::memory_order_acquire)) {
+                // Generate nonce
+                if (deterministicNonce) {
+#ifdef _OPENMP
+                  uint64_t current = omp_get_thread_num() + omp_get_num_threads() * (localTries + 1);
+#else
+                  uint64_t current = (localTries + 1);
+#endif                 
+                  for (size_t i = 0; i < nonceSize; i++) {
+                    localNonce[i] = static_cast<uint8_t>((current >> (i * 8)) & 0xFF);
                   }
-                  std::cout << std::endl;
+                } else {
+                  for (size_t i = 0; i < nonceSize; i++) {
+                    localNonce[i] = local_dist(local_rng);
+                  }
                 }
-              }
+
+                // Build trial buffer
+                std::vector<uint8_t> trial(keyBuf);
+                trial.insert(trial.end(), localNonce.begin(), localNonce.end());
+
+                // Hash it
+                invokeHash<bswap>(algot, seed, trial, threadHashOut, hash_size);
+
+                // Check scatter indices
+                bool allFound = true;
+                localUsedIndices.reset();
+                for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+                  auto it = threadHashOut.begin();
+                  while (it != threadHashOut.end()) {
+                    it = std::find(it, threadHashOut.end(), block[byteIdx]);
+                    if (it != threadHashOut.end()) {
+                      uint8_t idx = static_cast<uint8_t>(std::distance(threadHashOut.begin(), it));
+                      if (!localUsedIndices.test(idx)) {
+                        localScatterIndices[byteIdx] = idx;
+                        localUsedIndices.set(idx);
+                        break;
+                      }
+                      ++it;
+                    } else {
+                      allFound = false;
+                      break;
+                    }
+                  }
+                  if (!allFound) break;
+                }
+
+                if (allFound) {
+                  // Critical section to update shared variables
+#ifdef _OPENMP
+                  #pragma omp critical
+#endif
+                  {
+                    if (!done.load(std::memory_order_relaxed)) {
+                      bestNonce = localNonce;
+                      bestScatter = localScatterIndices;
+                      done.store(true, std::memory_order_release); // Synchronize with other threads
+                    }
+                  }
+                }
+
+                // Periodic progress reporting
+                if (localTries % progressInterval == 0 && !done.load(std::memory_order_relaxed)) {
+#ifdef _OPENMP
+                  # pragma omp critical
+#endif
+
+                  {
+                    if (!done.load(std::memory_order_relaxed)) {
+                      std::cerr << "\r[Parascatter] Block " << blockIndex + 1
+                                << "/" << totalBlocks << ", thread "
+#ifdef _OPENMP
+                                << omp_get_thread_num() << ": "
+#else
+                                << "Non-parallel: "
+#endif
+                                << localTries << " tries..." << std::flush;
+                    }
+                  }
+                }
+                localTries++;
+              } // End while
+            } // End parallel
+
+
+            // Write results after parallel region
+            if (done.load(std::memory_order_relaxed)) {
+                fout.write(reinterpret_cast<const char*>(bestNonce.data()), nonceSize);
+                fout.write(reinterpret_cast<const char*>(bestScatter.data()), bestScatter.size());
+
+                // Verbose output for written data
+                if (verbose) {
+                    std::cout << "\n[Parascatter] Final Nonce: ";
+                    for (const auto& byte : bestNonce) {
+                        std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte) << " ";
+                    }
+                    std::cout << std::dec << "\n[Parascatter] Scatter Indices: ";
+                    for (const auto& idx : bestScatter) {
+                        std::cout << static_cast<int>(idx) << " ";
+                    }
+                    std::cout << std::endl;
+                }
+
+                // Display block progress
+                if (verbose) {
+                    std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks << " processed.\n";
+                }
+            } else {
+                throw std::runtime_error("[Parascatter] No solution found.");
             }
 
-            if (found) break;
+        // ------------------------------------------------------
+        // other modes in else branch
+        // ------------------------------------------------------
+        } else { 
+            // We'll fill these once a solution is found
+            bool found = false;
+            std::vector<uint8_t> chosenNonce(nonceSize, 0);
+            std::vector<uint8_t> scatterIndices(thisBlockSize, 0);
 
-            if (tries % 1000000 == 0) {
-                std::cerr << "\r[Enc] Block " << blockIndex << ", " << tries << " tries... " << std::flush;
+            for (uint64_t tries = 0; ; tries++) {
+                // Generate the nonce
+                if (deterministicNonce) {
+                    for (size_t i = 0; i < nonceSize; i++) {
+                        chosenNonce[i] = static_cast<uint8_t>((nonceCounter >> (i * 8)) & 0xFF);
+                    }
+                    nonceCounter++;
+                } else {
+                    for (size_t i = 0; i < nonceSize; i++) {
+                        chosenNonce[i] = dist(rng);
+                    }
+                }
+
+                // Build trial buffer
+                std::vector<uint8_t> trial(keyBuf);
+                trial.insert(trial.end(), chosenNonce.begin(), chosenNonce.end());
+
+                // Hash it
+                invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
+
+                if (searchModeEnum == 0x00) { // prefix
+                    if (hashOut.size() >= thisBlockSize &&
+                        std::equal(block.begin(), block.end(), hashOut.begin())) {
+                        scatterIndices.assign(thisBlockSize, 0);
+                        found = true;
+                    }
+                }
+                else if (searchModeEnum == 0x01) { // sequence
+                    for (size_t i = 0; i <= hashOut.size() - thisBlockSize; i++) {
+                        if (std::equal(block.begin(), block.end(), hashOut.begin() + i)) {
+                            uint8_t startIdx = static_cast<uint8_t>(i);
+                            scatterIndices.assign(thisBlockSize, startIdx);
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                else if (searchModeEnum == 0x02) { // series
+                    bool allFound = true;
+                    std::bitset<64> usedIndices;
+                    usedIndices.reset();
+                    auto it = hashOut.begin();
+
+                    for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+                        while (it != hashOut.end()) {
+                            it = std::find(it, hashOut.end(), block[byteIdx]);
+                            if (it != hashOut.end()) {
+                                uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                                if (!usedIndices.test(idx)) {
+                                    scatterIndices[byteIdx] = idx;
+                                    usedIndices.set(idx);
+                                    break;
+                                }
+                                ++it;
+                            } else {
+                                allFound = false;
+                                break;
+                            }
+                        }
+                        if (it == hashOut.end()) {
+                            allFound = false;
+                            break;
+                        }
+                    }
+
+                    if (allFound) {
+                        found = true;
+                        if (verbose) {
+                            std::cout << "Series Indices: ";
+                            for (auto idx : scatterIndices) {
+                                std::cout << static_cast<int>(idx) << " ";
+                            }
+                            std::cout << std::endl;
+                        }
+                    }
+                }
+                else if (searchModeEnum == 0x03) { // scatter
+                    bool allFound = true;
+                    std::bitset<64> usedIndices;
+                    usedIndices.reset();
+
+                    for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+                        auto it = hashOut.begin();
+                        while (it != hashOut.end()) {
+                            it = std::find(it, hashOut.end(), block[byteIdx]);
+                            if (it != hashOut.end()) {
+                                uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                                if (!usedIndices.test(idx)) {
+                                    scatterIndices[byteIdx] = idx;
+                                    usedIndices.set(idx);
+                                    break;
+                                }
+                                ++it;
+                            } else {
+                                allFound = false;
+                                break;
+                            }
+                        }
+                        if (it == hashOut.end()) {
+                            allFound = false;
+                            break;
+                        }
+                    }
+
+                    if (allFound) {
+                        found = true;
+                        if (verbose) {
+                            std::cout << "Series Indices: ";
+                            for (auto idx : scatterIndices) {
+                                std::cout << static_cast<int>(idx) << " ";
+                            }
+                            std::cout << std::endl;
+                        }
+                    }
+                }
+                else if (searchModeEnum == 0x04) { // mapscatter
+                    // Reset offsets
+                    std::fill(std::begin(reverseMapOffsets), std::end(reverseMapOffsets), 0);
+
+                    // Fill the map with all positions of each byte in hashOut
+                    for (uint8_t i = 0; i < hashOut.size(); i++) {
+                        uint8_t b = hashOut[i];
+                        reverseMap[b * 64 + reverseMapOffsets[b]] = i;
+                        reverseMapOffsets[b]++;
+                    }
+
+                    bool allFound = true;
+                    for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
+                        uint8_t targetByte = block[byteIdx];
+                        if (reverseMapOffsets[targetByte] == 0) {
+                            allFound = false;
+                            break;
+                        }
+                        reverseMapOffsets[targetByte]--;
+                        scatterIndices[byteIdx] =
+                            reverseMap[targetByte * 64 + reverseMapOffsets[targetByte]];
+                    }
+
+                    if (allFound) {
+                        found = true;
+                        if (verbose) {
+                            std::cout << "Scatter Indices: ";
+                            for (auto idx : scatterIndices) {
+                                std::cout << static_cast<int>(idx) << " ";
+                            }
+                            std::cout << std::endl;
+                        }
+                    }
+                }
+
+                if (found) {
+                    // For non-parallel modes, write nonce and indices
+                    fout.write(reinterpret_cast<const char*>(chosenNonce.data()), nonceSize);
+                    if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) {
+                        fout.write(reinterpret_cast<const char*>(scatterIndices.data()), scatterIndices.size());
+                    } else {
+                        // prefix or sequence
+                        uint8_t startIndex = scatterIndices[0];
+                        fout.write(reinterpret_cast<const char*>(&startIndex), sizeof(startIndex));
+                    }
+                    break; // done with this block
+                }
+
+                // Periodic progress for non-parallel tries
+                if (tries % progressInterval == 0) {
+                    std::cerr << "\r[Enc] Mode: " << searchMode
+                              << ", Block " << (blockIndex + 1) << "/" << totalBlocks
+                              << ", " << tries << " tries..." << std::flush;
+                }
+            } // end tries loop
+
+            // Display block progress
+            if (verbose) {
+                std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks << " processed.\n";
             }
-        }
 
-        // Write nonce and indices
-        fout.write(reinterpret_cast<const char*>(chosenNonce.data()), nonceSize);
-        if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) {
-            fout.write(reinterpret_cast<const char*>(scatterIndices.data()), scatterIndices.size());
-        } else {
-            uint8_t startIndex = scatterIndices[0];
-            fout.write(reinterpret_cast<const char*>(&startIndex), sizeof(startIndex));
-        }
-    }
+        } // end else (other modes)
+
+
+    } // end for(blockIndex)
 
     fout.close();
     std::cout << "[Enc] Encryption complete: " << outFilename << "\n";
-}
+} // end function
 
 static void puzzleDecryptFileWithHeader(
     const std::string &inFilename,
@@ -786,7 +951,7 @@ static void puzzleDecryptFileWithHeader(
         // Read indices based on search mode
         std::vector<uint8_t> scatterIndices;
         uint8_t startIndex = 0;
-        if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) {
+        if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04 || searchModeEnum == 0x05) {
             scatterIndices.resize(thisBlockSize);
             std::memcpy(scatterIndices.data(), &cipherData[cipherOffset], thisBlockSize);
             cipherOffset += thisBlockSize;
@@ -808,7 +973,7 @@ static void puzzleDecryptFileWithHeader(
                 throw std::runtime_error("[Dec] Start index out of bounds in sequence mode.");
             }
             block.assign(hashOut.begin() + startIndex, hashOut.begin() + startIndex + thisBlockSize);
-        } else if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) { // Series/Scatter
+        } else if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04 || searchModeEnum == 0x05) { // Series/Scatter
             block.reserve(thisBlockSize);
             for (size_t j = 0; j < thisBlockSize; j++) {
                 uint8_t idx = scatterIndices[j];
@@ -892,6 +1057,7 @@ static void puzzleShowFileInfo(const std::string &inFilename) {
     case 0x02: searchMode = "series"; break;
     case 0x03: searchMode = "scatter"; break;
     case 0x04: searchMode = "mapscatter"; break;
+    case 0x05: searchMode = "parascatter"; break;
     default:   searchMode = "unknown"; break;
   }
 
@@ -931,7 +1097,7 @@ int main(int argc, char** argv) {
                 cxxopts::value<size_t>()->default_value("14"))
             ("deterministic-nonce", "Use a deterministic counter for nonce generation",
                 cxxopts::value<bool>()->default_value("false"))
-            ("search-mode", "Search mode: prefix, sequence, series, scatter, mapscatter",
+            ("search-mode", "Search mode: prefix, sequence, series, scatter, mapscatter, parascatter",
                 cxxopts::value<std::string>()->default_value("scatter"))
             ("o,output-file", "Output file",
                 cxxopts::value<std::string>()->default_value("/dev/stdout"))
@@ -991,7 +1157,7 @@ int main(int argc, char** argv) {
         // Search Mode
         std::string searchMode = result["search-mode"].as<std::string>();
         if (searchMode != "prefix" && searchMode != "sequence" &&
-            searchMode != "series" && searchMode != "scatter" && searchMode != "mapscatter") {
+            searchMode != "series" && searchMode != "scatter" && searchMode != "mapscatter" && searchMode != "parascatter") {
             throw std::runtime_error("Invalid search mode: " + searchMode);
         }
 
