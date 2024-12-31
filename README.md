@@ -17,9 +17,11 @@
 This repository features the **Rainbow** and **Rainstorm** hash functions (collectively, **Rain Hashes**), created by [Cris](https://github.com/o0101) at [DOSAYGO](https://github.com/dosyago) and licensed under Apache-2.0. All size variants of both hashes pass **all tests in SMHasher3**. Relevant [results](results) are available in the `results/` directory, or at the [SMHasher3 GitLab repository](https://gitlab.com/fwojcik/smhasher3/-/blob/main/results/README.md). The CLI tool API is similar to standard tools like `sha256sum`, but with more switches to select algorithm and digest length. The hashes produce digests ranging from 64 through to 512 bits wide. See the table below for details.
 
 The codebase includes:
+
 - A C++ reference implementation
 - A WASM port (for Node.js and browser environments)
 - A Makefile for building all targets
+- An experimental cryptosystem based on [plaintext mining ciphers](https://dosaygo-research.github.io/rain/paper/cipher-note.pdf)
 
 | Algorithm | Speed              | Hash Size        | Purpose                              | Core Mixing Function                              | Security                        |
 |-----------|--------------------|------------------|--------------------------------------|---------------------------------------------------|---------------------------------|

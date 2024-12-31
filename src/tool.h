@@ -15,11 +15,14 @@
 
 #define VERSION "1.3.0"
 
+uint32_t MagicNumber = 0x59524352; // RCRY
+
 enum class Mode {
   Digest,
   Stream,
   Enc,   // added
-  Dec    // added
+  Dec,    // added
+  Info
 };
 
 std::string modeToString(const Mode& mode) {
@@ -28,6 +31,7 @@ std::string modeToString(const Mode& mode) {
     case Mode::Stream: return "Stream";
     case Mode::Enc:    return "Enc";    // added
     case Mode::Dec:    return "Dec";    // added
+    case Mode::Info:   return "Info";
     default: throw std::runtime_error("Unknown hash mode");
   }
 }
@@ -39,6 +43,7 @@ std::istream& operator>>(std::istream& in, Mode& mode) {
   else if (token == "stream") mode = Mode::Stream;
   else if (token == "enc")    mode = Mode::Enc;   // added
   else if (token == "dec")    mode = Mode::Dec;   // added
+  else if (token == "info")   mode = Mode::Info;
   else                       in.setstate(std::ios_base::failbit);
   return in;
 }
@@ -85,7 +90,8 @@ enum SearchMode {
   Prefix,
   Sequence, 
   Series,
-  Scatter
+  Scatter,
+  MapScatter
 };
 
 std::string searchModeToString(const SearchMode& mode) {
@@ -94,6 +100,7 @@ std::string searchModeToString(const SearchMode& mode) {
     case SearchMode::Sequence:    return "Sequence";
     case SearchMode::Series:      return "Series";      // added
     case SearchMode::Scatter:     return "Scatter";     // added
+    case SearchMode::MapScatter:     return "MapScatter";     // added
     default: throw std::runtime_error("Unknown search mode");
   }
 }
@@ -109,6 +116,8 @@ std::istream& operator>>(std::istream& in, SearchMode& mode) {
     mode = SearchMode::Series;
   } else if (token == "Scatter" ) {
     mode = SearchMode::Scatter;
+  } else if (token == "MapScatter" ) {
+    mode = SearchMode::MapScatter;
   } else {
     in.setstate(std::ios_base::failbit);
   }

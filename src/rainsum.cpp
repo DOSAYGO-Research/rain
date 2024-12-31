@@ -17,26 +17,19 @@
 #include <iterator>
 #include "tool.h" // for invokeHash, etc.
 
+// Add a forward declaration for our new function
+static void puzzleShowFileInfo(const std::string &inFilename);
 
-// ------------------------------------------------------------------
-// Helper functions for mining
-// ------------------------------------------------------------------
-/*
-static std::vector<uint8_t> hexToBytes(const std::string& hexstr) {
-  if (hexstr.size() % 2 != 0) {
-    throw std::runtime_error("Hex prefix must have even length.");
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::vector<T>& vec) {
+  os << "[";
+  for (size_t i = 0; i < vec.size(); ++i) {
+    if (i > 0) os << ", ";
+    os << vec[i];
   }
-  std::vector<uint8_t> bytes(hexstr.size() / 2);
-  for (size_t i = 0; i < bytes.size(); ++i) {
-    unsigned int val = 0;
-    std::stringstream ss;
-    ss << std::hex << hexstr.substr(i * 2, 2);
-    ss >> val;
-    bytes[i] = static_cast<uint8_t>(val);
-  }
-  return bytes;
+  os << "]";
+  return os;
 }
-*/
 
 inline bool hasPrefix(const std::vector<uint8_t>& hash_output, const std::vector<uint8_t>& prefix_bytes) {
   if (prefix_bytes.size() > hash_output.size()) return false;
@@ -443,7 +436,6 @@ std::vector<uint8_t> decompressData(const std::vector<uint8_t>& data) {
   return decompressed;
 }
 
-
 static void puzzleEncryptFileWithHeader(
     const std::string &inFilename,
     const std::string &outFilename,
@@ -453,7 +445,9 @@ static void puzzleEncryptFileWithHeader(
     uint64_t seed,
     size_t blockSize,
     size_t nonceSize,
-    const std::string &searchMode
+    const std::string &searchMode,
+    bool verbose, // NEW: pass this flag in
+    bool deterministicNonce
 ) {
     // Open input file
     std::ifstream fin(inFilename, std::ios::binary);
@@ -471,7 +465,7 @@ static void puzzleEncryptFileWithHeader(
     }
 
     // Write header
-    uint32_t magicNumber = 0x52435259; // "RCRY"
+    uint32_t magicNumber = MagicNumber;
     uint8_t version = 0x01;
     uint8_t blockSize8 = static_cast<uint8_t>(blockSize);
     uint8_t nonceSize8 = static_cast<uint8_t>(nonceSize);
@@ -479,7 +473,9 @@ static void puzzleEncryptFileWithHeader(
     uint8_t searchModeEnum = 0x00; // Default to 'prefix'
     if (searchMode == "prefix") searchModeEnum = 0x00;
     else if (searchMode == "sequence") searchModeEnum = 0x01;
-    else if (searchMode == "series" || searchMode == "scatter") searchModeEnum = 0x02; // Treat 'series' same as 'scatter'
+    else if (searchMode == "series" ) searchModeEnum = 0x02; 
+    else if (searchMode == "scatter") searchModeEnum = 0x03;
+    else if (searchMode == "mapscatter") searchModeEnum = 0x04;
     else {
         throw std::runtime_error("Invalid search mode: " + searchMode);
     }
@@ -507,19 +503,24 @@ static void puzzleEncryptFileWithHeader(
 
     // Partition plaintext into blocks
     size_t totalBlocks = (plainData.size() + blockSize - 1) / blockSize;
-    std::vector<uint8_t> hashOut(hash_size / 8);
+    uint8_t hashBytes = hash_size / 8;
+    std::vector<uint8_t> hashOut(hashBytes);
     std::vector<uint8_t> keyBuf(key.begin(), key.end());
 
     // Prepare random generator for nonce
     std::mt19937_64 rng(std::random_device{}());
     std::uniform_int_distribution<uint64_t> dist;
+    uint64_t nonceCounter = 0; // Counter for deterministic nonce
+
+    static uint8_t reverseMap[256 * 64];
+    static uint8_t reverseMapOffsets[256];
 
     size_t remaining = originalSize;
 
     for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
         std::bitset<64> usedIndices;
         size_t thisBlockSize = std::min(blockSize, remaining);
-        remaining -= thisBlockSize; // Corrected subtraction
+        remaining -= thisBlockSize;
         std::vector<uint8_t> block(
             plainData.begin() + blockIndex * blockSize,
             plainData.begin() + blockIndex * blockSize + thisBlockSize
@@ -527,12 +528,20 @@ static void puzzleEncryptFileWithHeader(
 
         bool found = false;
         std::vector<uint8_t> chosenNonce(nonceSize, 0);
-        std::vector<uint8_t> scatterIndices(thisBlockSize, 0); // Changed to uint8_t
+        std::vector<uint8_t> scatterIndices(thisBlockSize, 0);
 
-        for (uint64_t tries = 0; ; tries++) { // No fixed MAX_TRIES
-            // Generate random nonce
-            for (size_t i = 0; i < nonceSize; i++) {
-                chosenNonce[i] = static_cast<uint8_t>(dist(rng) & 0xFF);
+        for (uint64_t tries = 0; ; tries++) {
+            if (deterministicNonce) {
+                // Incremental counter for nonce
+                for (size_t i = 0; i < nonceSize; i++) {
+                    chosenNonce[i] = static_cast<uint8_t>((nonceCounter >> (i * 8)) & 0xFF);
+                }
+                nonceCounter++;
+            } else {
+                // Random bytes for nonce
+                for (size_t i = 0; i < nonceSize; i++) {
+                    chosenNonce[i] = dist(rng);
+                }
             }
 
             // Build trial buffer
@@ -545,49 +554,41 @@ static void puzzleEncryptFileWithHeader(
             if (searchModeEnum == 0x00) { // Prefix
                 if (hashOut.size() >= thisBlockSize &&
                     std::equal(block.begin(), block.end(), hashOut.begin())) {
-                    // Found at the front
-                    scatterIndices.assign(thisBlockSize, 0); // All indices are 0
+                    scatterIndices.assign(thisBlockSize, 0);
                     found = true;
                 }
             }
             else if (searchModeEnum == 0x01) { // Sequence
-                // Search for block as a contiguous substring
-                uint8_t startIdx = 0;
                 for (size_t i = 0; i <= hashOut.size() - thisBlockSize; i++) {
                     if (std::equal(block.begin(), block.end(), hashOut.begin() + i)) {
-                        startIdx = static_cast<uint8_t>(i); // Ensure it fits in uint8_t
-                        scatterIndices.assign(thisBlockSize, startIdx); // All bytes share the same start index
+                        uint8_t startIdx = static_cast<uint8_t>(i);
+                        scatterIndices.assign(thisBlockSize, startIdx);
                         found = true;
                         break;
                     }
                 }
             }
-            else if (searchModeEnum == 0x02) { // Series/Scatter
+            else if (searchModeEnum == 0x02) { // Series
                 bool allFound = true;
-                usedIndices.reset(); // Clear used indices for the current block
+                usedIndices.reset();
+                auto it = hashOut.begin();
 
                 for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-                    auto it = hashOut.begin();
-
-                    // Loop to find a valid index for the current byte
                     while (it != hashOut.end()) {
-                        // Find the next occurrence of block[byteIdx]
                         it = std::find(it, hashOut.end(), block[byteIdx]);
-
-                        if (it != hashOut.end()) { // Found a match
+                        if (it != hashOut.end()) {
                             uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
-
-                            if (!usedIndices.test(idx)) { // Ensure the index is not already used
-                                scatterIndices[byteIdx] = idx; // Store the index
-                                usedIndices.set(idx);         // Mark it as used
-                                break;                        // Exit loop for this byte
+                            if (!usedIndices.test(idx)) {
+                                scatterIndices[byteIdx] = idx;
+                                usedIndices.set(idx);
+                                break;
                             }
-
-                            // Advance to the next position for further search
                             ++it;
+                        } else {
+                            allFound = false;
+                            break;
                         }
                     }
-
                     if (it == hashOut.end()) { // No valid index found for this byte
                         allFound = false;
                         break;
@@ -596,32 +597,109 @@ static void puzzleEncryptFileWithHeader(
 
                 if (allFound) {
                     found = true;
+                    // Only print if verbose
+                    if (verbose) {
+                      std::cout << "Series Indices: ";
+                      for (const auto& idx : scatterIndices) {
+                        std::cout << static_cast<int>(idx) << " ";
+                      }
+                      std::cout << std::endl;
+                    }
                 }
+            }
+            else if (searchModeEnum == 0x03) { // Scatter
+                bool allFound = true;
+                usedIndices.reset();
+
+                for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+                    auto it = hashOut.begin();
+                    while (it != hashOut.end()) {
+                        it = std::find(it, hashOut.end(), block[byteIdx]);
+                        if (it != hashOut.end()) {
+                            uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                            if (!usedIndices.test(idx)) {
+                                scatterIndices[byteIdx] = idx;
+                                usedIndices.set(idx);
+                                break;
+                            }
+                            ++it;
+                        } else {
+                            allFound = false;
+                            break;
+                        }
+                    }
+                    if (it == hashOut.end()) { // No valid index found for this byte
+                        allFound = false;
+                        break;
+                    }
+                }
+
+                if (allFound) {
+                    found = true;
+                    // Only print if verbose
+                    if (verbose) {
+                      std::cout << "Series Indices: ";
+                      for (const auto& idx : scatterIndices) {
+                        std::cout << static_cast<int>(idx) << " ";
+                      }
+                      std::cout << std::endl;
+                    }
+                }
+            }
+            else if (searchModeEnum == 0x04) { // MapScatter
+              // Reset offsets
+              std::fill(std::begin(reverseMapOffsets), std::end(reverseMapOffsets), 0);
+
+              // Fill the map with all positions of each byte in hashOut
+              for (uint8_t i = 0; i < hashOut.size(); i++) {
+                uint8_t b = hashOut[i];
+                reverseMap[b * 64 + reverseMapOffsets[b]] = i; // Store the index
+                reverseMapOffsets[b]++;
+              }
+
+              bool allFound = true;
+
+              // Match each byte in the plaintext block
+              for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
+                uint8_t targetByte = block[byteIdx];
+
+                // If reverseMapOffsets[targetByte] == 0, there are no more matches
+                if (reverseMapOffsets[targetByte] == 0) {
+                  allFound = false;
+                  break;
+                }
+
+                // Get the last match and decrement offset
+                reverseMapOffsets[targetByte]--;
+                scatterIndices[byteIdx] = (reverseMap[targetByte * 64 + reverseMapOffsets[targetByte]]);
+              }
+
+              if (allFound) {
+                found = true;
+
+                // Optional: Print scatter indices if verbose
+                if (verbose) {
+                  std::cout << "Scatter Indices: ";
+                  for (auto idx : scatterIndices) {
+                    std::cout << static_cast<int>(idx) << " ";
+                  }
+                  std::cout << std::endl;
+                }
+              }
             }
 
             if (found) break;
 
-            // Optional: Implement a maximum number of tries to prevent infinite loops
-            // Example:
-            /*
-            if (tries > MAX_TRIES) {
-                throw std::runtime_error("Failed to find a suitable nonce for block " + std::to_string(blockIndex));
-            }
-            */
-
-            if (tries % 1'000'000 == 0) {
+            if (tries % 1000000 == 0) {
                 std::cerr << "\r[Enc] Block " << blockIndex << ", " << tries << " tries... " << std::flush;
             }
         }
 
         // Write nonce and indices
         fout.write(reinterpret_cast<const char*>(chosenNonce.data()), nonceSize);
-        if (searchModeEnum == 0x02) { // Series/Scatter
-            // Write each index as uint8_t
-            fout.write(reinterpret_cast<const char*>(scatterIndices.data()), scatterIndices.size() * sizeof(uint8_t));
-        }
-        else { // Prefix/Sequence
-            // Write single start index
+        if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) {
+            fout.write(reinterpret_cast<const char*>(scatterIndices.data()), scatterIndices.size());
+        } else {
             uint8_t startIndex = scatterIndices[0];
             fout.write(reinterpret_cast<const char*>(&startIndex), sizeof(startIndex));
         }
@@ -666,7 +744,7 @@ static void puzzleDecryptFileWithHeader(
     fin.read(reinterpret_cast<char*>(&searchModeEnum), sizeof(searchModeEnum));
     fin.read(reinterpret_cast<char*>(&originalSize), sizeof(originalSize));
 
-    if (magicNumber != 0x52435259) { // "RCRY"
+    if (magicNumber != MagicNumber) { // "RCRY"
         throw std::runtime_error("Invalid magic number in header.");
     }
 
@@ -692,7 +770,7 @@ static void puzzleDecryptFileWithHeader(
     // Prepare to reconstruct plaintext
     std::vector<uint8_t> keyBuf(key.begin(), key.end());
     std::vector<uint8_t> hashOut(hash_size / 8);
-    std::vector<uint8_t> plaintextAccumulated; // Collect all decrypted blocks
+    std::vector<uint8_t> plaintextAccumulated;
 
     size_t recoveredSoFar = 0;
 
@@ -708,13 +786,13 @@ static void puzzleDecryptFileWithHeader(
         // Read indices based on search mode
         std::vector<uint8_t> scatterIndices;
         uint8_t startIndex = 0;
-        if (searchModeEnum == 0x02) { // Series/Scatter
+        if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) {
             scatterIndices.resize(thisBlockSize);
-            std::memcpy(scatterIndices.data(), &cipherData[cipherOffset], thisBlockSize * sizeof(uint8_t));
-            cipherOffset += thisBlockSize * sizeof(uint8_t);
-        } else { // Prefix/Sequence
-            std::memcpy(&startIndex, &cipherData[cipherOffset], sizeof(uint8_t));
-            cipherOffset += sizeof(uint8_t);
+            std::memcpy(scatterIndices.data(), &cipherData[cipherOffset], thisBlockSize);
+            cipherOffset += thisBlockSize;
+        } else {
+            std::memcpy(&startIndex, &cipherData[cipherOffset], 1);
+            cipherOffset += 1;
         }
 
         // Recompute the hash
@@ -722,7 +800,7 @@ static void puzzleDecryptFileWithHeader(
         trial.insert(trial.end(), storedNonce.begin(), storedNonce.end());
         invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
 
-        // Reconstruct plaintext block based on search mode
+        // Reconstruct plaintext block
         if (searchModeEnum == 0x00) { // Prefix
             block.assign(hashOut.begin(), hashOut.begin() + thisBlockSize);
         } else if (searchModeEnum == 0x01) { // Sequence
@@ -730,7 +808,7 @@ static void puzzleDecryptFileWithHeader(
                 throw std::runtime_error("[Dec] Start index out of bounds in sequence mode.");
             }
             block.assign(hashOut.begin() + startIndex, hashOut.begin() + startIndex + thisBlockSize);
-        } else if (searchModeEnum == 0x02) { // Series/Scatter
+        } else if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) { // Series/Scatter
             block.reserve(thisBlockSize);
             for (size_t j = 0; j < thisBlockSize; j++) {
                 uint8_t idx = scatterIndices[j];
@@ -743,7 +821,6 @@ static void puzzleDecryptFileWithHeader(
             throw std::runtime_error("Invalid search mode enum in decryption.");
         }
 
-        // Append block to accumulated plaintext
         plaintextAccumulated.insert(plaintextAccumulated.end(), block.begin(), block.end());
         recoveredSoFar += thisBlockSize;
 
@@ -754,10 +831,10 @@ static void puzzleDecryptFileWithHeader(
 
     std::cout << "\n[Dec] Ciphertext blocks decrypted successfully.\n";
 
-    // Decompress accumulated plaintext
+    // Decompress
     std::vector<uint8_t> decompressedData = decompressData(plaintextAccumulated);
 
-    // Write decompressed data to the output file
+    // Write to output
     std::ofstream fout(outFilename, std::ios::binary);
     if (!fout.is_open()) {
         throw std::runtime_error("Cannot open output file for decompressed plaintext: " + outFilename);
@@ -769,6 +846,70 @@ static void puzzleDecryptFileWithHeader(
     std::cout << "[Dec] Decompressed plaintext written to: " << outFilename << "\n";
 }
 
+// NEW: Just read the file header and display metadata
+static void puzzleShowFileInfo(const std::string &inFilename) {
+  std::ifstream fin(inFilename, std::ios::binary);
+  if (!fin.is_open()) {
+    throw std::runtime_error("Cannot open file: " + inFilename);
+  }
+
+  uint32_t magicNumber;
+  uint8_t version;
+  uint8_t blockSize;
+  uint8_t nonceSize;
+  uint16_t hash_size;
+  uint8_t hashNameLength;
+  std::string hashName;
+  uint8_t searchModeEnum;
+  uint64_t originalSize;
+
+  fin.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
+  fin.read(reinterpret_cast<char*>(&version), sizeof(version));
+  fin.read(reinterpret_cast<char*>(&blockSize), sizeof(blockSize));
+  fin.read(reinterpret_cast<char*>(&nonceSize), sizeof(nonceSize));
+  fin.read(reinterpret_cast<char*>(&hash_size), sizeof(hash_size));
+  fin.read(reinterpret_cast<char*>(&hashNameLength), sizeof(hashNameLength));
+
+  if (!fin.good()) {
+    throw std::runtime_error("File too small or truncated header.");
+  }
+
+  hashName.resize(hashNameLength);
+  fin.read(&hashName[0], hashNameLength);
+  fin.read(reinterpret_cast<char*>(&searchModeEnum), sizeof(searchModeEnum));
+  fin.read(reinterpret_cast<char*>(&originalSize), sizeof(originalSize));
+
+  fin.close();
+
+  if (magicNumber != MagicNumber) {
+    throw std::runtime_error("Invalid magic number (not an RCRY file).");
+  }
+
+  std::string searchMode;
+  switch (searchModeEnum) {
+    case 0x00: searchMode = "prefix"; break;
+    case 0x01: searchMode = "sequence"; break;
+    case 0x02: searchMode = "series"; break;
+    case 0x03: searchMode = "scatter"; break;
+    case 0x04: searchMode = "mapscatter"; break;
+    default:   searchMode = "unknown"; break;
+  }
+
+  size_t totalBlocks = (originalSize + blockSize - 1) / blockSize;
+
+  std::cout << "=== File Header Info ===\n";
+  std::cout << "Magic: RCRY (0x" << std::hex << magicNumber << std::dec << ")\n";
+  std::cout << "Version: " << static_cast<int>(version) << "\n";
+  std::cout << "Block Size: " << static_cast<int>(blockSize) << "\n";
+  std::cout << "Nonce Size: " << static_cast<int>(nonceSize) << "\n";
+  std::cout << "Hash Size: " << hash_size << " bits\n";
+  std::cout << "Hash Algorithm: " << hashName << "\n";
+  std::cout << "Search Mode: " << searchMode << "\n";
+  std::cout << "Compressed Plaintext Size: " << originalSize << " bytes\n";
+  std::cout << "Total Blocks: " << totalBlocks << "\n";
+  std::cout << "========================\n";
+}
+
 // The main function
 int main(int argc, char** argv) {
     try {
@@ -777,19 +918,21 @@ int main(int argc, char** argv) {
 
         // Define command-line options
         options.add_options()
-            ("m,mode", "Mode: digest, stream, enc, dec",
+            ("m,mode", "Mode: digest, stream, enc, dec, info",
                 cxxopts::value<std::string>()->default_value("digest"))
             ("v,version", "Print version")
             ("a,algorithm", "Specify the hash algorithm to use (rainbow, rainstorm)",
-                cxxopts::value<std::string>()->default_value("bow"))
+                cxxopts::value<std::string>()->default_value("storm"))
             ("s,size", "Specify the size of the hash (e.g., 64, 128, 256, 512)",
-                cxxopts::value<uint32_t>()->default_value("256"))
+                cxxopts::value<uint32_t>()->default_value("512"))
             ("block-size", "Block size in bytes for puzzle-based encryption (1-255)",
                 cxxopts::value<uint8_t>()->default_value("3"))
             ("n,nonce-size", "Size of the nonce in bytes (1-255)",
-                cxxopts::value<size_t>()->default_value("8"))
-            ("search-mode", "Search mode: prefix, sequence, series, scatter",
-                cxxopts::value<std::string>()->default_value("prefix"))
+                cxxopts::value<size_t>()->default_value("14"))
+            ("deterministic-nonce", "Use a deterministic counter for nonce generation",
+                cxxopts::value<bool>()->default_value("false"))
+            ("search-mode", "Search mode: prefix, sequence, series, scatter, mapscatter",
+                cxxopts::value<std::string>()->default_value("scatter"))
             ("o,output-file", "Output file",
                 cxxopts::value<std::string>()->default_value("/dev/stdout"))
             ("t,test-vectors", "Calculate the hash of the standard test vectors",
@@ -806,6 +949,9 @@ int main(int argc, char** argv) {
             // Encrypt / Decrypt options
             ("P,password", "Encryption/Decryption password",
                 cxxopts::value<std::string>()->default_value(""))
+            // NEW: verbose
+            ("verbose", "Enable verbose output for series/scatter indices",
+                cxxopts::value<bool>()->default_value("false"))
             ("h,help", "Print usage");
 
         // Parse command-line options
@@ -839,10 +985,13 @@ int main(int argc, char** argv) {
             throw std::runtime_error("Nonce size must be between 1 and 255 bytes.");
         }
 
+        // Nonce nature
+        bool deterministicNonce = result["deterministic-nonce"].as<bool>();
+
         // Search Mode
         std::string searchMode = result["search-mode"].as<std::string>();
         if (searchMode != "prefix" && searchMode != "sequence" &&
-            searchMode != "series" && searchMode != "scatter") {
+            searchMode != "series" && searchMode != "scatter" && searchMode != "mapscatter") {
             throw std::runtime_error("Invalid search mode: " + searchMode);
         }
 
@@ -860,6 +1009,7 @@ int main(int argc, char** argv) {
         else if (modeStr == "stream") mode = Mode::Stream;
         else if (modeStr == "enc") mode = Mode::Enc;
         else if (modeStr == "dec") mode = Mode::Dec;
+        else if (modeStr == "info") mode = Mode::Info; // NEW
         else throw std::runtime_error("Invalid mode: " + modeStr);
 
         // Determine Hash Algorithm
@@ -871,6 +1021,9 @@ int main(int argc, char** argv) {
 
         // Validate Hash Size based on Algorithm
         if (algot == HashAlgorithm::Rainbow) {
+            if (hash_size == 512) {
+              hash_size = 256;
+            }
             if (hash_size != 64 && hash_size != 128 && hash_size != 256) {
                 throw std::runtime_error("Invalid size for Rainbow (must be 64, 128, or 256).");
             }
@@ -913,6 +1066,8 @@ int main(int argc, char** argv) {
 
         std::string password = result["password"].as<std::string>();
 
+        // NEW: verbose
+        bool verbose = result["verbose"].as<bool>();
 
         // Handle Mining Modes
         if (mine_mode != MineMode::None) {
@@ -951,6 +1106,15 @@ int main(int argc, char** argv) {
                 default:
                     throw std::runtime_error("Invalid mine-mode encountered.");
             }
+        }
+
+        // If mode == info, just show header info
+        if (mode == Mode::Info) {
+            if (inpath.empty()) {
+                throw std::runtime_error("No input file specified for info mode.");
+            }
+            puzzleShowFileInfo(inpath);
+            return 0;
         }
 
         // Normal Hashing or Encryption/Decryption
@@ -997,7 +1161,7 @@ int main(int argc, char** argv) {
 
             // We'll write ciphertext to inpath + ".rc"
             std::string encFile = inpath + ".rc";
-            puzzleEncryptFileWithHeader(inpath, encFile, key, algot, hash_size, seed, blockSize, nonceSize, searchMode);
+            puzzleEncryptFileWithHeader(inpath, encFile, key, algot, hash_size, seed, blockSize, nonceSize, searchMode, verbose, deterministicNonce);
             std::cout << "[Enc] Wrote encrypted file to: " << encFile << "\n";
         }
         else if (mode == Mode::Dec) {
@@ -1022,8 +1186,8 @@ int main(int argc, char** argv) {
         return 0;
     }
     catch (const cxxopts::exceptions::exception& e) {
-      std::cerr << "Error parsing options: " << e.what() << "\n";
-      return 1;
+        std::cerr << "Error parsing options: " << e.what() << "\n";
+        return 1;
     }
     catch (const std::bad_cast &e) {
         std::cerr << "Bad cast during option parsing: " << e.what() << "\n";
@@ -1034,6 +1198,4 @@ int main(int argc, char** argv) {
         return 1;
     }
 }
-
-
 

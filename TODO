@@ -1,7 +1,9 @@
 cipher improvement
 
-- implement a js version of enc / dec
 - schedule K into block keys via XOF
+- implement a js version of enc / dec
+- test research construct
+    weak hash -- digest mining construction --> block cipher --- davies meyer construction ---> strong hash 
 
 Later maybe
 - parallelization for cipher mining efficiency

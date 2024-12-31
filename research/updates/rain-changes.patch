@@ -1,7 +1,7 @@
 # This patch explores changes to enhance the mixing of rainbow (prompted by Reiner Pope)
 # and changes to enhance the non invertibility of rainstorm (even given complete state information)
 # prompted by orlp's 'breaking hash functions' write up: https://orlp.net/blog/breaking-hash-functions/#trivial-fixed-seed-wyhash-multicollisions
-# 
+# the rainstorm passes all
 diff --git a/hashes/rainbow.cpp b/hashes/rainbow.cpp
 index 51adfd06..96b44ee5 100644
 --- a/hashes/rainbow.cpp
