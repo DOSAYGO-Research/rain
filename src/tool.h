@@ -90,7 +90,8 @@ enum SearchMode {
   Prefix,
   Sequence, 
   Series,
-  Scatter
+  Scatter,
+  MapScatter
 };
 
 std::string searchModeToString(const SearchMode& mode) {
@@ -99,6 +100,7 @@ std::string searchModeToString(const SearchMode& mode) {
     case SearchMode::Sequence:    return "Sequence";
     case SearchMode::Series:      return "Series";      // added
     case SearchMode::Scatter:     return "Scatter";     // added
+    case SearchMode::MapScatter:     return "MapScatter";     // added
     default: throw std::runtime_error("Unknown search mode");
   }
 }
@@ -114,6 +116,8 @@ std::istream& operator>>(std::istream& in, SearchMode& mode) {
     mode = SearchMode::Series;
   } else if (token == "Scatter" ) {
     mode = SearchMode::Scatter;
+  } else if (token == "MapScatter" ) {
+    mode = SearchMode::MapScatter;
   } else {
     in.setstate(std::ios_base::failbit);
   }
