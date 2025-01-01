@@ -515,6 +515,17 @@ int main(int argc, char** argv) {
             // We'll write ciphertext to inpath + ".rc"
             std::string encFile = inpath + ".rc";
 
+            // Check if encFile exists and overwrite it with zeros if it does
+            try {
+                overwriteFileWithZeros(encFile);
+                if (std::filesystem::exists(encFile)) {
+                    std::cout << "[Info] Existing encrypted file '" << encFile << "' has been securely overwritten with zeros.\n";
+                }
+            }
+            catch (const std::exception &e) {
+                throw std::runtime_error("Error while overwriting existing encrypted file: " + std::string(e.what()));
+            }
+
             // ADDED: Call the existing puzzleEncryptFileWithHeader with updated header
             puzzleEncryptFileWithHeader(inpath, encFile, key_input, algot, hash_size, seed, salt, blockSize, nonceSize, searchMode, verbose, deterministicNonce);
             std::cout << "[Enc] Wrote encrypted file to: " << encFile << "\n";
@@ -533,6 +544,17 @@ int main(int argc, char** argv) {
 
             // We'll write ciphertext to inpath + ".rc"
             std::string encFile = inpath + ".rc";
+
+            // Check if encFile exists and overwrite it with zeros if it does
+            try {
+                overwriteFileWithZeros(encFile);
+                if (std::filesystem::exists(encFile)) {
+                    std::cout << "[Info] Existing encrypted file '" << encFile << "' has been securely overwritten with zeros.\n";
+                }
+            }
+            catch (const std::exception &e) {
+                throw std::runtime_error("Error while overwriting existing encrypted file: " + std::string(e.what()));
+            }
 
             // ADDED: Call streamEncryptFileWithHeader
             streamEncryptFileWithHeader(
