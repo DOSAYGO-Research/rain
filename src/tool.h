@@ -1118,9 +1118,10 @@ static bool fileIsStreamMode(const std::string &filename) {
             std::atomic<bool> done(false);
             std::vector<uint8_t> bestNonce(nonceSize);         // Shared best nonce
             std::vector<uint8_t> bestScatter(thisBlockSize);   // Shared best scatter indices
-#ifdef _OPENMP
+
+          #ifdef _OPENMP
             #pragma omp parallel
-#endif
+          #endif
             {
               uint64_t localTries = 0;
               std::vector<uint8_t> localNonce(nonceSize);
@@ -1133,11 +1134,11 @@ static bool fileIsStreamMode(const std::string &filename) {
               while (!done.load(std::memory_order_acquire)) {
                 // Generate nonce
                 if (deterministicNonce) {
-#ifdef _OPENMP
+          #ifdef _OPENMP
                   uint64_t current = omp_get_thread_num() + omp_get_num_threads() * (localTries + 1);
-#else
+          #else
                   uint64_t current = (localTries + 1);
-#endif                 
+          #endif
                   for (size_t i = 0; i < nonceSize; i++) {
                     localNonce[i] = static_cast<uint8_t>((current >> (i * 8)) & 0xFF);
                   }
@@ -1148,7 +1149,7 @@ static bool fileIsStreamMode(const std::string &filename) {
                 }
 
                 // Build trial buffer
-                std::vector<uint8_t> trial(keyBuf);
+                std::vector<uint8_t> trial(blockSubkey);
                 trial.insert(trial.end(), localNonce.begin(), localNonce.end());
 
                 // Hash it
@@ -1179,9 +1180,9 @@ static bool fileIsStreamMode(const std::string &filename) {
 
                 if (allFound) {
                   // Critical section to update shared variables
-#ifdef _OPENMP
+          #ifdef _OPENMP
                   #pragma omp critical
-#endif
+          #endif
                   {
                     if (!done.load(std::memory_order_relaxed)) {
                       bestNonce = localNonce;
@@ -1191,60 +1192,24 @@ static bool fileIsStreamMode(const std::string &filename) {
                   }
                 }
 
-                // Periodic progress reporting
-                if (localTries % progressInterval == 0 && !done.load(std::memory_order_relaxed)) {
-#ifdef _OPENMP
-                  # pragma omp critical
-#endif
-
-                  {
-                    if (!done.load(std::memory_order_relaxed)) {
-                      std::cerr << "\r[Parascatter] Block " << blockIndex + 1
-                                << "/" << totalBlocks << ", thread "
-#ifdef _OPENMP
-                                << omp_get_thread_num() << ": "
-#else
-                                << "Non-parallel: "
-#endif
-                                << localTries << " tries..." << std::flush;
-                    }
-                  }
-                }
                 localTries++;
               } // End while
             } // End parallel
 
-
             // Write results after parallel region
             if (done.load(std::memory_order_relaxed)) {
-                fout.write(reinterpret_cast<const char*>(bestNonce.data()), nonceSize);
-                fout.write(reinterpret_cast<const char*>(bestScatter.data()), bestScatter.size());
-
-                // Verbose output for written data
-                if (verbose) {
-                    std::cout << "\n[Parascatter] Final Nonce: ";
-                    for (const auto& byte : bestNonce) {
-                        std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte) << " ";
-                    }
-                    std::cout << std::dec << "\n[Parascatter] Scatter Indices: ";
-                    for (const auto& idx : bestScatter) {
-                        std::cout << static_cast<int>(idx) << " ";
-                    }
-                    std::cout << std::endl;
-                }
-
-                // Display block progress
-                if (verbose) {
-                    std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks << " processed.\n";
-                }
+              fout.write(reinterpret_cast<const char*>(bestNonce.data()), nonceSize);
+              fout.write(reinterpret_cast<const char*>(bestScatter.data()), bestScatter.size());
             } else {
-                throw std::runtime_error("[Parascatter] No solution found.");
+              throw std::runtime_error("[Parascatter] No solution found.");
             }
+          }
+
 
           // ------------------------------------------------------
           // other modes in else branch
           // ------------------------------------------------------
-          } else {
+          else {
               // We'll fill these once a solution is found
               bool found = false;
               std::vector<uint8_t> chosenNonce(nonceSize, 0);
