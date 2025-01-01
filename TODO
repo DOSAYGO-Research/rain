@@ -1,8 +1,6 @@
 cipher improvement
 
-- weird get stuck on block 80/81 regardless of mode with block size 8
-- extend effective digest size with XOF as this will add speed for larger blocks (more chances to find P in larger D)
-- ensure det nonce works with parascatter
+- allow hash_size / 8 + output_extension to be greater than 256 (adapt used indexes table and index sizes to become larger somehow)
 - implement a js version of enc / dec
 
 Later maybe

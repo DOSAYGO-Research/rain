@@ -12,8 +12,16 @@
         size_t nonceSize,
         const std::string &searchMode,
         bool verbose,
-        bool deterministicNonce
+        bool deterministicNonce,
+        uint32_t outputExtension
     ) {
+        if (hash_size / 8 + outputExtension > 256) {
+          std::cerr << "[Warning] Total output length ("
+                      << hash_size / 8 + outputExtension
+                      << ") exceeds the cap of 256 bytes.\n";
+          outputExtension = std::min(outputExtension, 256 - hash_size / 8);
+          std::cerr << "[Warning] Capping outputExtension to " << outputExtension << "\n" ;
+        }
         // 1) Read & compress plaintext
         std::ifstream fin(inFilename, std::ios::binary);
         if (!fin.is_open()) {
@@ -73,6 +81,8 @@
         hdr.cipherMode   = 0x11;       // 0x11 for “Block Cipher + puzzle”
         hdr.blockSize    = static_cast<uint8_t>(blockSize);
         hdr.nonceSize    = static_cast<uint8_t>(nonceSize);
+        hdr.outputExtension = outputExtension;
+        std::cout << "Output ext" << outputExtension << std::flush;
         hdr.hashSizeBits = hash_size;
         hdr.hashName     = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
         hdr.iv           = seed;       // The seed as our “IV”
@@ -167,7 +177,8 @@
                     hash_size,              // Hash size in bits
                     seed,                   // Seed
                     algot,                  // Hash algorithm
-                    deterministicNonce     // Deterministic nonce flag
+                    deterministicNonce,     // Deterministic nonce flag
+                    outputExtension         // how much output is extended by per block
                 );
 
                 // Write the nonce and scatter indices
@@ -210,16 +221,43 @@
                     std::vector<uint8_t> hashOut(hash_size / 8);
                     invokeHash<false>(algot, seed, trial, hashOut, hash_size);
 
+                    // If outputExtension > 0, extend the output
+                      std::vector<uint8_t> finalHashOut = hashOut; // Default to OG hashOut
+                      if (outputExtension > 0) {
+                        // Derive PRK using trial, salt, and seed
+                        /*
+                        std::vector<uint8_t> prk = derivePRK(
+                          trial,              // Input key material: subkey || nonce
+                          salt,               // Salt from encryption call
+                          keyBuf,             // IKM from encryption call
+                          algot,              // Hash algorithm
+                          hash_size           // Base hash size
+                        );
+                        */
+
+                        // Extend the PRK to derive additional bytes (extendedOutput)
+                        size_t extendedSize = outputExtension; // Additional bytes required
+                        std::vector<uint8_t> extendedOutput = extendOutputKDF(
+                          trial,                // PRK derived from trial
+                          extendedSize,       // Length of the extension
+                          algot,              // Hash algorithm
+                          hash_size           // Original hash size
+                        );
+
+                        // Combine hashOut and extendedOutput
+                        finalHashOut.insert(finalHashOut.end(), extendedOutput.begin(), extendedOutput.end());
+                      }                    
+
                     if (searchModeEnum == 0x00) { // prefix
-                        if (hashOut.size() >= thisBlockSize &&
-                            std::equal(block.begin(), block.end(), hashOut.begin())) {
+                        if (finalHashOut.size() >= thisBlockSize &&
+                            std::equal(block.begin(), block.end(), finalHashOut.begin())) {
                             scatterIndices.assign(thisBlockSize, 0);
                             found = true;
                         }
                     }
                     else if (searchModeEnum == 0x01) { // sequence
-                        for (size_t i = 0; i <= hashOut.size() - thisBlockSize; i++) {
-                            if (std::equal(block.begin(), block.end(), hashOut.begin() + i)) {
+                        for (size_t i = 0; i <= finalHashOut.size() - thisBlockSize; i++) {
+                            if (std::equal(block.begin(), block.end(), finalHashOut.begin() + i)) {
                                 uint8_t startIdx = static_cast<uint8_t>(i);
                                 scatterIndices.assign(thisBlockSize, startIdx);
                                 found = true;
@@ -229,15 +267,15 @@
                     }
                     else if (searchModeEnum == 0x02) { // series
                         bool allFound = true;
-                        std::bitset<64> usedIndices;
+                        std::bitset<256> usedIndices;
                         usedIndices.reset();
-                        auto it = hashOut.begin();
+                        auto it = finalHashOut.begin();
 
                         for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-                            while (it != hashOut.end()) {
-                                it = std::find(it, hashOut.end(), block[byteIdx]);
-                                if (it != hashOut.end()) {
-                                    uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                            while (it != finalHashOut.end()) {
+                                it = std::find(it, finalHashOut.end(), block[byteIdx]);
+                                if (it != finalHashOut.end()) {
+                                    uint8_t idx = static_cast<uint8_t>(std::distance(finalHashOut.begin(), it));
                                     if (!usedIndices.test(idx)) {
                                         scatterIndices[byteIdx] = idx;
                                         usedIndices.set(idx);
@@ -250,7 +288,7 @@
                                     break;
                                 }
                             }
-                            if (it == hashOut.end()) {
+                            if (it == finalHashOut.end()) {
                                 allFound = false;
                                 break;
                             }
@@ -269,15 +307,15 @@
                     }
                     else if (searchModeEnum == 0x03) { // scatter
                         bool allFound = true;
-                        std::bitset<64> usedIndices;
+                        std::bitset<256> usedIndices;
                         usedIndices.reset();
 
                         for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-                            auto it = hashOut.begin();
-                            while (it != hashOut.end()) {
-                                it = std::find(it, hashOut.end(), block[byteIdx]);
-                                if (it != hashOut.end()) {
-                                    uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                            auto it = finalHashOut.begin();
+                            while (it != finalHashOut.end()) {
+                                it = std::find(it, finalHashOut.end(), block[byteIdx]);
+                                if (it != finalHashOut.end()) {
+                                    uint8_t idx = static_cast<uint8_t>(std::distance(finalHashOut.begin(), it));
                                     if (!usedIndices.test(idx)) {
                                         scatterIndices[byteIdx] = idx;
                                         usedIndices.set(idx);
@@ -290,7 +328,7 @@
                                     break;
                                 }
                             }
-                            if (it == hashOut.end()) {
+                            if (it == finalHashOut.end()) {
                                 allFound = false;
                                 break;
                             }
@@ -311,9 +349,9 @@
                         // Reset offsets
                         std::fill(std::begin(reverseMapOffsets), std::end(reverseMapOffsets), 0);
 
-                        // Fill the map with all positions of each byte in hashOut
-                        for (uint8_t i = 0; i < hashOut.size(); i++) {
-                            uint8_t b = hashOut[i];
+                        // Fill the map with all positions of each byte in finalHashOut
+                        for (uint8_t i = 0; i < finalHashOut.size(); i++) {
+                            uint8_t b = finalHashOut[i];
                             reverseMap[b * 64 + reverseMapOffsets[b]] = i;
                             reverseMapOffsets[b]++;
                         }
@@ -510,28 +548,55 @@
             std::vector<uint8_t> hashOut(hdr.hashSizeBits / 8);
             invokeHash<false>(algot, hdr.iv, trial, hashOut, hdr.hashSizeBits); // Assuming 'hdr.iv' is passed correctly
 
+            // If outputExtension > 0, extend the output
+            std::vector<uint8_t> finalHashOut = hashOut; // Default to OG hashOut
+            if (hdr.outputExtension > 0) {
+              // Derive PRK using trial, salt, and seed
+              /*
+              std::vector<uint8_t> prk = derivePRK(
+                trial,              // Input key material: subkey || nonce
+                hdr.salt,           // Salt from file header
+                ikm,                // IKM derived from decryption call
+                algot,              // Hash algorithm
+                hdr.hashSizeBits    // Base hash size
+              );
+              */
+
+              // Extend the PRK to derive additional bytes (extendedOutput)
+              size_t extendedSize = hdr.outputExtension; // Additional bytes from header
+              std::vector<uint8_t> extendedOutput = extendOutputKDF(
+                trial,                // PRK derived from trial
+                extendedSize,       // Length of the extension
+                algot,              // Hash algorithm
+                hdr.hashSizeBits    // Original hash size
+              );
+
+              // Combine hashOut and extendedOutput
+              finalHashOut.insert(finalHashOut.end(), extendedOutput.begin(), extendedOutput.end());
+            }
+
             // 4.5) Reconstruct plaintext block based on searchModeEnum
             if (hdr.searchModeEnum == 0x00) { // Prefix
-                if (hashOut.size() < thisBlockSize) {
+                if (finalHashOut.size() < thisBlockSize) {
                     throw std::runtime_error("[Dec] Hash output smaller than block size for Prefix mode.");
                 }
-                block.assign(hashOut.begin(), hashOut.begin() + thisBlockSize);
+                block.assign(finalHashOut.begin(), finalHashOut.begin() + thisBlockSize);
             }
             else if (hdr.searchModeEnum == 0x01) { // Sequence
-                if (startIndex + thisBlockSize > hashOut.size()) {
+                if (startIndex + thisBlockSize > finalHashOut.size()) {
                     throw std::runtime_error("[Dec] Start index out of bounds in Sequence mode.");
                 }
-                block.assign(hashOut.begin() + startIndex, hashOut.begin() + startIndex + thisBlockSize);
+                block.assign(finalHashOut.begin() + startIndex, finalHashOut.begin() + startIndex + thisBlockSize);
             }
             else if (hdr.searchModeEnum == 0x02 || hdr.searchModeEnum == 0x03 ||
                      hdr.searchModeEnum == 0x04 || hdr.searchModeEnum == 0x05) { // Series, Scatter, MapScatter, Parascatter
                 block.reserve(thisBlockSize);
                 for (size_t j = 0; j < thisBlockSize; j++) {
                     uint8_t idx = scatterIndices[j];
-                    if (idx >= hashOut.size()) {
+                    if (idx >= finalHashOut.size()) {
                         throw std::runtime_error("[Dec] Scatter index out of range.");
                     }
-                    block.push_back(hashOut[idx]);
+                    block.push_back(finalHashOut[idx]);
                 }
             }
             else {

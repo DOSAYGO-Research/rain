@@ -33,7 +33,7 @@ static std::mutex cerr_mutex;
 #include "cxxopts.hpp"
 #include "common.h"
 
-#define VERSION "1.3.1"
+#define VERSION "1.5.0"
 
 uint32_t MagicNumber = 0x59524352; // RCRY
 
@@ -235,75 +235,6 @@ uint32_t MagicNumber = 0x59524352; // RCRY
       default: throw std::runtime_error("Unknown mine mode");
     }
   }
-
-// ADDED: Unified FileHeader struct to include IV and Salt
-struct FileHeader {
-    uint32_t magic;             // MagicNumber
-    uint8_t version;            // Version
-    uint8_t cipherMode;         // Mode: 0x10 = Stream, 0x11 = Block
-    uint8_t blockSize;          // Block size in bytes (for block cipher)
-    uint8_t nonceSize;          // Nonce size in bytes
-    uint16_t hashSizeBits;      // Hash size in bits
-    std::string hashName;       // Hash algorithm name
-    uint64_t iv;                // 64-bit IV (seed)
-    uint8_t saltLen;            // Length of salt
-    std::vector<uint8_t> salt;  // Salt data
-    uint8_t searchModeEnum;     // Search mode enum (0x00 - 0x05 for block ciphers, 0xFF for stream)
-    uint64_t originalSize;      // Compressed plaintext size
-};
-
-// ADDED: Function to write the unified FileHeader
-static void writeFileHeader(std::ofstream &out, const FileHeader &hdr) {
-    out.write(reinterpret_cast<const char*>(&hdr.magic), sizeof(hdr.magic));
-    out.write(reinterpret_cast<const char*>(&hdr.version), sizeof(hdr.version));
-    out.write(reinterpret_cast<const char*>(&hdr.cipherMode), sizeof(hdr.cipherMode));
-    out.write(reinterpret_cast<const char*>(&hdr.blockSize), sizeof(hdr.blockSize));
-    out.write(reinterpret_cast<const char*>(&hdr.nonceSize), sizeof(hdr.nonceSize));
-    out.write(reinterpret_cast<const char*>(&hdr.hashSizeBits), sizeof(hdr.hashSizeBits));
-    
-    uint8_t hnLen = static_cast<uint8_t>(hdr.hashName.size());
-    out.write(reinterpret_cast<const char*>(&hnLen), sizeof(hnLen));
-    out.write(hdr.hashName.data(), hnLen);
-    
-    out.write(reinterpret_cast<const char*>(&hdr.iv), sizeof(hdr.iv));
-    
-    out.write(reinterpret_cast<const char*>(&hdr.saltLen), sizeof(hdr.saltLen));
-    if (hdr.saltLen > 0) {
-        out.write(reinterpret_cast<const char*>(hdr.salt.data()), hdr.salt.size());
-    }
-    
-    out.write(reinterpret_cast<const char*>(&hdr.searchModeEnum), sizeof(hdr.searchModeEnum));
-    out.write(reinterpret_cast<const char*>(&hdr.originalSize), sizeof(hdr.originalSize));
-}
-
-// ADDED: Function to read the unified FileHeader
-static FileHeader readFileHeader(std::ifstream &in) {
-    FileHeader hdr{};
-    in.read(reinterpret_cast<char*>(&hdr.magic), sizeof(hdr.magic));
-    in.read(reinterpret_cast<char*>(&hdr.version), sizeof(hdr.version));
-    in.read(reinterpret_cast<char*>(&hdr.cipherMode), sizeof(hdr.cipherMode));
-    in.read(reinterpret_cast<char*>(&hdr.blockSize), sizeof(hdr.blockSize));
-    in.read(reinterpret_cast<char*>(&hdr.nonceSize), sizeof(hdr.nonceSize));
-    in.read(reinterpret_cast<char*>(&hdr.hashSizeBits), sizeof(hdr.hashSizeBits));
-    
-    uint8_t hnLen;
-    in.read(reinterpret_cast<char*>(&hnLen), sizeof(hnLen));
-    hdr.hashName.resize(hnLen);
-    in.read(&hdr.hashName[0], hnLen);
-    
-    in.read(reinterpret_cast<char*>(&hdr.iv), sizeof(hdr.iv));
-    
-    in.read(reinterpret_cast<char*>(&hdr.saltLen), sizeof(hdr.saltLen));
-    hdr.salt.resize(hdr.saltLen);
-    if (hdr.saltLen > 0) {
-        in.read(reinterpret_cast<char*>(hdr.salt.data()), hdr.saltLen);
-    }
-    
-    in.read(reinterpret_cast<char*>(&hdr.searchModeEnum), sizeof(hdr.searchModeEnum));
-    in.read(reinterpret_cast<char*>(&hdr.originalSize), sizeof(hdr.originalSize));
-    
-    return hdr;
-}
 
 // ------------------------------------------------------------------
 // Mining Mode Operator>>(std::istream&, MineMode&) Implementation

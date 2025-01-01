@@ -1,4 +1,4 @@
-#define __STORMVERSION__ "1.2.2"
+#define __STORMVERSION__ "1.3.0"
 
 #include <cstdint>
 #include <cstdlib>

@@ -2,60 +2,9 @@
 #include <omp.h>
 #endif
 #include "tool.h" // for invokeHash, etc.
+#include "file-header.h"
 #include "block-cipher.h"
 #include "stream-cipher.h"
-
-
-// =================================================================
-// ADDED: Enhanced showFileFullInfo to handle unified FileHeader
-// =================================================================
-static void showFileFullInfo(const std::string &inFilename) {
-    std::ifstream fin(inFilename, std::ios::binary);
-    if (!fin.is_open()) {
-        throw std::runtime_error("Cannot open file for info: " + inFilename);
-    }
-
-    FileHeader hdr = readFileHeader(fin);
-    fin.close();
-
-    if (hdr.magic != MagicNumber) {
-        throw std::runtime_error("Invalid magic number in file.");
-    }
-
-    std::string cipherModeStr;
-    if (hdr.cipherMode == 0x10) {
-        cipherModeStr = "StreamCipher";
-    }
-    else if (hdr.cipherMode == 0x11) {
-        cipherModeStr = "BlockCipher";
-    }
-    else {
-        cipherModeStr = "Unknown/LegacyPuzzle";
-    }
-
-    std::cout << "=== Unified File Header Info ===\n";
-    std::cout << "Magic: RCRY (0x" << std::hex << hdr.magic << std::dec << ")\n";
-    std::cout << "Version: " << static_cast<int>(hdr.version) << "\n";
-    std::cout << "Cipher Mode: " << cipherModeStr << " (0x" 
-              << std::hex << static_cast<int>(hdr.cipherMode) << std::dec << ")\n";
-    std::cout << "Block Size: " << static_cast<int>(hdr.blockSize) << "\n";
-    std::cout << "Nonce Size: " << static_cast<int>(hdr.nonceSize) << "\n";
-    std::cout << "Hash Size: " << hdr.hashSizeBits << " bits\n";
-    std::cout << "Hash Algorithm: " << hdr.hashName << "\n";
-    std::cout << "IV (Seed): 0x" << std::hex << hdr.iv << std::dec << "\n";
-    std::cout << "Salt Length: " << static_cast<int>(hdr.saltLen) << "\n";
-    if (hdr.saltLen > 0) {
-        std::cout << "Salt Data: ";
-        for (auto b : hdr.salt) {
-            std::cout << std::hex << std::setw(2) << std::setfill('0') 
-                      << static_cast<int>(b) << " ";
-        }
-        std::cout << std::dec << "\n";
-    }
-    std::cout << "Compressed Plaintext Size: " << hdr.originalSize << " bytes\n";
-    std::cout << "Search Mode Enum: 0x" << std::hex << static_cast<int>(hdr.searchModeEnum) << std::dec << "\n";
-    std::cout << "===============================\n";
-}
 
 
 // =================================================================
@@ -71,7 +20,7 @@ int main(int argc, char** argv) {
             ("m,mode", "Mode: digest, stream, block-enc, stream-enc, dec, info",
                 cxxopts::value<std::string>()->default_value("digest"))
             ("a,algorithm", "Specify the hash algorithm to use (rainbow, rainstorm, rainbow-rp, rainstorm-nis1)",
-                cxxopts::value<std::string>()->default_value("storm"))
+                cxxopts::value<std::string>()->default_value("bow"))
             ("s,size", "Specify the size of the hash (e.g., 64, 128, 256, 512)",
                 cxxopts::value<uint32_t>()->default_value("256"))
             ("block-size", "Block size in bytes for puzzle-based encryption (1-255)",
@@ -159,7 +108,6 @@ int main(int argc, char** argv) {
         // Convert Seed (either numeric or hex string)
         std::string seed_str = result["seed"].as<std::string>();
         uint64_t seed = 0;
-        bool userProvidedSeed = false;
         if (!seed_str.empty()) {
             try {
                 if (seed_str.find("0x") == 0 || seed_str.find("0X") == 0) {
@@ -168,7 +116,6 @@ int main(int argc, char** argv) {
                 else {
                     seed = std::stoull(seed_str, nullptr, 10);
                 }
-                userProvidedSeed = true;
             }
             catch (...) {
                 // If not a valid number, hash the string to 64 bits
@@ -228,7 +175,8 @@ int main(int argc, char** argv) {
                 throw std::runtime_error("Invalid size for Rainbow (must be 64, 128, or 256).");
             }
             if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc ) {
-              hash_size = 256;
+              algot = HashAlgorithm::Rainstorm;
+              hash_size = 512;
             }
         }
         else if (algot == HashAlgorithm::Rainstorm) {
@@ -382,7 +330,7 @@ int main(int argc, char** argv) {
             }
 
             // ADDED: Call the existing puzzleEncryptFileWithHeader with updated header
-            puzzleEncryptFileWithHeader(inpath, encFile, key_input, algot, hash_size, seed, salt, blockSize, nonceSize, searchMode, verbose, deterministicNonce);
+            puzzleEncryptFileWithHeader(inpath, encFile, key_input, algot, hash_size, seed, salt, blockSize, nonceSize, searchMode, verbose, deterministicNonce, output_extension);
             std::cout << "[Enc] Wrote encrypted file to: " << encFile << "\n";
         }
         else if (mode == Mode::StreamEnc) {
