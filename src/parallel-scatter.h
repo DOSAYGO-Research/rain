@@ -2,7 +2,7 @@
 struct ParascatterResult {
   bool found;
   std::vector<uint8_t> chosenNonce;
-  std::vector<uint8_t> scatterIndices;
+  std::vector<uint16_t> scatterIndices;
 };
 
 // Parallel scatter function:
@@ -27,7 +27,7 @@ ParascatterResult parallelParascatter(
   // 2) Shared flag + shared final solution
   std::atomic<bool> found(false);
   std::vector<uint8_t> chosenNonceShared(nonceSize);
-  std::vector<uint8_t> scatterIndicesShared(thisBlockSize);
+  std::vector<uint16_t> scatterIndicesShared(thisBlockSize);
 
   // 3) Launch parallel region
   #pragma omp parallel default(none) \
@@ -36,7 +36,7 @@ ParascatterResult parallelParascatter(
   {
     // Each thread's preallocated buffers
     std::vector<uint8_t> localNonce(nonceSize);
-    std::vector<uint8_t> localScatterIndices(thisBlockSize);
+    std::vector<uint16_t> localScatterIndices(thisBlockSize);
 
     // RNG
     std::mt19937_64 rng(std::random_device{}());
@@ -50,7 +50,7 @@ ParascatterResult parallelParascatter(
     uint8_t resetFlag = 1;
     std::vector<uint8_t> hashOut(hash_size / 8);
     std::vector<uint8_t> extendedOutput(outputExtension);
-    std::array<uint8_t, 256> usedIndices = {};
+    std::array<uint8_t, 65536> usedIndices = {};
     std::vector<uint8_t> finalHashOut;
 
     // 4) Main loop
@@ -114,7 +114,7 @@ ParascatterResult parallelParascatter(
           size_t idx = static_cast<size_t>(std::distance(finalHashOut.begin(), it));
           if (usedIndices[idx] != resetFlag) {
             usedIndices[idx] = resetFlag;
-            localScatterIndices[byteIdx] = static_cast<uint8_t>(idx);
+            localScatterIndices[byteIdx] = static_cast<uint16_t>(idx);
             break;
           }
           it = std::find(std::next(it), finalHashOut.end(), target);
