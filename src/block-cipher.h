@@ -30,8 +30,7 @@
         omp_set_num_threads(halfCores);
 #endif
 
-        //auto compressed = compressData(plainData);
-        auto compressed = plainData;
+        auto compressed = compressData(plainData);
 
         plainData = std::move(compressed);
 
@@ -556,13 +555,10 @@
         std::cout << "\n[Dec] Ciphertext blocks decrypted successfully.\n";
 
         // 5) Decompress the accumulated plaintext
-        //std::vector<uint8_t> decompressedData = decompressData(plaintextAccumulated);
-        std::vector<uint8_t> decompressedData = plaintextAccumulated;
-        /*
+        std::vector<uint8_t> decompressedData = decompressData(plaintextAccumulated);
         if (plaintextAccumulated.size() != hdr.originalSize) {
             throw std::runtime_error("Compressed data size does not match original size.");
         }
-        */
 
         // 6) Write the decompressed plaintext to output file
         std::ofstream fout(outFilename, std::ios::binary);
