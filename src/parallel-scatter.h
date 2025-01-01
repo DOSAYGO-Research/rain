@@ -49,6 +49,7 @@ ParascatterResult parallelParascatter(
 
     std::vector<uint8_t> hashOut(hash_size / 8);
     std::vector<uint8_t> extendedOutput(outputExtension);
+    std::vector<uint8_t> usedIndices(hash_size / 8 + outputExtension, false);
     std::vector<uint8_t> finalHashOut;
 
     // 4) Main loop
@@ -97,7 +98,7 @@ ParascatterResult parallelParascatter(
 
       // Attempt scatter match
       bool allFound = true;
-      std::vector<bool> usedIndices(finalHashOut.size(), false);
+      std::fill(usedIndices.begin(), usedIndices.end(), 0); // Reset all elements to 0
 
       for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
         uint8_t target = block[byteIdx];
@@ -105,7 +106,7 @@ ParascatterResult parallelParascatter(
         while (it != finalHashOut.end()) {
           size_t idx = static_cast<size_t>(std::distance(finalHashOut.begin(), it));
           if (!usedIndices[idx]) {
-            usedIndices[idx] = true;
+            usedIndices[idx] = 1;
             localScatterIndices[byteIdx] = static_cast<uint8_t>(idx);
             break;
           }

@@ -260,7 +260,7 @@
                     }
                     else if (searchModeEnum == 0x02) { // series
                         bool allFound = true;
-                        std::bitset<64> usedIndices;
+                        std::bitset<256> usedIndices;
                         usedIndices.reset();
                         auto it = finalHashOut.begin();
 
@@ -300,7 +300,7 @@
                     }
                     else if (searchModeEnum == 0x03) { // scatter
                         bool allFound = true;
-                        std::bitset<64> usedIndices;
+                        std::bitset<256> usedIndices;
                         usedIndices.reset();
 
                         for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
