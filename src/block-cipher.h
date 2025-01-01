@@ -25,6 +25,11 @@
         );
         fin.close();
 
+#ifdef _OPENMP
+        int halfCores = std::max(1, static_cast<int>(std::thread::hardware_concurrency()) / 2);
+        omp_set_num_threads(halfCores);
+#endif
+
         //auto compressed = compressData(plainData);
         auto compressed = plainData;
 
@@ -163,13 +168,8 @@
                     hash_size,              // Hash size in bits
                     seed,                   // Seed
                     algot,                  // Hash algorithm
-                    verbose,                // Verbose flag
-                    deterministicNonce,     // Deterministic nonce flag
-                    progressInterval        // Progress reporting interval
+                    deterministicNonce     // Deterministic nonce flag
                 );
-
-                // Update total tries
-                uint64_t tries = result.totalTries;
 
                 // Write the nonce and scatter indices
                 fout.write(reinterpret_cast<const char*>(result.chosenNonce.data()), nonceSize);
@@ -177,8 +177,7 @@
 
                 // Progress Reporting
                 std::cerr << "\r[Enc] Mode: parascatter, Block " << (blockIndex + 1)
-                          << "/" << totalBlocks
-                          << ", Total Tries: " << tries << "..." << std::flush;
+                          << "/" << totalBlocks << " " << std::flush;
             }           
 
             // ------------------------------------------------------

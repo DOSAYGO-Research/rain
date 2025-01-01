@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <memory>
+#include <thread>
 #include <iterator>
 #include <zlib.h>
 #include <stdexcept>

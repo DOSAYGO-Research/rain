@@ -1,12 +1,11 @@
-
-
+// Result structure:
 struct ParascatterResult {
-    bool found;
-    std::vector<uint8_t> chosenNonce;
-    std::vector<uint8_t> scatterIndices;
-    uint64_t totalTries;
+  bool found;
+  std::vector<uint8_t> chosenNonce;
+  std::vector<uint8_t> scatterIndices;
 };
 
+// Parallel scatter function:
 ParascatterResult parallelParascatter(
     size_t blockIndex,
     size_t thisBlockSize,
@@ -16,104 +15,99 @@ ParascatterResult parallelParascatter(
     size_t hash_size,
     uint64_t seed,
     HashAlgorithm algot,
-    bool verbose,
-    bool deterministicNonce,
-    size_t progressInterval
+    bool deterministicNonce
 ) {
-    // Initialize result structure
-    ParascatterResult result;
-    result.found = false;
-    result.totalTries = 0;
-    result.chosenNonce.resize(nonceSize, 0);
-    result.scatterIndices.resize(thisBlockSize, 0);
+  // 1) Prepare the result
+  ParascatterResult result;
+  result.found = false;
+  result.chosenNonce.resize(nonceSize, 0);
+  result.scatterIndices.resize(thisBlockSize, 0);
 
-    // Shared data
-    std::atomic<bool> found(false); // Global flag indicating solution found
-    std::atomic<uint64_t> tries(0); // Total tries across threads
-    std::vector<uint8_t> chosenNonceShared(nonceSize, 0); // Shared solution nonce
-    std::vector<uint8_t> scatterIndicesShared(thisBlockSize, 0); // Shared scatter indices
+  // 2) Shared flag + shared final solution
+  std::atomic<bool> found(false);
+  std::vector<uint8_t> chosenNonceShared(nonceSize);
+  std::vector<uint8_t> scatterIndicesShared(thisBlockSize);
 
-    #pragma omp parallel default(none) \
-        shared(block, blockSubkey, found, chosenNonceShared, scatterIndicesShared, tries) \
-        firstprivate(nonceSize, hash_size, seed, algot, deterministicNonce, blockIndex, thisBlockSize)
-    {
-        // Thread-local variables
-        std::vector<uint8_t> localNonce(nonceSize, 0);
-        std::vector<uint8_t> localScatterIndices(thisBlockSize, 0);
-        std::mt19937_64 rng(std::random_device{}());
-        std::uniform_int_distribution<uint8_t> dist(0, 255);
-        uint64_t nonceCounter = 0;
-        uint64_t localTries = 0;
+  // 3) Launch parallel region
+  #pragma omp parallel default(none) \
+    shared(block, blockSubkey, found, chosenNonceShared, scatterIndicesShared) \
+    firstprivate(nonceSize, hash_size, seed, algot, deterministicNonce, blockIndex, thisBlockSize)
+  {
+    // Each thread's preallocated buffers
+    std::vector<uint8_t> localNonce(nonceSize);
+    std::vector<uint8_t> localScatterIndices(thisBlockSize);
 
-        // Preallocate 'trial' and 'hashOut' buffers
-        std::vector<uint8_t> trial(blockSubkey.size() + nonceSize, 0);
-        std::vector<uint8_t> hashOut(hash_size / 8);
+    // RNG
+    std::mt19937_64 rng(std::random_device{}());
+    std::uniform_int_distribution<uint8_t> dist(0, 255);
+    uint64_t nonceCounter = 0;
 
-        // Copy blockSubkey to the first part of the trial buffer
-        std::copy(blockSubkey.begin(), blockSubkey.end(), trial.begin());
+    // Preallocate 'trial' and 'hashOut' buffers
+    std::vector<uint8_t> trial(blockSubkey.size() + nonceSize);
+    std::copy(blockSubkey.begin(), blockSubkey.end(), trial.begin()); // Copy subkey into trial
 
-        while (!found.load(std::memory_order_acquire)) {
-            // Generate a nonce
-            if (deterministicNonce) {
-                for (size_t i = 0; i < nonceSize; ++i) {
-                    localNonce[i] = static_cast<uint8_t>((nonceCounter >> (i * 8)) & 0xFF);
-                }
-                ++nonceCounter;
-            } else {
-                for (size_t i = 0; i < nonceSize; ++i) {
-                    localNonce[i] = dist(rng);
-                }
-            }
+    std::vector<uint8_t> hashOut(hash_size / 8);
 
-            // Build trial buffer
-            std::copy(localNonce.begin(), localNonce.end(), trial.begin() + blockSubkey.size());
+    // 4) Main loop
+    while (!found.load(std::memory_order_acquire)) {
+      // Generate nonce
+      if (deterministicNonce) {
+        for (size_t i = 0; i < nonceSize; ++i) {
+          localNonce[i] = static_cast<uint8_t>((nonceCounter >> (i * 8)) & 0xFF);
+        }
+        ++nonceCounter;
+      } else {
+        for (size_t i = 0; i < nonceSize; ++i) {
+          localNonce[i] = dist(rng);
+        }
+      }
 
-            // Hash the trial buffer
-            invokeHash<false>(algot, seed, trial, hashOut, hash_size);
+      // Build trial buffer
+      std::copy(localNonce.begin(), localNonce.end(),
+                trial.begin() + blockSubkey.size());
 
-            // Check for a valid solution
-            bool allFound = true;
-            std::vector<bool> usedIndices(hashOut.size(), false); // Track used indices
+      // Hash it
+      invokeHash<false>(algot, seed, trial, hashOut, hash_size);
 
-            for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
-                auto it = std::find(hashOut.begin(), hashOut.end(), block[byteIdx]);
-                while (it != hashOut.end()) {
-                    size_t idx = std::distance(hashOut.begin(), it);
-                    if (!usedIndices[idx]) {
-                        localScatterIndices[byteIdx] = static_cast<uint8_t>(idx);
-                        usedIndices[idx] = true;
-                        break;
-                    }
-                    it = std::find(it + 1, hashOut.end(), block[byteIdx]); // Search for next occurrence
-                }
-                if (it == hashOut.end()) {
-                    allFound = false; // If we can't match this byte, the solution is invalid
-                    break;
-                }
-            }
+      // Attempt scatter match
+      bool allFound = true;
+      std::vector<bool> usedIndices(hashOut.size(), false);
 
-            // If a valid solution is found
-            if (allFound) {
-                if (!found.exchange(true, std::memory_order_acq_rel)) {
-                    // Copy the solution to shared data
-                    std::copy(localNonce.begin(), localNonce.end(), chosenNonceShared.begin());
-                    std::copy(localScatterIndices.begin(), localScatterIndices.end(), scatterIndicesShared.begin());
-                }
-                break; // Exit loop as this thread has contributed the solution
-            }
+      for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
+        uint8_t target = block[byteIdx];
+        auto it = std::find(hashOut.begin(), hashOut.end(), target);
+        while (it != hashOut.end()) {
+          size_t idx = static_cast<size_t>(std::distance(hashOut.begin(), it));
+          if (!usedIndices[idx]) {
+            usedIndices[idx] = true;
+            localScatterIndices[byteIdx] = static_cast<uint8_t>(idx);
+            break;
+          }
+          it = std::find(std::next(it), hashOut.end(), target);
+        }
+        if (it == hashOut.end()) {
+          allFound = false;
+          break;
+        }
+      }
 
-            // Increment local and shared tries
-            ++localTries;
-            tries.fetch_add(1, std::memory_order_relaxed);
-        } // End of while loop
-    } // End of parallel region
+      // If success, mark found & copy results
+      if (allFound) {
+        bool expected = false;
+        if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+          chosenNonceShared = localNonce;
+          scatterIndicesShared = localScatterIndices;
+        }
+        break; // This thread can stop
+      }
+    } // end while
+  } // end parallel region
 
-    // Populate result with shared data
-    result.found = true;
-    result.chosenNonce = chosenNonceShared;
-    result.scatterIndices = scatterIndicesShared;
-    result.totalTries = tries.load(std::memory_order_relaxed);
+  // 5) Fill final result
+  result.found = true; // By now a solution was found if the loop ended
+  result.chosenNonce = chosenNonceShared;
+  result.scatterIndices = scatterIndicesShared;
 
-    return result;
+  return result;
 }
 
