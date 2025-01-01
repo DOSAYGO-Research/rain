@@ -1,6 +1,5 @@
 cipher improvement
 
-- allow hash_size / 8 + output_extension to be greater than 256 (adapt used indexes table and index sizes to become larger somehow)
 - implement a js version of enc / dec
 
 Later maybe
