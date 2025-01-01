@@ -15,7 +15,8 @@ ParascatterResult parallelParascatter(
     size_t hash_size,
     uint64_t seed,
     HashAlgorithm algot,
-    bool deterministicNonce
+    bool deterministicNonce,
+    uint32_t outputExtension
 ) {
   // 1) Prepare the result
   ParascatterResult result;
@@ -31,7 +32,7 @@ ParascatterResult parallelParascatter(
   // 3) Launch parallel region
   #pragma omp parallel default(none) \
     shared(block, blockSubkey, found, chosenNonceShared, scatterIndicesShared) \
-    firstprivate(nonceSize, hash_size, seed, algot, deterministicNonce, blockIndex, thisBlockSize)
+    firstprivate(nonceSize, hash_size, seed, algot, deterministicNonce, blockIndex, thisBlockSize, outputExtension)
   {
     // Each thread's preallocated buffers
     std::vector<uint8_t> localNonce(nonceSize);
@@ -47,6 +48,8 @@ ParascatterResult parallelParascatter(
     std::copy(blockSubkey.begin(), blockSubkey.end(), trial.begin()); // Copy subkey into trial
 
     std::vector<uint8_t> hashOut(hash_size / 8);
+    std::vector<uint8_t> extendedOutput(outputExtension);
+    std::vector<uint8_t> finalHashOut;
 
     // 4) Main loop
     while (!found.load(std::memory_order_acquire)) {
@@ -68,24 +71,47 @@ ParascatterResult parallelParascatter(
 
       // Hash it
       invokeHash<false>(algot, seed, trial, hashOut, hash_size);
+      finalHashOut = hashOut;
+
+      // Extend hashOut if outputExtension > 0
+      if (outputExtension > 0) {
+        /*
+        std::vector<uint8_t> prk = derivePRK(
+          trial,       // Input key material: subkey || nonce
+          salt,        // Salt
+          blockSubkey, // IKM (shared subkey as an example)
+          algot,       // Hash algorithm
+          hash_size    // Hash size
+        );
+        */
+
+        extendedOutput = extendOutputKDF(
+          trial,             // PRK derived from trial
+          outputExtension, // Additional length
+          algot,           // Hash algorithm
+          hash_size        // Original hash size
+        );
+
+        finalHashOut.insert(finalHashOut.end(), extendedOutput.begin(), extendedOutput.end());
+      }
 
       // Attempt scatter match
       bool allFound = true;
-      std::vector<bool> usedIndices(hashOut.size(), false);
+      std::vector<bool> usedIndices(finalHashOut.size(), false);
 
       for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
         uint8_t target = block[byteIdx];
-        auto it = std::find(hashOut.begin(), hashOut.end(), target);
-        while (it != hashOut.end()) {
-          size_t idx = static_cast<size_t>(std::distance(hashOut.begin(), it));
+        auto it = std::find(finalHashOut.begin(), finalHashOut.end(), target);
+        while (it != finalHashOut.end()) {
+          size_t idx = static_cast<size_t>(std::distance(finalHashOut.begin(), it));
           if (!usedIndices[idx]) {
             usedIndices[idx] = true;
             localScatterIndices[byteIdx] = static_cast<uint8_t>(idx);
             break;
           }
-          it = std::find(std::next(it), hashOut.end(), target);
+          it = std::find(std::next(it), finalHashOut.end(), target);
         }
-        if (it == hashOut.end()) {
+        if (it == finalHashOut.end()) {
           allFound = false;
           break;
         }
