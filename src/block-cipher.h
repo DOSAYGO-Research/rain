@@ -595,7 +595,7 @@
                 for (size_t j = 0; j < thisBlockSize; j++) {
                     uint16_t idx = scatterIndices[j];
                     if (idx >= finalHashOut.size()) {
-                        std::cerr << "idx " << idx << " final hash out size " << finalHashOut.size() << std::flush;
+                        // std::cerr << "idx " << idx << " final hash out size " << finalHashOut.size() << std::flush;
                         throw std::runtime_error("[Dec] Scatter index out of range.");
                     }
                     block.push_back(finalHashOut[idx]);
