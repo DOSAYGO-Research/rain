@@ -1,11 +1,13 @@
 cipher improvement
 
-- schedule K into block keys via XOF
+- weird get stuck on block 80/81 regardless of mode with block size 8
 - extend effective digest size with XOF as this will add speed for larger blocks (more chances to find P in larger D)
+- ensure det nonce works with parascatter
 - implement a js version of enc / dec
+
+Later maybe
 - test research construct
     weak hash -- digest mining construction --> block cipher --- davies meyer construction ---> strong hash 
 
-Later maybe
 - ensure we print out the inc nonce for mining and rand nonce for mining (right now we just show the iter count, and lose the rand nonce)
 
