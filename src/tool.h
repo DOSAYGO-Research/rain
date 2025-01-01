@@ -699,6 +699,71 @@ enum class HashAlgorithm {
   }
 
 // encrypt/decrypt block mode
+  /* Existing puzzleShowFileInfo function */
+  static void puzzleShowFileInfo(const std::string &inFilename) {
+      std::ifstream fin(inFilename, std::ios::binary);
+      if (!fin.is_open()) {
+          throw std::runtime_error("Cannot open file: " + inFilename);
+      }
+
+      uint32_t magicNumber;
+      uint8_t version;
+      uint8_t blockSize;
+      uint8_t nonceSize;
+      uint16_t hash_size;
+      uint8_t hashNameLength;
+      std::string hashName;
+      uint8_t searchModeEnum;
+      uint64_t originalSize;
+
+      fin.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
+      fin.read(reinterpret_cast<char*>(&version), sizeof(version));
+      fin.read(reinterpret_cast<char*>(&blockSize), sizeof(blockSize));
+      fin.read(reinterpret_cast<char*>(&nonceSize), sizeof(nonceSize));
+      fin.read(reinterpret_cast<char*>(&hash_size), sizeof(hash_size));
+      fin.read(reinterpret_cast<char*>(&hashNameLength), sizeof(hashNameLength));
+
+      if (!fin.good()) {
+          throw std::runtime_error("File too small or truncated header.");
+      }
+
+      hashName.resize(hashNameLength);
+      fin.read(&hashName[0], hashNameLength);
+      fin.read(reinterpret_cast<char*>(&searchModeEnum), sizeof(searchModeEnum));
+      fin.read(reinterpret_cast<char*>(&originalSize), sizeof(originalSize));
+
+      fin.close();
+
+      if (magicNumber != MagicNumber) {
+          throw std::runtime_error("Invalid magic number (not an RCRY file).");
+      }
+
+      std::string searchMode;
+      switch (searchModeEnum) {
+          case 0x00: searchMode = "prefix"; break;
+          case 0x01: searchMode = "sequence"; break;
+          case 0x02: searchMode = "series"; break;
+          case 0x03: searchMode = "scatter"; break;
+          case 0x04: searchMode = "mapscatter"; break;
+          case 0x05: searchMode = "parascatter"; break;
+          default:   searchMode = "unknown"; break;
+      }
+
+      size_t totalBlocks = (originalSize + blockSize - 1) / blockSize;
+
+      std::cout << "=== File Header Info ===\n";
+      std::cout << "Magic: RCRY (0x" << std::hex << magicNumber << std::dec << ")\n";
+      std::cout << "Version: " << static_cast<int>(version) << "\n";
+      std::cout << "Block Size: " << static_cast<int>(blockSize) << "\n";
+      std::cout << "Nonce Size: " << static_cast<int>(nonceSize) << "\n";
+      std::cout << "Hash Size: " << hash_size << " bits\n";
+      std::cout << "Hash Algorithm: " << hashName << "\n";
+      std::cout << "Search Mode: " << searchMode << "\n";
+      std::cout << "Compressed Plaintext Size: " << originalSize << " bytes\n";
+      std::cout << "Total Blocks: " << totalBlocks << "\n";
+      std::cout << "========================\n";
+  }
+
   static void puzzleEncryptFileWithHeader(
       const std::string &inFilename,
       const std::string &outFilename,
