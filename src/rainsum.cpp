@@ -108,7 +108,6 @@ int main(int argc, char** argv) {
         // Convert Seed (either numeric or hex string)
         std::string seed_str = result["seed"].as<std::string>();
         uint64_t seed = 0;
-        bool userProvidedSeed = false;
         if (!seed_str.empty()) {
             try {
                 if (seed_str.find("0x") == 0 || seed_str.find("0X") == 0) {
@@ -117,7 +116,6 @@ int main(int argc, char** argv) {
                 else {
                     seed = std::stoull(seed_str, nullptr, 10);
                 }
-                userProvidedSeed = true;
             }
             catch (...) {
                 // If not a valid number, hash the string to 64 bits

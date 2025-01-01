@@ -47,14 +47,21 @@ ParascatterResult parallelParascatter(
     std::vector<uint8_t> trial(blockSubkey.size() + nonceSize);
     std::copy(blockSubkey.begin(), blockSubkey.end(), trial.begin()); // Copy subkey into trial
 
-    uint8_t resetFlag = 0;
+    uint8_t resetFlag = 1;
     std::vector<uint8_t> hashOut(hash_size / 8);
     std::vector<uint8_t> extendedOutput(outputExtension);
-    std::vector<uint8_t> usedIndices(hash_size / 8 + outputExtension, false);
+    std::array<uint8_t, 256> usedIndices = {};
     std::vector<uint8_t> finalHashOut;
 
     // 4) Main loop
     while (!found.load(std::memory_order_acquire)) {
+      if (resetFlag == std::numeric_limits<uint8_t>::max()) {
+        std::fill(usedIndices.begin(), usedIndices.end(), 0);
+        resetFlag = 1;
+      } else {
+        ++resetFlag;
+      }
+
       // Generate nonce
       if (deterministicNonce) {
         for (size_t i = 0; i < nonceSize; ++i) {
@@ -99,7 +106,6 @@ ParascatterResult parallelParascatter(
 
       // Attempt scatter match
       bool allFound = true;
-      ++resetFlag;
 
       for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
         uint8_t target = block[byteIdx];

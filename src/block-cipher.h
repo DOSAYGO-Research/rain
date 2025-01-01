@@ -15,6 +15,13 @@
         bool deterministicNonce,
         uint32_t outputExtension
     ) {
+        if (hash_size / 8 + outputExtension > 256) {
+          std::cerr << "[Warning] Total output length ("
+                      << hash_size / 8 + outputExtension
+                      << ") exceeds the cap of 256 bytes.\n";
+          outputExtension = std::min(outputExtension, 256 - hash_size / 8);
+          std::cerr << "[Warning] Capping outputExtension to " << outputExtension << "\n" ;
+        }
         // 1) Read & compress plaintext
         std::ifstream fin(inFilename, std::ios::binary);
         if (!fin.is_open()) {
