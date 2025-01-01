@@ -26,7 +26,7 @@
         fin.close();
 
 #ifdef _OPENMP
-        int halfCores = std::max(1, static_cast<int>(std::thread::hardware_concurrency()) / 2);
+        int halfCores = std::max(1, 1 + static_cast<int>(std::thread::hardware_concurrency()) / 2);
         omp_set_num_threads(halfCores);
 #endif
 
