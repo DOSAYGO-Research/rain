@@ -1,6 +1,6 @@
 CXX = clang++
 CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O3 
-CXXFLAGS += -g -fsanitize=thread
+#CXXFLAGS += -g -fsanitize=address
 CXXFLAGS += -isysroot $(shell xcrun --show-sdk-path)
 CXXFLAGS += -fuse-ld=ld -lz
 DEPFLAGS = -MMD -MF $(@:.o=.d)

@@ -6,8 +6,8 @@ EMCC = emcc
 CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O3
 CXXFLAGS += -isysroot $(shell xcrun --show-sdk-path)
 # for omp thread debugging
-CXXFLAGS += -g -fsanitize=thread -fopenmp -I/opt/homebrew/opt/llvm/include
-#CXXFLAGS += -fopenmp -I/opt/homebrew/opt/llvm/include
+#CXXFLAGS += -g -fsanitize=thread -fopenmp -I/opt/homebrew/opt/llvm/include
+CXXFLAGS += -fopenmp -I/opt/homebrew/opt/llvm/include
 DEPFLAGS = -MMD -MF $(@:.o=.d)
 
 LDFLAGS = -fopenmp -L/opt/homebrew/opt/llvm/lib -lz -lc++

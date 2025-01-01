@@ -208,6 +208,540 @@ static void showFileFullInfo(const std::string &inFilename) {
     std::cout << "Search Mode Enum: 0x" << std::hex << static_cast<int>(hdr.searchModeEnum) << std::dec << "\n";
     std::cout << "===============================\n";
 }
+  // parallel scatter
+    // A struct to hold all the parameters we need in parallel
+    struct ParascatterArgs {
+      size_t blockIndex;
+      size_t thisBlockSize;
+      std::vector<uint8_t> block;
+      std::vector<uint8_t> blockSubkey;
+      size_t nonceSize;
+      size_t hash_size;
+      uint64_t seed;
+      HashAlgorithm algot;
+      bool verbose;
+      bool deterministicNonce;
+      size_t progressInterval;
+      // Note: We can't store references, but we can store pointers or a std::ofstream*.
+      std::ofstream* fout;
+    };
+
+    void parallelParascatter(
+        size_t blockIndex,
+        size_t thisBlockSize,
+        const std::vector<uint8_t>& block,
+        const std::vector<uint8_t>& blockSubkey,
+        size_t nonceSize,
+        size_t hash_size,
+        uint64_t seed,
+        HashAlgorithm algot,
+        std::ofstream& fout,
+        bool verbose,
+        bool deterministicNonce,
+        size_t progressInterval
+    ) {
+      // Step 1: Heap-allocate a struct and copy all parameters into it
+      std::unique_ptr<ParascatterArgs> args(new ParascatterArgs{
+        blockIndex,
+        thisBlockSize,
+        block,
+        blockSubkey,
+        nonceSize,
+        hash_size,
+        seed,
+        algot,
+        verbose,
+        deterministicNonce,
+        progressInterval,
+        &fout
+      });
+
+      // Step 2: Shared data for solution
+      std::atomic<bool> found(false);
+      std::vector<uint8_t> chosenNonce(args->nonceSize, 0);
+      std::vector<uint8_t> scatterIndices(args->thisBlockSize, 0);
+
+      // Step 3: Mutexes
+      static std::mutex consoleMutex;
+      static std::mutex stateMutex;
+      uint64_t tries;
+
+      // Step 4: Parallel region. 
+      // We pass the pointer 'args.get()' as shared, so nobody touches the main thread’s stack.
+      #pragma omp parallel default(none) \
+        shared(args, found, chosenNonce, scatterIndices, consoleMutex, stateMutex, std::cout, std::cerr, block, thisBlockSize) private(blockIndex) firstprivate(nonceSize, hash_size, seed, verbose, deterministicNonce, progressInterval)
+      {
+        // Thread-local variables
+        std::vector<uint8_t> localNonce(args->nonceSize);
+        std::vector<uint8_t> localScatterIndices(args->thisBlockSize);
+
+        std::mt19937_64 rng(std::random_device{}());
+        std::uniform_int_distribution<uint8_t> dist(0, 255);
+
+        uint64_t nonceCounter = 0;
+        uint64_t tries;
+
+        for (tries = 0; !found.load(std::memory_order_acquire); ) {
+          // Generate nonce
+          if (args->deterministicNonce) {
+            for (size_t i = 0; i < args->nonceSize; ++i) {
+              localNonce[i] = static_cast<uint8_t>((nonceCounter >> (i * 8)) & 0xFF);
+            }
+            #pragma omp atomic
+            ++nonceCounter;
+          } else {
+            for (size_t i = 0; i < args->nonceSize; ++i) {
+              localNonce[i] = dist(rng);
+            }
+          }
+
+          // Build trial buffer
+          std::vector<uint8_t> trial(args->blockSubkey);
+          trial.insert(trial.end(), localNonce.begin(), localNonce.end());
+
+          // Hash it
+          std::vector<uint8_t> hashOut(args->hash_size / 8);
+          invokeHash<false>(args->algot, args->seed, trial, hashOut, args->hash_size);
+
+          bool allFound = true;
+          std::bitset<64> usedIndices;
+          usedIndices.reset();
+
+          for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
+            auto it = hashOut.begin();
+            while (it != hashOut.end()) {
+              it = std::find(it, hashOut.end(), block[byteIdx]);
+              if (it != hashOut.end()) {
+                uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                if (!usedIndices.test(idx)) {
+                  localScatterIndices[byteIdx] = idx;
+                  usedIndices.set(idx);
+                  break;
+                }
+                ++it;
+              } else {
+                allFound = false;
+                break;
+              }
+            }
+            if (it == hashOut.end()) {
+                allFound = false;
+                break;
+            }
+          }
+
+          if (allFound) {
+            if (verbose) {
+              // Synchronize console output
+              std::lock_guard<std::mutex> lock(consoleMutex);
+              std::cout << "Scatter Indices: ";
+              for (auto idx : localScatterIndices) {
+                std::cout << static_cast<int>(idx) << " ";
+              }
+              std::cout << std::endl;
+            }
+
+            #pragma omp critical
+            {
+              std::lock_guard<std::mutex> lock(stateMutex);
+              if (!found.exchange(true, std::memory_order_acq_rel)) {
+                chosenNonce = localNonce;
+                scatterIndices = localScatterIndices;
+                found.store(true);
+              }
+            }
+            break;
+          }
+
+          tries++;
+        } // End of tries loop
+        if (tries % progressInterval == 0) {
+          // Synchronize console output
+          std::lock_guard<std::mutex> lock(consoleMutex);
+          std::cerr << "\r[Enc] Mode: parascatter, Block " << (blockIndex + 1)
+                      << ", Tries: " << tries << "..." << std::flush;
+        }
+
+      } // End of parallel region
+      // Periodic progress reporting
+
+      if (found.load(std::memory_order_acquire)) {
+        args->fout->write(reinterpret_cast<const char*>(chosenNonce.data()), nonceSize);
+        args->fout->write(reinterpret_cast<const char*>(scatterIndices.data()), scatterIndices.size());
+      } else {
+        throw std::runtime_error("Failed to find a solution for parascatter block.");
+      }
+    }
+
+  // encrypt block cipher
+    static void puzzleEncryptFileWithHeader(
+        const std::string &inFilename,
+        const std::string &outFilename,
+        const std::string &key,
+        HashAlgorithm algot,
+        uint32_t hash_size,
+        uint64_t seed,             // Used as IV
+        std::vector<uint8_t> salt, // Provided salt
+        size_t blockSize,
+        size_t nonceSize,
+        const std::string &searchMode,
+        bool verbose,
+        bool deterministicNonce
+    ) {
+        // 1) Read & compress plaintext
+        std::ifstream fin(inFilename, std::ios::binary);
+        if (!fin.is_open()) {
+            throw std::runtime_error("Cannot open input file: " + inFilename);
+        }
+        std::vector<uint8_t> plainData(
+            (std::istreambuf_iterator<char>(fin)),
+            (std::istreambuf_iterator<char>())
+        );
+        fin.close();
+
+        //auto compressed = compressData(plainData);
+        auto compressed = plainData;
+
+        plainData = std::move(compressed);
+
+        // 2) Prepare output & new FileHeader
+        std::ofstream fout(outFilename, std::ios::binary);
+        if (!fout.is_open()) {
+            throw std::runtime_error("Cannot open output file: " + outFilename);
+        }
+
+        // 3) Determine searchModeEnum based on searchMode string
+        uint8_t searchModeEnum = 0xFF; // Default for Stream Cipher Mode
+        if (algot == HashAlgorithm::Rainbow || algot == HashAlgorithm::Rainstorm) { // Only for Block Cipher Modes
+            if (searchMode == "prefix") {
+                searchModeEnum = 0x00;
+            }
+            else if (searchMode == "sequence") {
+                searchModeEnum = 0x01;
+            }
+            else if (searchMode == "series") {
+                searchModeEnum = 0x02;
+            }
+            else if (searchMode == "scatter") {
+                searchModeEnum = 0x03;
+            }
+            else if (searchMode == "mapscatter") {
+                searchModeEnum = 0x04;
+            }
+            else if (searchMode == "parascatter") {
+                searchModeEnum = 0x05;
+            }
+            else {
+                throw std::runtime_error("Invalid search mode: " + searchMode);
+            }
+        }
+
+        // 4) Build the new FileHeader
+        FileHeader hdr{};
+        hdr.magic        = MagicNumber;
+        hdr.version      = 0x02;       // New version
+        hdr.cipherMode   = 0x11;       // 0x11 for “Block Cipher + puzzle”
+        hdr.blockSize    = static_cast<uint8_t>(blockSize);
+        hdr.nonceSize    = static_cast<uint8_t>(nonceSize);
+        hdr.hashSizeBits = hash_size;
+        hdr.hashName     = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
+        hdr.iv           = seed;       // The seed as our “IV”
+
+        // 5) Assign provided salt
+        hdr.saltLen = static_cast<uint8_t>(salt.size());
+        hdr.salt    = salt;
+
+        // 6) Assign original (compressed) size
+        hdr.originalSize = plainData.size();
+
+        // 7) Assign searchModeEnum
+        hdr.searchModeEnum = searchModeEnum;
+
+        // 8) Write the unified header
+        writeFileHeader(fout, hdr);
+
+        // 9) Prepare puzzle searching
+        size_t totalBlocks = (hdr.originalSize + blockSize - 1) / blockSize;
+        int progressInterval = 1'000'000;
+
+        // 10) Derive a “master PRK” from (seed, salt, key)
+        // Using your iterative KDF
+        std::vector<uint8_t> keyBuf(key.begin(), key.end());
+        // Convert seed (uint64_t) to vector<uint8_t>
+        std::vector<uint8_t> seed_vec(8);
+        for (size_t i = 0; i < 8; ++i) {
+            seed_vec[i] = static_cast<uint8_t>((seed >> (i * 8)) & 0xFF);
+        }
+
+        std::vector<uint8_t> prk = derivePRK(
+            seed_vec,          // Converted seed as vector<uint8_t>
+            salt,              // Provided salt
+            keyBuf,            // IKM (Input Key Material)
+            algot,             // Hash algorithm
+            hash_size          // Hash size in bits
+        );
+
+        // 11) Extend that PRK into subkeys for each block
+        // Each subkey is hash_size/8 bytes
+        size_t subkeySize = hdr.hashSizeBits / 8;
+        size_t totalNeeded = totalBlocks * subkeySize;
+        std::vector<uint8_t> allSubkeys = extendOutputKDF(
+            prk,
+            totalNeeded,
+            algot,
+            hdr.hashSizeBits
+        );
+
+        // 12) Initialize RNG for non-deterministic nonce generation
+        std::mt19937_64 rng(std::random_device{}());
+        std::uniform_int_distribution<uint8_t> dist(0, 255);
+        uint64_t nonceCounter = 0;
+
+        size_t remaining = hdr.originalSize;
+        // For mapscatter arrays
+        uint8_t reverseMap[256 * 64] = {0};
+        uint8_t reverseMapOffsets[256] = {0};
+
+        // 13) Iterate over each block to perform puzzle encryption
+        for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
+            size_t thisBlockSize = std::min(blockSize, remaining);
+            remaining -= thisBlockSize;
+
+            // Extract this block
+            std::vector<uint8_t> block(
+                plainData.begin() + blockIndex * blockSize,
+                plainData.begin() + blockIndex * blockSize + thisBlockSize
+            );
+
+            // Extract subkey for this block
+            const size_t offset = blockIndex * subkeySize;
+            if (offset + subkeySize > allSubkeys.size()) {
+                throw std::runtime_error("Subkey index out of range.");
+            }
+            std::vector<uint8_t> blockSubkey(
+                allSubkeys.begin() + offset,
+                allSubkeys.begin() + offset + subkeySize
+            );
+
+            // -----------------------
+            // parascatter branch
+            // -----------------------
+
+            if (searchModeEnum == 0x05) { // parascatter
+              parallelParascatter(
+                blockIndex,             // Current block index
+                thisBlockSize,          // Size of this block
+                block,                  // Block data
+                blockSubkey,            // Subkey for this block
+                nonceSize,              // Nonce size
+                hash_size,              // Hash size in bits
+                seed,                   // Seed
+                algot,                  // Hash algorithm
+                fout,                   // Output file stream
+                verbose,                // Verbose flag
+                deterministicNonce,     // Deterministic nonce flag
+                progressInterval        // Progress reporting interval
+              );
+            }
+
+            // ------------------------------------------------------
+            // other modes in else branch
+            // ------------------------------------------------------
+            else {
+                // We'll fill these once a solution is found
+                bool found = false;
+                std::vector<uint8_t> chosenNonce(nonceSize, 0);
+                std::vector<uint8_t> scatterIndices(thisBlockSize, 0);
+
+                for (uint64_t tries = 0; ; tries++) {
+                    // Generate the nonce
+                    if (deterministicNonce) {
+                        for (size_t i = 0; i < nonceSize; i++) {
+                            chosenNonce[i] = static_cast<uint8_t>((nonceCounter >> (i * 8)) & 0xFF);
+                        }
+                        nonceCounter++;
+                    }
+                    else {
+                        for (size_t i = 0; i < nonceSize; i++) {
+                            chosenNonce[i] = dist(rng);
+                        }
+                    }
+
+                    // Build trial buffer
+                    std::vector<uint8_t> trial(blockSubkey);
+                    trial.insert(trial.end(), chosenNonce.begin(), chosenNonce.end());
+
+                    // Hash it
+                    std::vector<uint8_t> hashOut(hash_size / 8);
+                    invokeHash<false>(algot, seed, trial, hashOut, hash_size);
+
+                    if (searchModeEnum == 0x00) { // prefix
+                        if (hashOut.size() >= thisBlockSize &&
+                            std::equal(block.begin(), block.end(), hashOut.begin())) {
+                            scatterIndices.assign(thisBlockSize, 0);
+                            found = true;
+                        }
+                    }
+                    else if (searchModeEnum == 0x01) { // sequence
+                        for (size_t i = 0; i <= hashOut.size() - thisBlockSize; i++) {
+                            if (std::equal(block.begin(), block.end(), hashOut.begin() + i)) {
+                                uint8_t startIdx = static_cast<uint8_t>(i);
+                                scatterIndices.assign(thisBlockSize, startIdx);
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    else if (searchModeEnum == 0x02) { // series
+                        bool allFound = true;
+                        std::bitset<64> usedIndices;
+                        usedIndices.reset();
+                        auto it = hashOut.begin();
+
+                        for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+                            while (it != hashOut.end()) {
+                                it = std::find(it, hashOut.end(), block[byteIdx]);
+                                if (it != hashOut.end()) {
+                                    uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                                    if (!usedIndices.test(idx)) {
+                                        scatterIndices[byteIdx] = idx;
+                                        usedIndices.set(idx);
+                                        break;
+                                    }
+                                    ++it;
+                                }
+                                else {
+                                    allFound = false;
+                                    break;
+                                }
+                            }
+                            if (it == hashOut.end()) {
+                                allFound = false;
+                                break;
+                            }
+                        }
+
+                        if (allFound) {
+                            found = true;
+                            if (verbose) {
+                                std::cout << "Series Indices: ";
+                                for (auto idx : scatterIndices) {
+                                    std::cout << static_cast<int>(idx) << " ";
+                                }
+                                std::cout << std::endl;
+                            }
+                        }
+                    }
+                    else if (searchModeEnum == 0x03) { // scatter
+                        bool allFound = true;
+                        std::bitset<64> usedIndices;
+                        usedIndices.reset();
+
+                        for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+                            auto it = hashOut.begin();
+                            while (it != hashOut.end()) {
+                                it = std::find(it, hashOut.end(), block[byteIdx]);
+                                if (it != hashOut.end()) {
+                                    uint8_t idx = static_cast<uint8_t>(std::distance(hashOut.begin(), it));
+                                    if (!usedIndices.test(idx)) {
+                                        scatterIndices[byteIdx] = idx;
+                                        usedIndices.set(idx);
+                                        break;
+                                    }
+                                    ++it;
+                                }
+                                else {
+                                    allFound = false;
+                                    break;
+                                }
+                            }
+                            if (it == hashOut.end()) {
+                                allFound = false;
+                                break;
+                            }
+                        }
+
+                        if (allFound) {
+                            found = true;
+                            if (verbose) {
+                                std::cout << "Scatter Indices: ";
+                                for (auto idx : scatterIndices) {
+                                    std::cout << static_cast<int>(idx) << " ";
+                                }
+                                std::cout << std::endl;
+                            }
+                        }
+                    }
+                    else if (searchModeEnum == 0x04) { // mapscatter
+                        // Reset offsets
+                        std::fill(std::begin(reverseMapOffsets), std::end(reverseMapOffsets), 0);
+
+                        // Fill the map with all positions of each byte in hashOut
+                        for (uint8_t i = 0; i < hashOut.size(); i++) {
+                            uint8_t b = hashOut[i];
+                            reverseMap[b * 64 + reverseMapOffsets[b]] = i;
+                            reverseMapOffsets[b]++;
+                        }
+
+                        bool allFound = true;
+                        for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
+                            uint8_t targetByte = block[byteIdx];
+                            if (reverseMapOffsets[targetByte] == 0) {
+                                allFound = false;
+                                break;
+                            }
+                            reverseMapOffsets[targetByte]--;
+                            scatterIndices[byteIdx] =
+                                reverseMap[targetByte * 64 + reverseMapOffsets[targetByte]];
+                        }
+
+                        if (allFound) {
+                            found = true;
+                            if (verbose) {
+                                std::cout << "Scatter Indices: ";
+                                for (auto idx : scatterIndices) {
+                                    std::cout << static_cast<int>(idx) << " ";
+                                }
+                                std::cout << std::endl;
+                            }
+                        }
+                    }
+
+                    if (found) {
+                        // For non-parallel modes, write nonce and indices
+                        fout.write(reinterpret_cast<const char*>(chosenNonce.data()), nonceSize);
+                        if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) {
+                            fout.write(reinterpret_cast<const char*>(scatterIndices.data()), scatterIndices.size());
+                        }
+                        else {
+                            // prefix or sequence
+                            uint8_t startIdx = scatterIndices[0];
+                            fout.write(reinterpret_cast<const char*>(&startIdx), sizeof(startIdx));
+                        }
+                        break; // done with this block
+                    }
+
+                    // Periodic progress for non-parallel tries
+                    if (tries % progressInterval == 0) {
+                        std::cerr << "\r[Enc] Mode: " << searchMode
+                                  << ", Block " << (blockIndex + 1) << "/" << totalBlocks
+                                  << ", " << tries << " tries..." << std::flush;
+                    }
+                } // end tries loop
+
+                // Display block progress
+                if (verbose) {
+                    std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks << " processed.\n";
+                }
+
+            } // end else (other modes)
+
+        } // end block loop
+
+        fout.close();
+        std::cout << "[Enc] Block-based puzzle encryption with subkeys complete: " << outFilename << "\n";
+    }
+
 
 // =================================================================
 // ADDED: Main Function with Additions Only
