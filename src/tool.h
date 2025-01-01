@@ -198,6 +198,83 @@ enum class HashAlgorithm {
     }
   }
 
+// ADDED: Unified FileHeader struct to include IV and Salt
+struct FileHeader {
+    uint32_t magic;             // MagicNumber
+    uint8_t version;            // Version
+    uint8_t cipherMode;         // Mode: 0x10 = Stream, 0x11 = Block
+    uint8_t blockSize;          // Block size in bytes (for block cipher)
+    uint8_t nonceSize;          // Nonce size in bytes
+    uint16_t hashSizeBits;      // Hash size in bits
+    std::string hashName;       // Hash algorithm name
+    uint64_t iv;                // 64-bit IV (seed)
+    uint8_t saltLen;            // Length of salt
+    std::vector<uint8_t> salt;  // Salt data
+    uint8_t searchModeEnum;     // Search mode enum (0x00 - 0x05 for block ciphers, 0xFF for stream)
+    uint64_t originalSize;      // Compressed plaintext size
+};
+
+// ADDED: Function to write the unified FileHeader
+static void writeFileHeader(std::ofstream &out, const FileHeader &hdr) {
+    out.write(reinterpret_cast<const char*>(&hdr.magic), sizeof(hdr.magic));
+    out.write(reinterpret_cast<const char*>(&hdr.version), sizeof(hdr.version));
+    out.write(reinterpret_cast<const char*>(&hdr.cipherMode), sizeof(hdr.cipherMode));
+    out.write(reinterpret_cast<const char*>(&hdr.blockSize), sizeof(hdr.blockSize));
+    out.write(reinterpret_cast<const char*>(&hdr.nonceSize), sizeof(hdr.nonceSize));
+    out.write(reinterpret_cast<const char*>(&hdr.hashSizeBits), sizeof(hdr.hashSizeBits));
+    
+    uint8_t hnLen = static_cast<uint8_t>(hdr.hashName.size());
+    out.write(reinterpret_cast<const char*>(&hnLen), sizeof(hnLen));
+    out.write(hdr.hashName.data(), hnLen);
+    
+    out.write(reinterpret_cast<const char*>(&hdr.iv), sizeof(hdr.iv));
+    
+    out.write(reinterpret_cast<const char*>(&hdr.saltLen), sizeof(hdr.saltLen));
+    if (hdr.saltLen > 0) {
+        out.write(reinterpret_cast<const char*>(hdr.salt.data()), hdr.salt.size());
+    }
+    
+    out.write(reinterpret_cast<const char*>(&hdr.searchModeEnum), sizeof(hdr.searchModeEnum));
+    out.write(reinterpret_cast<const char*>(&hdr.originalSize), sizeof(hdr.originalSize));
+}
+
+// ADDED: Function to read the unified FileHeader
+static FileHeader readFileHeader(std::ifstream &in) {
+    FileHeader hdr{};
+    in.read(reinterpret_cast<char*>(&hdr.magic), sizeof(hdr.magic));
+    in.read(reinterpret_cast<char*>(&hdr.version), sizeof(hdr.version));
+    in.read(reinterpret_cast<char*>(&hdr.cipherMode), sizeof(hdr.cipherMode));
+    in.read(reinterpret_cast<char*>(&hdr.blockSize), sizeof(hdr.blockSize));
+    in.read(reinterpret_cast<char*>(&hdr.nonceSize), sizeof(hdr.nonceSize));
+    in.read(reinterpret_cast<char*>(&hdr.hashSizeBits), sizeof(hdr.hashSizeBits));
+    
+    uint8_t hnLen;
+    in.read(reinterpret_cast<char*>(&hnLen), sizeof(hnLen));
+    hdr.hashName.resize(hnLen);
+    in.read(&hdr.hashName[0], hnLen);
+    
+    in.read(reinterpret_cast<char*>(&hdr.iv), sizeof(hdr.iv));
+    
+    in.read(reinterpret_cast<char*>(&hdr.saltLen), sizeof(hdr.saltLen));
+    hdr.salt.resize(hdr.saltLen);
+    if (hdr.saltLen > 0) {
+        in.read(reinterpret_cast<char*>(hdr.salt.data()), hdr.saltLen);
+    }
+    
+    in.read(reinterpret_cast<char*>(&hdr.searchModeEnum), sizeof(hdr.searchModeEnum));
+    in.read(reinterpret_cast<char*>(&hdr.originalSize), sizeof(hdr.originalSize));
+    
+    return hdr;
+}
+
+// ADDED: Function to check if a file is in Stream Cipher mode
+static bool fileIsStreamMode(const std::string &filename) {
+    std::ifstream fin(filename, std::ios::binary);
+    if (!fin.is_open()) return false;
+    FileHeader hdr = readFileHeader(fin);
+    fin.close();
+    return (hdr.magic == MagicNumber) && (hdr.cipherMode == 0x10); // 0x10 = Stream Cipher
+}
 // ------------------------------------------------------------------
 // Mining Mode Operator>>(std::istream&, MineMode&) Implementation
 //    (If you haven't placed this in tool.h, it can go here)
@@ -698,6 +775,92 @@ enum class HashAlgorithm {
               << "  --match-prefix <hexstring>               Hex prefix to match for mining tasks\n";
   }
 
+// prk and xof
+// ADDED: KDF with Iterations and Info
+  static const std::string KDF_INFO_STRING = "powered by Rain hashes created by Cris and DOSYAGO (aka DOSAYGO) over the years 2023 through 2025";
+  static const int KDF_ITERATIONS = 8;
+  static const int XOF_ITERATIONS = 4;
+  static const int DE_ITERATIONS = 1;
+
+  // ADDED: Derive PRK with iterations
+  static std::vector<uint8_t> derivePRK(
+    const std::vector<uint8_t> &seed,
+    const std::vector<uint8_t> &salt,
+    const std::vector<uint8_t> &ikm,
+    HashAlgorithm algot,
+    uint32_t hash_bits) {
+      // Combine salt || ikm || info
+      std::vector<uint8_t> combined;
+      combined.reserve(salt.size() + ikm.size() + KDF_INFO_STRING.size());
+      combined.insert(combined.end(), salt.begin(), salt.end());
+      combined.insert(combined.end(), ikm.begin(), ikm.end());
+      combined.insert(combined.end(), KDF_INFO_STRING.begin(), KDF_INFO_STRING.end());
+      
+      std::vector<uint8_t> prk(hash_bits / 8, 0);
+      std::vector<uint8_t> temp(combined);
+
+      // Convert first 8 bytes of seed vector to uint64_t (little-endian)
+      uint64_t seed_num = 0;
+      for (size_t j = 0; j < std::min(static_cast<size_t>(8), seed.size()); ++j) {
+          seed_num |= static_cast<uint64_t>(seed[j]) << (j * 8);
+      }
+      
+      // Iterate the hash function KDF_ITERATIONS times
+      for (int i = 0; i < KDF_ITERATIONS; ++i) {
+          invokeHash<false>(algot, seed_num, temp, prk, hash_bits);
+          temp = prk; // Next iteration takes the output of the previous
+      }
+      
+      return prk;
+  }
+
+  // ADDED: Extend Output with iterations and counter
+  static std::vector<uint8_t> extendOutputKDF(
+    const std::vector<uint8_t> &prk,
+    size_t totalLen,
+    HashAlgorithm algot,
+    uint32_t hash_bits) {
+      std::vector<uint8_t> out;
+      out.reserve(totalLen);
+      
+      uint64_t counter = 1;
+      std::vector<uint8_t> kn = prk; // Initial K_n = PRK
+      
+      while (out.size() < totalLen) {
+          // Combine PRK || info || counter
+          std::vector<uint8_t> combined;
+          combined.reserve(kn.size() + KDF_INFO_STRING.size() + 8); // 8 bytes for counter
+          combined.insert(combined.end(), prk.begin(), prk.end());
+          combined.insert(combined.end(), KDF_INFO_STRING.begin(), KDF_INFO_STRING.end());
+          
+          // Append counter in big-endian
+          for (int i = 7; i >= 0; --i) {
+              combined.push_back(static_cast<uint8_t>((counter >> (i * 8)) & 0xFF));
+          }
+          
+          // Iterate the hash function KDF_ITERATIONS times
+          std::vector<uint8_t> temp(combined);
+          std::vector<uint8_t> kn_next(hash_bits / 8, 0);
+          for (int i = 0; i < KDF_ITERATIONS; ++i) {
+              invokeHash<false>(algot, 0, temp, kn_next, hash_bits);
+              temp = kn_next;
+          }
+          
+          // Update K_n
+          kn = kn_next;
+          
+          // Append to output
+          size_t remaining = totalLen - out.size();
+          size_t to_copy = std::min(static_cast<size_t>(kn.size()), remaining);
+          out.insert(out.end(), kn.begin(), kn.begin() + to_copy);
+          
+          counter++;
+      }
+      
+      out.resize(totalLen);
+      return out;
+  }
+
 // encrypt/decrypt block mode
   /* Existing puzzleShowFileInfo function */
   static void puzzleShowFileInfo(const std::string &inFilename) {
@@ -770,14 +933,15 @@ enum class HashAlgorithm {
       const std::string &key,
       HashAlgorithm algot,
       uint32_t hash_size,
-      uint64_t seed,
+      uint64_t seed,             // Used as IV
+      std::vector<uint8_t> salt, // Provided salt
       size_t blockSize,
       size_t nonceSize,
       const std::string &searchMode,
       bool verbose,
       bool deterministicNonce
   ) {
-      // Open input file
+      // 1) Read & compress plaintext
       std::ifstream fin(inFilename, std::ios::binary);
       if (!fin.is_open()) {
           throw std::runtime_error("Cannot open input file: " + inFilename);
@@ -788,96 +952,132 @@ enum class HashAlgorithm {
       );
       fin.close();
 
-      // Open output file
+      auto compressed = compressData(plainData);
+      plainData = std::move(compressed);
+
+      // 2) Prepare output & new FileHeader
       std::ofstream fout(outFilename, std::ios::binary);
       if (!fout.is_open()) {
           throw std::runtime_error("Cannot open output file: " + outFilename);
       }
 
-      // Write header
-      uint32_t magicNumber = MagicNumber;
-      uint8_t version = 0x01;
-      uint8_t blockSize8 = static_cast<uint8_t>(blockSize);
-      uint8_t nonceSize8 = static_cast<uint8_t>(nonceSize);
-      uint16_t digestSize16 = static_cast<uint16_t>(hash_size);
-
-      // Determine searchModeEnum
-      uint8_t searchModeEnum = 0x00; // Default to 'prefix'
-      if (searchMode == "prefix") {
-          searchModeEnum = 0x00;
-      }
-      else if (searchMode == "sequence") {
-          searchModeEnum = 0x01;
-      }
-      else if (searchMode == "series") {
-          searchModeEnum = 0x02;
-      }
-      else if (searchMode == "scatter") {
-          searchModeEnum = 0x03;
-      }
-      else if (searchMode == "mapscatter") {
-          searchModeEnum = 0x04;
-      }
-      else if (searchMode == "parascatter") {
-          searchModeEnum = 0x05;
-      }
-      else {
-          throw std::runtime_error("Invalid search mode: " + searchMode);
+      // 3) Determine searchModeEnum based on searchMode string
+      uint8_t searchModeEnum = 0xFF; // Default for Stream Cipher Mode
+      if (algot == HashAlgorithm::Rainbow || algot == HashAlgorithm::Rainstorm) { // Only for Block Cipher Modes
+          if (searchMode == "prefix") {
+              searchModeEnum = 0x00;
+          }
+          else if (searchMode == "sequence") {
+              searchModeEnum = 0x01;
+          }
+          else if (searchMode == "series") {
+              searchModeEnum = 0x02;
+          }
+          else if (searchMode == "scatter") {
+              searchModeEnum = 0x03;
+          }
+          else if (searchMode == "mapscatter") {
+              searchModeEnum = 0x04;
+          }
+          else if (searchMode == "parascatter") {
+              searchModeEnum = 0x05;
+          }
+          else {
+              throw std::runtime_error("Invalid search mode: " + searchMode);
+          }
       }
 
-      std::string hashName = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
-      uint8_t hashNameLength = static_cast<uint8_t>(hashName.size());
+      // 4) Build the new FileHeader
+      FileHeader hdr{};
+      hdr.magic        = MagicNumber;
+      hdr.version      = 0x02;       // New version
+      hdr.cipherMode   = 0x11;       // 0x11 for “Block Cipher + puzzle”
+      hdr.blockSize    = static_cast<uint8_t>(blockSize);
+      hdr.nonceSize    = static_cast<uint8_t>(nonceSize);
+      hdr.hashSizeBits = hash_size;
+      hdr.hashName     = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
+      hdr.iv           = seed;       // The seed as our “IV”
 
-      fout.write(reinterpret_cast<const char*>(&magicNumber), sizeof(magicNumber));
-      fout.write(reinterpret_cast<const char*>(&version), sizeof(version));
-      fout.write(reinterpret_cast<const char*>(&blockSize8), sizeof(blockSize8));
-      fout.write(reinterpret_cast<const char*>(&nonceSize8), sizeof(nonceSize8));
-      fout.write(reinterpret_cast<const char*>(&digestSize16), sizeof(digestSize16));
-      fout.write(reinterpret_cast<const char*>(&hashNameLength), sizeof(hashNameLength));
-      fout.write(hashName.data(), hashName.size());
-      fout.write(reinterpret_cast<const char*>(&searchModeEnum), sizeof(searchModeEnum));
+      // 5) Assign provided salt
+      hdr.saltLen = static_cast<uint8_t>(salt.size());
+      hdr.salt    = salt;
 
-      // Compress plaintext
-      std::vector<uint8_t> compressedData = compressData(plainData);
-      plainData = std::move(compressedData);
+      // 6) Assign original (compressed) size
+      hdr.originalSize = plainData.size();
 
-      // Update original size in the header to match compressed size
-      uint64_t originalSize = plainData.size();
-      fout.write(reinterpret_cast<const char*>(&originalSize), sizeof(originalSize));
+      // 7) Assign searchModeEnum
+      hdr.searchModeEnum = searchModeEnum;
 
-      // Partition plaintext into blocks
-      size_t totalBlocks = (originalSize + blockSize - 1) / blockSize;
-      uint8_t hashBytes = hash_size / 8;
-      std::vector<uint8_t> hashOut(hashBytes);
-      std::vector<uint8_t> keyBuf(key.begin(), key.end());
+      // 8) Write the unified header
+      writeFileHeader(fout, hdr);
 
-      // Prepare RNG for nonce
-      std::mt19937_64 rng(std::random_device{}());
-      std::uniform_int_distribution<uint8_t> dist(0, 255); // Corrected to uint8_t
-      uint64_t nonceCounter = 0; // Counter for deterministic nonce
-
-      // For mapscatter
-      uint8_t reverseMap[256 * 64] = {0}; // Initialize to zero
-      uint8_t reverseMapOffsets[256] = {0};
-
-      size_t remaining = originalSize;
+      // 9) Prepare puzzle searching
+      size_t totalBlocks = (hdr.originalSize + blockSize - 1) / blockSize;
       int progressInterval = 1'000'000;
 
-      // MAIN BLOCK LOOP
+      // 10) Derive a “master PRK” from (seed, salt, key)
+      // Using your iterative KDF
+      std::vector<uint8_t> keyBuf(key.begin(), key.end());
+      // Convert seed (uint64_t) to vector<uint8_t>
+      std::vector<uint8_t> seed_vec(8);
+      for (size_t i = 0; i < 8; ++i) {
+          seed_vec[i] = static_cast<uint8_t>((seed >> (i * 8)) & 0xFF);
+      }
+
+      std::vector<uint8_t> prk = derivePRK(
+          seed_vec,          // Converted seed as vector<uint8_t>
+          salt,              // Provided salt
+          keyBuf,            // IKM (Input Key Material)
+          algot,             // Hash algorithm
+          hash_size          // Hash size in bits
+      );
+
+      // 11) Extend that PRK into subkeys for each block
+      // Each subkey is hash_size/8 bytes
+      size_t subkeySize = hdr.hashSizeBits / 8;
+      size_t totalNeeded = totalBlocks * subkeySize;
+      std::vector<uint8_t> allSubkeys = extendOutputKDF(
+          prk,
+          totalNeeded,
+          algot,
+          hdr.hashSizeBits
+      );
+
+      // 12) Initialize RNG for non-deterministic nonce generation
+      std::mt19937_64 rng(std::random_device{}());
+      std::uniform_int_distribution<uint8_t> dist(0, 255);
+      uint64_t nonceCounter = 0;
+
+      size_t remaining = hdr.originalSize;
+      // For mapscatter arrays
+      uint8_t reverseMap[256 * 64] = {0};
+      uint8_t reverseMapOffsets[256] = {0};
+
+      // 13) Iterate over each block to perform puzzle encryption
       for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
           size_t thisBlockSize = std::min(blockSize, remaining);
           remaining -= thisBlockSize;
 
-          // Extract this block from the compressed plaintext
+          // Extract this block
           std::vector<uint8_t> block(
               plainData.begin() + blockIndex * blockSize,
               plainData.begin() + blockIndex * blockSize + thisBlockSize
           );
 
+          // Extract subkey for this block
+          const size_t offset = blockIndex * subkeySize;
+          if (offset + subkeySize > allSubkeys.size()) {
+              throw std::runtime_error("Subkey index out of range.");
+          }
+          std::vector<uint8_t> blockSubkey(
+              allSubkeys.begin() + offset,
+              allSubkeys.begin() + offset + subkeySize
+          );
+
           // -----------------------
           // parascatter branch
           // -----------------------
-          if (searchModeEnum == 0x05) {
+          if (searchModeEnum == 0x05) { // parascatter
               std::atomic<bool> done(false);
               std::vector<uint8_t> bestNonce(nonceSize);         // Shared best nonce
               std::vector<uint8_t> bestScatter(thisBlockSize);   // Shared best scatter indices
@@ -885,98 +1085,98 @@ enum class HashAlgorithm {
               #pragma omp parallel
   #endif
               {
-                uint64_t localTries = 0;
-                std::vector<uint8_t> localNonce(nonceSize);
-                std::vector<uint8_t> localScatterIndices(thisBlockSize, 0); // Thread-local
-                std::vector<uint8_t> threadHashOut(hash_size / 8);
-                std::bitset<64> localUsedIndices;
-                std::mt19937_64 local_rng(std::random_device{}()); // Thread-local RNG
-                std::uniform_int_distribution<uint8_t> local_dist(0, 255);
+                  uint64_t localTries = 0;
+                  std::vector<uint8_t> localNonce(nonceSize);
+                  std::vector<uint8_t> localScatterIndices(thisBlockSize, 0); // Thread-local
+                  std::vector<uint8_t> threadHashOut(hash_size / 8);
+                  std::bitset<64> localUsedIndices;
+                  std::mt19937_64 local_rng(std::random_device{}()); // Thread-local RNG
+                  std::uniform_int_distribution<uint8_t> local_dist(0, 255);
 
-                while (!done.load(std::memory_order_acquire)) {
-                  // Generate nonce
-                  if (deterministicNonce) {
+                  while (!done.load(std::memory_order_acquire)) {
+                      // Generate nonce
+                      if (deterministicNonce) {
   #ifdef _OPENMP
-                    uint64_t current = omp_get_thread_num() + omp_get_num_threads() * (localTries + 1);
+                          uint64_t current = omp_get_thread_num() + omp_get_num_threads() * (localTries + 1);
   #else
-                    uint64_t current = (localTries + 1);
-  #endif                 
-                    for (size_t i = 0; i < nonceSize; i++) {
-                      localNonce[i] = static_cast<uint8_t>((current >> (i * 8)) & 0xFF);
-                    }
-                  } else {
-                    for (size_t i = 0; i < nonceSize; i++) {
-                      localNonce[i] = local_dist(local_rng);
-                    }
-                  }
-
-                  // Build trial buffer
-                  std::vector<uint8_t> trial(keyBuf);
-                  trial.insert(trial.end(), localNonce.begin(), localNonce.end());
-
-                  // Hash it
-                  invokeHash<bswap>(algot, seed, trial, threadHashOut, hash_size);
-
-                  // Check scatter indices
-                  bool allFound = true;
-                  localUsedIndices.reset();
-                  for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-                    auto it = threadHashOut.begin();
-                    while (it != threadHashOut.end()) {
-                      it = std::find(it, threadHashOut.end(), block[byteIdx]);
-                      if (it != threadHashOut.end()) {
-                        uint8_t idx = static_cast<uint8_t>(std::distance(threadHashOut.begin(), it));
-                        if (!localUsedIndices.test(idx)) {
-                          localScatterIndices[byteIdx] = idx;
-                          localUsedIndices.set(idx);
-                          break;
-                        }
-                        ++it;
-                      } else {
-                        allFound = false;
-                        break;
-                      }
-                    }
-                    if (!allFound) break;
-                  }
-
-                  if (allFound) {
-                    // Critical section to update shared variables
-  #ifdef _OPENMP
-                    #pragma omp critical
+                          uint64_t current = (localTries + 1);
   #endif
-                    {
-                      if (!done.load(std::memory_order_relaxed)) {
-                        bestNonce = localNonce;
-                        bestScatter = localScatterIndices;
-                        done.store(true, std::memory_order_release); // Synchronize with other threads
+                          for (size_t i = 0; i < nonceSize; i++) {
+                              localNonce[i] = static_cast<uint8_t>((current >> (i * 8)) & 0xFF);
+                          }
                       }
-                    }
-                  }
+                      else {
+                          for (size_t i = 0; i < nonceSize; i++) {
+                              localNonce[i] = local_dist(local_rng);
+                          }
+                      }
 
-                  // Periodic progress reporting
-                  if (localTries % progressInterval == 0 && !done.load(std::memory_order_relaxed)) {
+                      // Build trial buffer
+                      std::vector<uint8_t> trial(blockSubkey);
+                      trial.insert(trial.end(), localNonce.begin(), localNonce.end());
+
+                      // Hash it
+                      invokeHash<false>(algot, seed, trial, threadHashOut, hash_size);
+
+                      // Check scatter indices
+                      bool allFound = true;
+                      localUsedIndices.reset();
+                      for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+                          auto it = threadHashOut.begin();
+                          while (it != threadHashOut.end()) {
+                              it = std::find(it, threadHashOut.end(), block[byteIdx]);
+                              if (it != threadHashOut.end()) {
+                                  uint8_t idx = static_cast<uint8_t>(std::distance(threadHashOut.begin(), it));
+                                  if (!localUsedIndices.test(idx)) {
+                                      localScatterIndices[byteIdx] = idx;
+                                      localUsedIndices.set(idx);
+                                      break;
+                                  }
+                                  ++it;
+                              }
+                              else {
+                                  allFound = false;
+                                  break;
+                              }
+                          }
+                          if (!allFound) break;
+                      }
+
+                      if (allFound) {
+                          // Critical section to update shared variables
   #ifdef _OPENMP
-                    # pragma omp critical
+                          #pragma omp critical
   #endif
+                          {
+                              if (!done.load(std::memory_order_relaxed)) {
+                                  bestNonce = localNonce;
+                                  bestScatter = localScatterIndices;
+                                  done.store(true, std::memory_order_release); // Synchronize with other threads
+                              }
+                          }
+                      }
 
-                    {
-                      if (!done.load(std::memory_order_relaxed)) {
-                        std::cerr << "\r[Parascatter] Block " << blockIndex + 1
-                                  << "/" << totalBlocks << ", thread "
+                      // Periodic progress reporting
+                      if (localTries % progressInterval == 0 && !done.load(std::memory_order_relaxed)) {
   #ifdef _OPENMP
-                                  << omp_get_thread_num() << ": "
+                          #pragma omp critical
+  #endif
+                          {
+                              if (!done.load(std::memory_order_relaxed)) {
+                                  std::cerr << "\r[Parascatter] Block " << blockIndex + 1
+                                            << "/" << totalBlocks << ", thread "
+  #ifdef _OPENMP
+                                            << omp_get_thread_num() << ": "
   #else
-                                  << "Non-parallel: "
+                                            << "Non-parallel: "
   #endif
-                                  << localTries << " tries..." << std::flush;
+                                            << localTries << " tries..." << std::flush;
+                              }
+                          }
                       }
-                    }
-                  }
-                  localTries++;
-                } // End while
+                      localTries++;
+                  } // End while
               } // End parallel
-
 
               // Write results after parallel region
               if (done.load(std::memory_order_relaxed)) {
@@ -1000,14 +1200,15 @@ enum class HashAlgorithm {
                   if (verbose) {
                       std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks << " processed.\n";
                   }
-              } else {
+              }
+              else {
                   throw std::runtime_error("[Parascatter] No solution found.");
               }
 
           // ------------------------------------------------------
           // other modes in else branch
           // ------------------------------------------------------
-          } else { 
+          } else {
               // We'll fill these once a solution is found
               bool found = false;
               std::vector<uint8_t> chosenNonce(nonceSize, 0);
@@ -1020,18 +1221,20 @@ enum class HashAlgorithm {
                           chosenNonce[i] = static_cast<uint8_t>((nonceCounter >> (i * 8)) & 0xFF);
                       }
                       nonceCounter++;
-                  } else {
+                  }
+                  else {
                       for (size_t i = 0; i < nonceSize; i++) {
                           chosenNonce[i] = dist(rng);
                       }
                   }
 
                   // Build trial buffer
-                  std::vector<uint8_t> trial(keyBuf);
+                  std::vector<uint8_t> trial(blockSubkey);
                   trial.insert(trial.end(), chosenNonce.begin(), chosenNonce.end());
 
                   // Hash it
-                  invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
+                  std::vector<uint8_t> hashOut(hash_size / 8);
+                  invokeHash<false>(algot, seed, trial, hashOut, hash_size);
 
                   if (searchModeEnum == 0x00) { // prefix
                       if (hashOut.size() >= thisBlockSize &&
@@ -1067,7 +1270,8 @@ enum class HashAlgorithm {
                                       break;
                                   }
                                   ++it;
-                              } else {
+                              }
+                              else {
                                   allFound = false;
                                   break;
                               }
@@ -1106,7 +1310,8 @@ enum class HashAlgorithm {
                                       break;
                                   }
                                   ++it;
-                              } else {
+                              }
+                              else {
                                   allFound = false;
                                   break;
                               }
@@ -1120,7 +1325,7 @@ enum class HashAlgorithm {
                       if (allFound) {
                           found = true;
                           if (verbose) {
-                              std::cout << "Series Indices: ";
+                              std::cout << "Scatter Indices: ";
                               for (auto idx : scatterIndices) {
                                   std::cout << static_cast<int>(idx) << " ";
                               }
@@ -1168,10 +1373,11 @@ enum class HashAlgorithm {
                       fout.write(reinterpret_cast<const char*>(chosenNonce.data()), nonceSize);
                       if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04) {
                           fout.write(reinterpret_cast<const char*>(scatterIndices.data()), scatterIndices.size());
-                      } else {
+                      }
+                      else {
                           // prefix or sequence
-                          uint8_t startIndex = scatterIndices[0];
-                          fout.write(reinterpret_cast<const char*>(&startIndex), sizeof(startIndex));
+                          uint8_t startIdx = scatterIndices[0];
+                          fout.write(reinterpret_cast<const char*>(&startIdx), sizeof(startIdx));
                       }
                       break; // done with this block
                   }
@@ -1191,57 +1397,44 @@ enum class HashAlgorithm {
 
           } // end else (other modes)
 
-
-      } // end for(blockIndex)
+      } // end block loop
 
       fout.close();
-      std::cout << "[Enc] Encryption complete: " << outFilename << "\n";
-  } // end function
+      std::cout << "[Enc] Block-based puzzle encryption with subkeys complete: " << outFilename << "\n";
+  }
 
   static void puzzleDecryptFileWithHeader(
       const std::string &inFilename,
       const std::string &outFilename,
       const std::string &key
   ) {
-      // Open input file
+      // 1) Open input file & read FileHeader
       std::ifstream fin(inFilename, std::ios::binary);
       if (!fin.is_open()) {
           throw std::runtime_error("Cannot open ciphertext file: " + inFilename);
       }
 
-      // Read header
-      uint32_t magicNumber;
-      uint8_t version;
-      uint8_t blockSize;
-      uint8_t nonceSize;
-      uint16_t hash_size;
-      uint8_t hashNameLength;
-      std::string hashName;
-      uint8_t searchModeEnum;
-      uint64_t originalSize;
-
-      fin.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
-      fin.read(reinterpret_cast<char*>(&version), sizeof(version));
-      fin.read(reinterpret_cast<char*>(&blockSize), sizeof(blockSize));
-      fin.read(reinterpret_cast<char*>(&nonceSize), sizeof(nonceSize));
-      fin.read(reinterpret_cast<char*>(&hash_size), sizeof(hash_size));
-      fin.read(reinterpret_cast<char*>(&hashNameLength), sizeof(hashNameLength));
-
-      hashName.resize(hashNameLength);
-      fin.read(&hashName[0], hashNameLength);
-      fin.read(reinterpret_cast<char*>(&searchModeEnum), sizeof(searchModeEnum));
-      fin.read(reinterpret_cast<char*>(&originalSize), sizeof(originalSize));
-
-      if (magicNumber != MagicNumber) { // "RCRY"
-          throw std::runtime_error("Invalid magic number in header.");
+      // Read unified FileHeader
+      FileHeader hdr = readFileHeader(fin);
+      if (hdr.magic != MagicNumber) { // "RCRY"
+          throw std::runtime_error("Invalid magic number in file header.");
       }
 
-      HashAlgorithm algot = (hashName == "rainbow") ? HashAlgorithm::Rainbow :
-                             (hashName == "rainstorm") ? HashAlgorithm::Rainstorm :
-                             HashAlgorithm::Unknown;
+      // Determine cipher mode
+      if (hdr.cipherMode != 0x11) { // 0x11 = Block Cipher Mode
+          throw std::runtime_error("File is not in Block Cipher mode (expected cipherMode=0x11).");
+      }
 
-      if (algot == HashAlgorithm::Unknown) {
-          throw std::runtime_error("Unsupported hash algorithm in header.");
+      // Validate hash algorithm
+      HashAlgorithm algot = HashAlgorithm::Unknown;
+      if (hdr.hashName == "rainbow") {
+          algot = HashAlgorithm::Rainbow;
+      }
+      else if (hdr.hashName == "rainstorm") {
+          algot = HashAlgorithm::Rainstorm;
+      }
+      else {
+          throw std::runtime_error("Unsupported hash algorithm in header: " + hdr.hashName);
       }
 
       // Read the rest of the file as cipher data
@@ -1251,52 +1444,112 @@ enum class HashAlgorithm {
       );
       fin.close();
 
-      // Verify cipherData size
-      size_t totalBlocks = (originalSize + blockSize - 1) / blockSize;
-      size_t cipherOffset = 0;
+      // 2) Derive PRK using KDF
+      // Assume 'derivePRK' and 'extendOutputKDF' are defined in tool.h and in scope
+      std::vector<uint8_t> ikm(key.begin(), key.end());
+      // Convert seed (uint64_t) to vector<uint8_t>
+      std::vector<uint8_t> seed_vec(8);
+      uint64_t seed = hdr.iv;
+      for (size_t i = 0; i < 8; ++i) {
+          seed_vec[i] = static_cast<uint8_t>((seed >> (i * 8)) & 0xFF);
+      }
 
-      // Prepare to reconstruct plaintext
-      std::vector<uint8_t> keyBuf(key.begin(), key.end());
-      std::vector<uint8_t> hashOut(hash_size / 8);
+      std::vector<uint8_t> prk = derivePRK(
+          seed_vec,          // Converted seed as vector<uint8_t>
+          hdr.salt,              // Provided salt
+          ikm,            // IKM (Input Key Material)
+          algot,             // Hash algorithm
+          hdr.hashSizeBits          // Hash size in bits
+      );
+
+      // 3) Extend PRK into subkeys for each block
+      size_t totalBlocks = (hdr.originalSize + hdr.blockSize - 1) / hdr.blockSize;
+      size_t subkeySize = hdr.hashSizeBits / 8;
+      size_t totalNeeded = totalBlocks * subkeySize;
+      std::vector<uint8_t> allSubkeys = extendOutputKDF(
+          prk,
+          totalNeeded,
+          algot,
+          hdr.hashSizeBits
+      );
+
+      // 4) Prepare to reconstruct plaintext
       std::vector<uint8_t> plaintextAccumulated;
+      plaintextAccumulated.reserve(hdr.originalSize);
 
+      size_t cipherOffset = 0;
       size_t recoveredSoFar = 0;
 
       for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
-          size_t thisBlockSize = std::min<size_t>(blockSize, originalSize - recoveredSoFar);
+          size_t thisBlockSize = std::min<size_t>(static_cast<size_t>(hdr.blockSize), hdr.originalSize - recoveredSoFar);
           std::vector<uint8_t> block;
 
-          // Extract nonce
-          std::vector<uint8_t> storedNonce(cipherData.begin() + cipherOffset,
-                                           cipherData.begin() + cipherOffset + nonceSize);
-          cipherOffset += nonceSize;
+          // 4.1) Extract storedNonce
+          if (cipherOffset + hdr.nonceSize > cipherData.size()) {
+              throw std::runtime_error("Unexpected end of cipher data when reading nonce.");
+          }
+          std::vector<uint8_t> storedNonce(
+              cipherData.begin() + cipherOffset,
+              cipherData.begin() + cipherOffset + hdr.nonceSize
+          );
+          cipherOffset += hdr.nonceSize;
 
-          // Read indices based on search mode
+          // 4.2) Read scatterIndices or startIndex based on searchModeEnum
           std::vector<uint8_t> scatterIndices;
           uint8_t startIndex = 0;
-          if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04 || searchModeEnum == 0x05) {
-              scatterIndices.resize(thisBlockSize);
-              std::memcpy(scatterIndices.data(), &cipherData[cipherOffset], thisBlockSize);
+          if (hdr.searchModeEnum == 0x02 || hdr.searchModeEnum == 0x03 ||
+              hdr.searchModeEnum == 0x04 || hdr.searchModeEnum == 0x05) {
+              // Series, Scatter, MapScatter, Parascatter
+              if (cipherOffset + thisBlockSize > cipherData.size()) {
+                  throw std::runtime_error("Unexpected end of cipher data when reading scatter indices.");
+              }
+              scatterIndices.assign(
+                  cipherData.begin() + cipherOffset,
+                  cipherData.begin() + cipherOffset + thisBlockSize
+              );
               cipherOffset += thisBlockSize;
-          } else {
-              std::memcpy(&startIndex, &cipherData[cipherOffset], 1);
+          }
+          else {
+              // Prefix or Sequence
+              if (cipherOffset + 1 > cipherData.size()) {
+                  throw std::runtime_error("Unexpected end of cipher data when reading start index.");
+              }
+              startIndex = cipherData[cipherOffset];
               cipherOffset += 1;
           }
 
-          // Recompute the hash
-          std::vector<uint8_t> trial(keyBuf);
-          trial.insert(trial.end(), storedNonce.begin(), storedNonce.end());
-          invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
+          // 4.3) Derive subkey for this block
+          size_t subkeyOffset = blockIndex * subkeySize;
+          if (subkeyOffset + subkeySize > allSubkeys.size()) {
+              throw std::runtime_error("Subkey index out of range.");
+          }
+          std::vector<uint8_t> blockSubkey(
+              allSubkeys.begin() + subkeyOffset,
+              allSubkeys.begin() + subkeyOffset + subkeySize
+          );
 
-          // Reconstruct plaintext block
-          if (searchModeEnum == 0x00) { // Prefix
+          // 4.4) Recompute the hash using blockSubkey and storedNonce
+          std::vector<uint8_t> trial(blockSubkey);
+          trial.insert(trial.end(), storedNonce.begin(), storedNonce.end());
+
+          std::vector<uint8_t> hashOut(hdr.hashSizeBits / 8);
+          invokeHash<false>(algot, hdr.iv, trial, hashOut, hdr.hashSizeBits); // Assuming 'hdr.iv' is passed correctly
+
+          // 4.5) Reconstruct plaintext block based on searchModeEnum
+          if (hdr.searchModeEnum == 0x00) { // Prefix
+              if (hashOut.size() < thisBlockSize) {
+                  throw std::runtime_error("[Dec] Hash output smaller than block size for Prefix mode.");
+              }
               block.assign(hashOut.begin(), hashOut.begin() + thisBlockSize);
-          } else if (searchModeEnum == 0x01) { // Sequence
+          }
+          else if (hdr.searchModeEnum == 0x01) { // Sequence
               if (startIndex + thisBlockSize > hashOut.size()) {
-                  throw std::runtime_error("[Dec] Start index out of bounds in sequence mode.");
+                  throw std::runtime_error("[Dec] Start index out of bounds in Sequence mode.");
               }
               block.assign(hashOut.begin() + startIndex, hashOut.begin() + startIndex + thisBlockSize);
-          } else if (searchModeEnum == 0x02 || searchModeEnum == 0x03 || searchModeEnum == 0x04 || searchModeEnum == 0x05) { // Series/Scatter
+          }
+          else if (hdr.searchModeEnum == 0x02 || hdr.searchModeEnum == 0x03 ||
+                   hdr.searchModeEnum == 0x04 || hdr.searchModeEnum == 0x05) { // Series, Scatter, MapScatter, Parascatter
               block.reserve(thisBlockSize);
               for (size_t j = 0; j < thisBlockSize; j++) {
                   uint8_t idx = scatterIndices[j];
@@ -1305,24 +1558,34 @@ enum class HashAlgorithm {
                   }
                   block.push_back(hashOut[idx]);
               }
-          } else {
+          }
+          else {
               throw std::runtime_error("Invalid search mode enum in decryption.");
           }
 
-          plaintextAccumulated.insert(plaintextAccumulated.end(), block.begin(), block.end());
+          // 4.6) Accumulate the reconstructed block
+          plaintextAccumulated.insert(
+              plaintextAccumulated.end(),
+              block.begin(),
+              block.end()
+          );
           recoveredSoFar += thisBlockSize;
 
+          // 4.7) Progress Reporting
           if (blockIndex % 100 == 0) {
-              std::cerr << "\r[Dec] Processing block " << blockIndex << " / " << totalBlocks << std::flush;
+              std::cerr << "\r[Dec] Processing block " << (blockIndex + 1) << " / " << totalBlocks << "..." << std::flush;
           }
-      }
+      } // end for(blockIndex)
 
       std::cout << "\n[Dec] Ciphertext blocks decrypted successfully.\n";
 
-      // Decompress
+      // 5) Decompress the accumulated plaintext
       std::vector<uint8_t> decompressedData = decompressData(plaintextAccumulated);
+      if (plaintextAccumulated.size() != hdr.originalSize) {
+          throw std::runtime_error("Compressed data size does not match original size.");
+      }
 
-      // Write to output
+      // 6) Write the decompressed plaintext to output file
       std::ofstream fout(outFilename, std::ios::binary);
       if (!fout.is_open()) {
           throw std::runtime_error("Cannot open output file for decompressed plaintext: " + outFilename);
@@ -1333,4 +1596,5 @@ enum class HashAlgorithm {
 
       std::cout << "[Dec] Decompressed plaintext written to: " << outFilename << "\n";
   }
+
 

@@ -7,158 +7,6 @@
 // ADDED: Unified FileHeader Struct and Associated Helpers
 // =================================================================
 
-// ADDED: Unified FileHeader struct to include IV and Salt
-struct FileHeader {
-    uint32_t magic;             // MagicNumber
-    uint8_t version;            // Version
-    uint8_t cipherMode;         // Mode: 0x10 = Stream, 0x11 = Block
-    uint8_t blockSize;          // Block size in bytes (for block cipher)
-    uint8_t nonceSize;          // Nonce size in bytes
-    uint16_t hashSizeBits;      // Hash size in bits
-    std::string hashName;       // Hash algorithm name
-    uint64_t iv;                // 64-bit IV (seed)
-    uint8_t saltLen;            // Length of salt
-    std::vector<uint8_t> salt;  // Salt data
-    uint64_t originalSize;      // Compressed plaintext size
-    // Additional fields can be added here if needed (e.g., searchMode for block cipher)
-};
-
-// ADDED: Function to write the unified FileHeader
-static void writeFileHeader(std::ofstream &out, const FileHeader &hdr) {
-    out.write(reinterpret_cast<const char*>(&hdr.magic), sizeof(hdr.magic));
-    out.write(reinterpret_cast<const char*>(&hdr.version), sizeof(hdr.version));
-    out.write(reinterpret_cast<const char*>(&hdr.cipherMode), sizeof(hdr.cipherMode));
-    out.write(reinterpret_cast<const char*>(&hdr.blockSize), sizeof(hdr.blockSize));
-    out.write(reinterpret_cast<const char*>(&hdr.nonceSize), sizeof(hdr.nonceSize));
-    out.write(reinterpret_cast<const char*>(&hdr.hashSizeBits), sizeof(hdr.hashSizeBits));
-    
-    uint8_t hnLen = static_cast<uint8_t>(hdr.hashName.size());
-    out.write(reinterpret_cast<const char*>(&hnLen), sizeof(hnLen));
-    out.write(hdr.hashName.data(), hnLen);
-    
-    out.write(reinterpret_cast<const char*>(&hdr.iv), sizeof(hdr.iv));
-    
-    out.write(reinterpret_cast<const char*>(&hdr.saltLen), sizeof(hdr.saltLen));
-    if (hdr.saltLen > 0) {
-        out.write(reinterpret_cast<const char*>(hdr.salt.data()), hdr.salt.size());
-    }
-    
-    out.write(reinterpret_cast<const char*>(&hdr.originalSize), sizeof(hdr.originalSize));
-    // If additional fields are present, write them here
-}
-
-// ADDED: Function to read the unified FileHeader
-static FileHeader readFileHeader(std::ifstream &in) {
-    FileHeader hdr{};
-    in.read(reinterpret_cast<char*>(&hdr.magic), sizeof(hdr.magic));
-    in.read(reinterpret_cast<char*>(&hdr.version), sizeof(hdr.version));
-    in.read(reinterpret_cast<char*>(&hdr.cipherMode), sizeof(hdr.cipherMode));
-    in.read(reinterpret_cast<char*>(&hdr.blockSize), sizeof(hdr.blockSize));
-    in.read(reinterpret_cast<char*>(&hdr.nonceSize), sizeof(hdr.nonceSize));
-    in.read(reinterpret_cast<char*>(&hdr.hashSizeBits), sizeof(hdr.hashSizeBits));
-    
-    uint8_t hnLen;
-    in.read(reinterpret_cast<char*>(&hnLen), sizeof(hnLen));
-    hdr.hashName.resize(hnLen);
-    in.read(&hdr.hashName[0], hnLen);
-    
-    in.read(reinterpret_cast<char*>(&hdr.iv), sizeof(hdr.iv));
-    
-    in.read(reinterpret_cast<char*>(&hdr.saltLen), sizeof(hdr.saltLen));
-    hdr.salt.resize(hdr.saltLen);
-    if (hdr.saltLen > 0) {
-        in.read(reinterpret_cast<char*>(hdr.salt.data()), hdr.saltLen);
-    }
-    
-    in.read(reinterpret_cast<char*>(&hdr.originalSize), sizeof(hdr.originalSize));
-    // If additional fields are present, read them here
-    
-    return hdr;
-}
-
-// ADDED: Function to check if a file is in Stream Cipher mode
-static bool fileIsStreamMode(const std::string &filename) {
-    std::ifstream fin(filename, std::ios::binary);
-    if (!fin.is_open()) return false;
-    FileHeader hdr = readFileHeader(fin);
-    fin.close();
-    return (hdr.magic == MagicNumber) && (hdr.cipherMode == 0x10); // 0x10 = Stream Cipher
-}
-
-// ADDED: KDF with Iterations and Info
-static const std::string KDF_INFO_STRING = "powered by Rain hashes created by Cris and DOSYAGO (aka DOSAYGO) over the years 2023 through 2025";
-static const int KDF_ITERATIONS = 8;
-
-// ADDED: Derive PRK with iterations
-static std::vector<uint8_t> derivePRK(const std::vector<uint8_t> &seed,
-                                     const std::vector<uint8_t> &salt,
-                                     const std::vector<uint8_t> &ikm,
-                                     HashAlgorithm algot,
-                                     uint32_t hash_bits) {
-    // Combine salt || ikm || info
-    std::vector<uint8_t> combined;
-    combined.reserve(salt.size() + ikm.size() + KDF_INFO_STRING.size());
-    combined.insert(combined.end(), salt.begin(), salt.end());
-    combined.insert(combined.end(), ikm.begin(), ikm.end());
-    combined.insert(combined.end(), KDF_INFO_STRING.begin(), KDF_INFO_STRING.end());
-    
-    std::vector<uint8_t> prk(hash_bits / 8, 0);
-    std::vector<uint8_t> temp(combined);
-    
-    // Iterate the hash function KDF_ITERATIONS times
-    for (int i = 0; i < KDF_ITERATIONS; ++i) {
-        invokeHash<false>(algot, seed, temp, prk, hash_bits);
-        temp = prk; // Next iteration takes the output of the previous
-    }
-    
-    return prk;
-}
-
-// ADDED: Extend Output with iterations and counter
-static std::vector<uint8_t> extendOutputKDF(const std::vector<uint8_t> &prk,
-                                           size_t totalLen,
-                                           HashAlgorithm algot,
-                                           uint32_t hash_bits) {
-    std::vector<uint8_t> out;
-    out.reserve(totalLen);
-    
-    uint64_t counter = 1;
-    std::vector<uint8_t> kn = prk; // Initial K_n = PRK
-    
-    while (out.size() < totalLen) {
-        // Combine PRK || info || counter
-        std::vector<uint8_t> combined;
-        combined.reserve(kn.size() + KDF_INFO_STRING.size() + 8); // 8 bytes for counter
-        combined.insert(combined.end(), prk.begin(), prk.end());
-        combined.insert(combined.end(), KDF_INFO_STRING.begin(), KDF_INFO_STRING.end());
-        
-        // Append counter in big-endian
-        for (int i = 7; i >= 0; --i) {
-            combined.push_back(static_cast<uint8_t>((counter >> (i * 8)) & 0xFF));
-        }
-        
-        // Iterate the hash function KDF_ITERATIONS times
-        std::vector<uint8_t> temp(combined);
-        std::vector<uint8_t> kn_next(hash_bits / 8, 0);
-        for (int i = 0; i < KDF_ITERATIONS; ++i) {
-            invokeHash<false>(algot, 0, temp, kn_next, hash_bits);
-            temp = kn_next;
-        }
-        
-        // Update K_n
-        kn = kn_next;
-        
-        // Append to output
-        size_t remaining = totalLen - out.size();
-        size_t to_copy = std::min(static_cast<size_t>(kn.size()), remaining);
-        out.insert(out.end(), kn.begin(), kn.begin() + to_copy);
-        
-        counter++;
-    }
-    
-    out.resize(totalLen);
-    return out;
-}
 
 // =================================================================
 // ADDED: Stream Encryption and Decryption Functions
@@ -210,8 +58,14 @@ static void streamEncryptFileWithHeader(
     writeFileHeader(fout, hdr);
 
     // 5) Derive PRK
+    // Convert seed to vector<uint8_t>
+    std::vector<uint8_t> seed_vec(8);
+    for (size_t i = 0; i < 8; ++i) {
+        seed_vec[i] = static_cast<uint8_t>((seed >> (i * 8)) & 0xFF);
+    }
+
     std::vector<uint8_t> ikm(key.begin(), key.end());
-    std::vector<uint8_t> prk = derivePRK(ikm, salt, ikm, algot, hash_bits); // Using ikm as both seed and ikm
+    std::vector<uint8_t> prk = derivePRK(seed_vec, salt, ikm, algot, hash_bits); // Using seed_vec
 
     // 6) Generate Keystream with KDF
     size_t needed = compressed.size();
@@ -259,13 +113,21 @@ static void streamDecryptFileWithHeader(
     }
 
     // 2) Read ciphertext
-    std::vector<uint8_t> cipherData((std::istreambuf_iterator<char>(fin)),
-                                    (std::istreambuf_iterator<char>()));
+    std::vector<uint8_t> cipherData(
+        (std::istreambuf_iterator<char>(fin)),
+        (std::istreambuf_iterator<char>())
+    );
     fin.close();
 
     // 3) Derive PRK
+    // Convert seed to vector<uint8_t>
+    std::vector<uint8_t> seed_vec(8);
+    for (size_t i = 0; i < 8; ++i) {
+        seed_vec[i] = static_cast<uint8_t>((hdr.iv >> (i * 8)) & 0xFF);
+    }
+
     std::vector<uint8_t> ikm(key.begin(), key.end());
-    std::vector<uint8_t> prk = derivePRK(ikm, hdr.salt, ikm, algot, hash_bits); // Using ikm as both seed and ikm
+    std::vector<uint8_t> prk = derivePRK(seed_vec, hdr.salt, ikm, algot, hash_bits); // Using seed_vec
 
     // 4) Generate Keystream with KDF
     size_t needed = cipherData.size();
@@ -343,6 +205,7 @@ static void showFileFullInfo(const std::string &inFilename) {
         std::cout << std::dec << "\n";
     }
     std::cout << "Compressed Plaintext Size: " << hdr.originalSize << " bytes\n";
+    std::cout << "Search Mode Enum: 0x" << std::hex << static_cast<int>(hdr.searchModeEnum) << std::dec << "\n";
     std::cout << "===============================\n";
 }
 
@@ -369,7 +232,11 @@ int main(int argc, char** argv) {
             ("deterministic-nonce", "Use a deterministic counter for nonce generation",
                 cxxopts::value<bool>()->default_value("false"))
             ("search-mode", "Search mode for plaintext mining block cipher: prefix, sequence, series, scatter, mapscatter, parascatter",
+#ifdef _OPENMP
+                cxxopts::value<std::string>()->default_value("parascatter"))
+#else
                 cxxopts::value<std::string>()->default_value("scatter"))
+#endif
             ("o,output-file", "Output file (stream mode)",
                 cxxopts::value<std::string>()->default_value("/dev/stdout"))
             ("t,test-vectors", "Calculate the hash of the standard test vectors",
@@ -378,8 +245,10 @@ int main(int argc, char** argv) {
                 cxxopts::value<uint64_t>()->default_value("1000000"))
             ("x,output-extension", "Output extension in bytes (block-enc mode). Extend digest by this many bytes to make mining larger P blocks faster",
                 cxxopts::value<uint32_t>()->default_value("128"))
-            ("seed", "Seed value (hex string or numeric)",
-                cxxopts::value<std::string>()->default_value("0"))
+            ("seed", "Seed value (0x prefixed hex string or numeric)",
+                cxxopts::value<std::string>()->default_value("0x0"))
+            ("salt", "Salt value (0x prefixed hex string or string)",
+                cxxopts::value<std::string>()->default_value(""))
             // Mining options
             ("mine-mode", "Mining demo mode: chain, nonceInc, nonceRand (mining demo only)",
                 cxxopts::value<std::string>()->default_value("None"))
@@ -456,6 +325,31 @@ int main(int argc, char** argv) {
                 // If not a valid number, hash the string to 64 bits
                 seed = hash_string_to_64_bit(seed_str); // Assuming this function exists in tool.h
             }
+        }
+
+        // Later in your main function, parse and convert the salt
+        std::string salt_str = result["salt"].as<std::string>();
+        std::vector<uint8_t> salt; // Existing salt vector
+        if (!salt_str.empty()) {
+            if (salt_str.find("0x") == 0 || salt_str.find("0X") == 0) {
+                // Hex string
+                salt_str = salt_str.substr(2);
+                if (salt_str.size() % 2 != 0) {
+                    throw std::runtime_error("Salt hex string must have even length.");
+                }
+                for (size_t i = 0; i < salt_str.size(); i += 2) {
+                    uint8_t byte = static_cast<uint8_t>(std::stoul(salt_str.substr(i, 2), nullptr, 16));
+                    salt.push_back(byte);
+                }
+            }
+            else {
+                // Regular string
+                salt.assign(salt_str.begin(), salt_str.end());
+            }
+        }
+        else {
+            // Assign default zeroed salt to the existing salt vector
+            salt.assign(hash_size / 8, 0x00); // Or another method
         }
 
         // Determine Mode
@@ -610,70 +504,45 @@ int main(int argc, char** argv) {
             if (inpath.empty()) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
-            std::string key;
+            std::string key_input;
             if (!password.empty()) {
-                key = password;
+                key_input = password;
             }
             else {
-                key = promptForKey("Enter encryption key: ");
+                key_input = promptForKey("Enter encryption key: ");
             }
 
             // We'll write ciphertext to inpath + ".rc"
             std::string encFile = inpath + ".rc";
-            // ADDED: Construct FileHeader for BlockEnc
-            FileHeader hdr{};
-            hdr.magic = MagicNumber;
-            hdr.version = 0x01; // Example version
-            hdr.cipherMode = 0x11; // Block Cipher Mode
-            hdr.blockSize = blockSize;
-            hdr.nonceSize = static_cast<uint8_t>(nonceSize);
-            hdr.hashSizeBits = hash_size;
-            hdr.hashName = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
-            hdr.iv = seed; // Seed used as IV
-            hdr.saltLen = 0; // To be updated by tool later
-            hdr.originalSize = 0; // To be updated by tool later
-
-            // ADDED: Write FileHeader
-            std::ofstream fout(encFile, std::ios::binary);
-            if (!fout.is_open()) {
-                throw std::runtime_error("[BlockEnc] Cannot open output file: " + encFile);
-            }
-            writeFileHeader(fout, hdr);
-            fout.close();
 
             // ADDED: Call the existing puzzleEncryptFileWithHeader with updated header
-            puzzleEncryptFileWithHeader(inpath, encFile, key, algot, hash_size, seed, blockSize, nonceSize, searchMode, verbose, deterministicNonce);
+            puzzleEncryptFileWithHeader(inpath, encFile, key_input, algot, hash_size, seed, salt, blockSize, nonceSize, searchMode, verbose, deterministicNonce);
             std::cout << "[Enc] Wrote encrypted file to: " << encFile << "\n";
         }
         else if (mode == Mode::StreamEnc) {
             if (inpath.empty()) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
-            std::string key;
+            std::string key_input;
             if (!password.empty()) {
-                key = password;
+                key_input = password;
             }
             else {
-                key = promptForKey("Enter encryption key: ");
+                key_input = promptForKey("Enter encryption key: ");
             }
 
             // We'll write ciphertext to inpath + ".rc"
             std::string encFile = inpath + ".rc";
 
-            // ADDED: Default salt to hash_size/8 bytes of 0x00 if not provided
-            std::vector<uint8_t> salt(hash_size / 8, 0x00); // Default salt
-
-            // ADDED: You can parse salt from command line if desired (not shown here)
-
             // ADDED: Call streamEncryptFileWithHeader
             streamEncryptFileWithHeader(
                 inpath,
                 encFile,
-                key,
+                key_input,
                 algot,
                 hash_size,
                 seed,          // Using seed as IV
-                salt,          // Using default salt
+                salt,          // Using provided salt
                 output_extension,
                 verbose
             );
@@ -683,12 +552,12 @@ int main(int argc, char** argv) {
             if (inpath.empty()) {
                 throw std::runtime_error("No ciphertext file specified for decryption.");
             }
-            std::string key;
+            std::string key_input;
             if (!password.empty()) {
-                key = password;
+                key_input = password;
             }
             else {
-                key = promptForKey("Enter decryption key: ");
+                key_input = promptForKey("Enter decryption key: ");
             }
 
             // We'll write plaintext to inpath + ".dec"
@@ -711,7 +580,7 @@ int main(int argc, char** argv) {
                 streamDecryptFileWithHeader(
                     inpath,
                     decFile,
-                    key,
+                    key_input,
                     algot,
                     hash_size,
                     output_extension,
@@ -721,7 +590,7 @@ int main(int argc, char** argv) {
             }
             else if (hdr.cipherMode == 0x11) { // Block Cipher Mode
                 // ADDED: Block Decryption (integration with tool.h assumed)
-                puzzleDecryptFileWithHeader(inpath, decFile, key );
+                puzzleDecryptFileWithHeader(inpath, decFile, key_input);
                 std::cout << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
             }
             else {
