@@ -75,78 +75,14 @@ int main(int argc, char** argv) {
             return 0;
         }
 
+        // ADDED: verbose
+        bool verbose = result["verbose"].as<bool>();
+
+
         // Access and validate options
 
         // Hash Size
         uint32_t hash_size = result["size"].as<uint32_t>();
-
-        // Block Size
-        uint8_t blockSize = result["block-size"].as<uint8_t>();
-        if (blockSize == 0 || blockSize > 255) {
-            throw std::runtime_error("Block size must be between 1 and 255 bytes.");
-        }
-
-        // Nonce Size
-        size_t nonceSize = result["nonce-size"].as<size_t>();
-        if (nonceSize == 0 || nonceSize > 255) {
-            throw std::runtime_error("Nonce size must be between 1 and 255 bytes.");
-        }
-
-        // Nonce nature
-        bool deterministicNonce = result["deterministic-nonce"].as<bool>();
-
-        // Search Mode
-        std::string searchMode = result["search-mode"].as<std::string>();
-        if (searchMode != "prefix" && searchMode != "sequence" &&
-            searchMode != "series" && searchMode != "scatter" && searchMode != "mapscatter" && searchMode != "parascatter") {
-            throw std::runtime_error("Invalid search mode: " + searchMode);
-        }
-
-        // Output extension
-        uint32_t output_extension = result["output-extension"].as<uint32_t>();
-
-        // Convert Seed (either numeric or hex string)
-        std::string seed_str = result["seed"].as<std::string>();
-        uint64_t seed = 0;
-        if (!seed_str.empty()) {
-            try {
-                if (seed_str.find("0x") == 0 || seed_str.find("0X") == 0) {
-                    seed = std::stoull(seed_str.substr(2), nullptr, 16);
-                }
-                else {
-                    seed = std::stoull(seed_str, nullptr, 10);
-                }
-            }
-            catch (...) {
-                // If not a valid number, hash the string to 64 bits
-                seed = hash_string_to_64_bit(seed_str); // Assuming this function exists in tool.h
-            }
-        }
-
-        // Later in your main function, parse and convert the salt
-        std::string salt_str = result["salt"].as<std::string>();
-        std::vector<uint8_t> salt; // Existing salt vector
-        if (!salt_str.empty()) {
-            if (salt_str.find("0x") == 0 || salt_str.find("0X") == 0) {
-                // Hex string
-                salt_str = salt_str.substr(2);
-                if (salt_str.size() % 2 != 0) {
-                    throw std::runtime_error("Salt hex string must have even length.");
-                }
-                for (size_t i = 0; i < salt_str.size(); i += 2) {
-                    uint8_t byte = static_cast<uint8_t>(std::stoul(salt_str.substr(i, 2), nullptr, 16));
-                    salt.push_back(byte);
-                }
-            }
-            else {
-                // Regular string
-                salt.assign(salt_str.begin(), salt_str.end());
-            }
-        }
-        else {
-            // Assign default zeroed salt to the existing salt vector
-            salt.assign(hash_size / 8, 0x00); // Or another method
-        }
 
         // Determine Mode
         std::string modeStr = result["mode"].as<std::string>();
@@ -188,6 +124,104 @@ int main(int argc, char** argv) {
             }
         }
 
+        // Block Size
+        uint8_t blockSize = result["block-size"].as<uint8_t>();
+        if (blockSize == 0 || blockSize > 255) {
+            throw std::runtime_error("Block size must be between 1 and 255 bytes.");
+        }
+
+        // Nonce Size
+        size_t nonceSize = result["nonce-size"].as<size_t>();
+        if (nonceSize == 0 || nonceSize > 255) {
+            throw std::runtime_error("Nonce size must be between 1 and 255 bytes.");
+        }
+
+        // Nonce nature
+        bool deterministicNonce = result["deterministic-nonce"].as<bool>();
+
+        // Search Mode
+        std::string searchMode = result["search-mode"].as<std::string>();
+        if (searchMode != "prefix" && searchMode != "sequence" &&
+            searchMode != "series" && searchMode != "scatter" && searchMode != "mapscatter" && searchMode != "parascatter") {
+            throw std::runtime_error("Invalid search mode: " + searchMode);
+        }
+
+        // Output extension
+        uint32_t output_extension = result["output-extension"].as<uint32_t>();
+
+        // Convert Seed (either numeric or hex string)
+        std::string seed_str = result["seed"].as<std::string>();
+        uint64_t seed = 0;
+        bool userProvidedSeed = false;
+        if (!seed_str.empty() && seed_str != "0x0") {
+          userProvidedSeed = true;
+          try {
+            if (seed_str.find("0x") == 0 || seed_str.find("0X") == 0) {
+              seed = std::stoull(seed_str.substr(2), nullptr, 16);
+            } else {
+              seed = std::stoull(seed_str, nullptr, 10);
+            }
+          }
+          catch (...) {
+            // If not a valid number, hash the string to 64 bits
+            seed = hash_string_to_64_bit(seed_str);
+          }
+        }
+
+        // If user did NOT provide seed, generate a random one
+        if (!userProvidedSeed && mode != Mode::Digest) {
+          // A simple example using std::random_device + Mersenne Twister
+          std::random_device rd;
+          std::mt19937_64 rng(rd());
+          seed = rng();  // 64-bit random
+          if (verbose) {
+            std::cerr << "[Info] No seed provided; generated random seed: 0x"
+                      << std::hex << seed << std::dec << "\n";
+          }
+        }
+
+        // SALT handling:
+        std::string salt_str = result["salt"].as<std::string>();
+        std::vector<uint8_t> salt;
+        bool userProvidedSalt = false;
+
+        if (!salt_str.empty()) {
+          userProvidedSalt = true;
+          if (salt_str.find("0x") == 0 || salt_str.find("0X") == 0) {
+            // Hex string
+            salt_str = salt_str.substr(2);
+            if (salt_str.size() % 2 != 0) {
+              throw std::runtime_error("Salt hex string must have even length.");
+            }
+            for (size_t i = 0; i < salt_str.size(); i += 2) {
+              uint8_t byte = static_cast<uint8_t>(std::stoul(salt_str.substr(i, 2), nullptr, 16));
+              salt.push_back(byte);
+            }
+          } else {
+            // Regular string
+            salt.assign(salt_str.begin(), salt_str.end());
+          }
+        }
+
+        // If user did NOT provide salt, generate random salt with size 32 (or hash_size/8, your choice)
+        if (!userProvidedSalt && mode != Mode::Digest) {
+          // For example, 32 random bytes:
+          const size_t saltLen = 32;
+          std::random_device rd;
+          std::mt19937_64 rng(rd());
+          salt.resize(saltLen);
+          for (size_t i = 0; i < saltLen; ++i) {
+            salt[i] = static_cast<uint8_t>(rng());
+          }
+          if (verbose) {
+            std::cerr << "[Info] No salt provided; generated random 32-byte salt:\n  ";
+            for (auto &b : salt) {
+              std::cerr << std::hex << (int)b << " ";
+            }
+            std::cerr << std::dec << "\n";
+          }
+        }
+
         // Test Vectors
         bool use_test_vectors = result["test-vectors"].as<bool>();
 
@@ -196,9 +230,11 @@ int main(int argc, char** argv) {
 
         // Adjust output_length based on mode
         if (mode == Mode::Digest) {
+            // digest mode output_length is just the digest size
             output_length = hash_size / 8;
         }
         else if (mode == Mode::Stream) {
+            // stream mode is hash output in bytes by output_length because output length is then iterations of hash
             output_length *= hash_size / 8;
         }
 
@@ -219,9 +255,6 @@ int main(int argc, char** argv) {
         }
 
         std::string password = result["password"].as<std::string>();
-
-        // ADDED: verbose
-        bool verbose = result["verbose"].as<bool>();
 
         // Handle Mining Modes
         if (mine_mode != MineMode::None) {
