@@ -1,5 +1,6 @@
 cipher improvement
 
+- use nis1 and rp variants if specified. and always use nis1 as default for any cipher mode
 - test research construct
     weak hash -- digest mining construction --> block cipher --- davies meyer construction ---> strong hash 
   by prototyping in js
