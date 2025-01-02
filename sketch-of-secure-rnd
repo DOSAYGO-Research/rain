@@ -1,0 +1,45 @@
+#ifndef TOOL_H
+#define TOOL_H
+
+#include <vector>
+#include <random>
+#include <stdexcept>
+
+// Uncomment if libsodium is available
+// #include <sodium.h>
+
+class RandomGenerator {
+public:
+  RandomGenerator() {
+#ifdef SODIUM_AVAILABLE
+    if (sodium_init() < 0) {
+      throw std::runtime_error("Failed to initialize libsodium");
+    }
+#endif
+  }
+
+  // Generate random bytes
+  std::vector<unsigned char> get_random_bytes(size_t size) {
+#ifdef SODIUM_AVAILABLE
+    std::vector<unsigned char> buffer(size);
+    randombytes_buf(buffer.data(), size);
+    return buffer;
+#else
+    return fallback_random_bytes(size);
+#endif
+  }
+
+private:
+  // Fallback method using std::random_device and std::mt19937_64
+  std::vector<unsigned char> fallback_random_bytes(size_t size) {
+    static thread_local std::mt19937_64 rng(std::random_device{}());
+    std::vector<unsigned char> buffer(size);
+    for (size_t i = 0; i < size; ++i) {
+      buffer[i] = static_cast<unsigned char>(rng() & 0xFF);
+    }
+    return buffer;
+  }
+};
+
+#endif // TOOL_H
+
