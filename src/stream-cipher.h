@@ -104,9 +104,18 @@ static void streamEncryptFileWithHeader(
   }
 
   // 7) XOR compressed data with keystream, skipping first 'outputExtension' bytes
+  const size_t progress_step = 1000000; // 1,000,000 bytes
+  size_t next_progress = progress_step;
   for (size_t i = 0; i < compressed.size(); ++i) {
-    compressed[i] ^= keystream[i + outputExtension];
+      compressed[i] ^= keystream[i + outputExtension];
+
+      // Progress update
+      if (i + 1 == next_progress || i + 1 == compressed.size()) {
+          std::cerr << "\r" << (i + 1) << "/" << compressed.size() << " bytes processed." << std::flush;
+          next_progress += progress_step;
+      }
   }
+  std::cerr << std::endl; // Final newline after loop
 
   // 8) Write ciphertext
   fout.write(reinterpret_cast<const char*>(compressed.data()), compressed.size());
@@ -217,9 +226,17 @@ static void streamDecryptFileWithHeader(
   }
 
   // 5) XOR ciphertext with keystream (skipping first 'outputExtension' bytes)
+  const size_t progress_step = 1000000; // 1,000,000 bytes
+  size_t next_progress = progress_step;
   for (size_t i = 0; i < cipherData.size(); ++i) {
     cipherData[i] ^= keystream[i + hdr.outputExtension];
+    // Progress update
+    if (i + 1 == next_progress || i + 1 == cipherData.size()) {
+      std::cerr << "\r" << (i + 1) << "/" << cipherData.size() << " bytes processed." << std::flush;
+      next_progress += progress_step;
+    }
   }
+  std::cerr << std::endl; // Final newline after loop
 
   // 6) Decompress to get plaintext
   auto decompressed = decompressData(cipherData);

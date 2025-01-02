@@ -66,12 +66,12 @@ int main(int argc, char** argv) {
 
         // Handle help and version immediately
         if (result.count("help")) {
-            std::cout << options.help() << "\n";
+            std::cerr << options.help() << "\n";
             return 0;
         }
 
         if (result.count("version")) {
-            std::cout << "rainsum version: " << VERSION << "\n"; // Replace with actual VERSION
+            std::cerr << "rainsum version: " << VERSION << "\n"; // Replace with actual VERSION
             return 0;
         }
 
@@ -308,6 +308,10 @@ int main(int argc, char** argv) {
 
         // Normal Hashing or Encryption/Decryption
         std::string outpath = result["output-file"].as<std::string>();
+        std::string key_input;
+        // We'll write ciphertext to inpath + ".rc"
+        std::string encFile = inpath + ".rc";
+
 
         if (mode == Mode::Digest) {
             // Just a normal digest
@@ -340,7 +344,6 @@ int main(int argc, char** argv) {
             if (inpath.empty()) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
-            std::string key_input;
             if (!password.empty()) {
                 key_input = password;
             }
@@ -348,14 +351,11 @@ int main(int argc, char** argv) {
                 key_input = promptForKey("Enter encryption key: ");
             }
 
-            // We'll write ciphertext to inpath + ".rc"
-            std::string encFile = inpath + ".rc";
-
             // Check if encFile exists and overwrite it with zeros if it does
             try {
                 overwriteFileWithZeros(encFile);
                 if (std::filesystem::exists(encFile)) {
-                    std::cout << "[Info] Existing encrypted file '" << encFile << "' has been securely overwritten with zeros.\n";
+                    std::cerr << "[Info] Existing encrypted file '" << encFile << "' has been securely overwritten with zeros.\n";
                 }
             }
             catch (const std::exception &e) {
@@ -364,13 +364,12 @@ int main(int argc, char** argv) {
 
             // ADDED: Call the existing puzzleEncryptFileWithHeader with updated header
             puzzleEncryptFileWithHeader(inpath, encFile, key_input, algot, hash_size, seed, salt, blockSize, nonceSize, searchMode, verbose, deterministicNonce, output_extension);
-            std::cout << "[Enc] Wrote encrypted file to: " << encFile << "\n";
+            std::cerr << "[Enc] Wrote encrypted file to: " << encFile << "\n";
         }
         else if (mode == Mode::StreamEnc) {
             if (inpath.empty()) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
-            std::string key_input;
             if (!password.empty()) {
                 key_input = password;
             }
@@ -378,14 +377,11 @@ int main(int argc, char** argv) {
                 key_input = promptForKey("Enter encryption key: ");
             }
 
-            // We'll write ciphertext to inpath + ".rc"
-            std::string encFile = inpath + ".rc";
-
             // Check if encFile exists and overwrite it with zeros if it does
             try {
                 overwriteFileWithZeros(encFile);
                 if (std::filesystem::exists(encFile)) {
-                    std::cout << "[Info] Existing encrypted file '" << encFile << "' has been securely overwritten with zeros.\n";
+                    std::cerr << "[Info] Existing encrypted file '" << encFile << "' has been securely overwritten with zeros.\n";
                 }
             }
             catch (const std::exception &e) {
@@ -404,7 +400,7 @@ int main(int argc, char** argv) {
                 output_extension,
                 verbose
             );
-            std::cout << "[StreamEnc] Wrote encrypted file to: " << encFile << "\n";
+            std::cerr << "[StreamEnc] Wrote encrypted file to: " << encFile << "\n";
         }
         else if (mode == Mode::Dec) {
             if (inpath.empty()) {
@@ -421,19 +417,48 @@ int main(int argc, char** argv) {
             // We'll write plaintext to inpath + ".dec"
             std::string decFile = inpath + ".dec";
 
-            // ADDED: Check cipherMode from header
-            std::ifstream fin(inpath, std::ios::binary);
-            if (!fin.is_open()) {
+            // ======== HMAC Verification ========
+            // 1. Open the encrypted file to read header and ciphertext
+            std::ifstream fin_dec(inpath, std::ios::binary);
+            if (!fin_dec.is_open()) {
                 throw std::runtime_error("[Dec] Cannot open ciphertext file: " + inpath);
             }
-            FileHeader hdr = readFileHeader(fin);
-            fin.close();
 
-            if (hdr.magic != MagicNumber) {
+            // 2. Read the header
+            FileHeader hdr_dec = readFileHeader(fin_dec);
+
+            // 3. Read the ciphertext (rest of the file after header)
+            std::vector<uint8_t> ciphertext_dec(
+                (std::istreambuf_iterator<char>(fin_dec)),
+                (std::istreambuf_iterator<char>())
+            );
+            fin_dec.close();
+
+            // 4. Backup the stored HMAC
+            std::vector<uint8_t> storedHMAC_vec(hdr_dec.hmac.begin(), hdr_dec.hmac.end());
+
+            // 5. Serialize the header with zeroed HMAC for HMAC computation
+            FileHeader hdr_dec_for_hmac = hdr_dec;
+            std::fill(hdr_dec_for_hmac.hmac.begin(), hdr_dec_for_hmac.hmac.end(), 0x00);
+            std::vector<uint8_t> headerData_dec = serializeFileHeader(hdr_dec_for_hmac);
+
+            // 6. Convert key_input to vector<uint8_t>
+            std::vector<uint8_t> keyVec_dec(key_input.begin(), key_input.end());
+
+            // 7. Compute HMAC
+            auto computedHMAC_dec = createHMAC(headerData_dec, ciphertext_dec, keyVec_dec);
+
+            // 8. Verify HMAC
+            if (!verifyHMAC(headerData_dec, ciphertext_dec, keyVec_dec, storedHMAC_vec)) {
+                throw std::runtime_error("[Dec] HMAC verification failed! File may be corrupted or tampered with.");
+            }
+            std::cerr << "[Dec] HMAC verification succeeded.\n";
+
+            if (hdr_dec.magic != MagicNumber) {
                 throw std::runtime_error("[Dec] Invalid magic number in header.");
             }
 
-            if (hdr.cipherMode == 0x10) { // Stream Cipher Mode
+            if (hdr_dec.cipherMode == 0x10) { // Stream Cipher Mode
                 // ADDED: Stream Decryption
                 streamDecryptFileWithHeader(
                     inpath,
@@ -441,16 +466,69 @@ int main(int argc, char** argv) {
                     key_input,
                     verbose
                 );
-                std::cout << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
+                std::cerr << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
             }
-            else if (hdr.cipherMode == 0x11) { // Block Cipher Mode
+            else if (hdr_dec.cipherMode == 0x11) { // Block Cipher Mode
                 // ADDED: Block Decryption (integration with tool.h assumed)
                 puzzleDecryptFileWithHeader(inpath, decFile, key_input);
-                std::cout << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
+                std::cerr << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
             }
             else {
                 throw std::runtime_error("[Dec] Unknown cipher mode in header.");
             }
+        }
+
+        if ( mode == Mode::StreamEnc || mode == Mode::BlockEnc ) {
+            // ======== HMAC Creation ========
+            // 1. Open the encrypted file to read header and ciphertext
+            std::ifstream fin_enc(encFile, std::ios::binary);
+            if (!fin_enc.is_open()) {
+                throw std::runtime_error("Cannot reopen encrypted file for HMAC computation: " + encFile);
+            }
+
+            // 2. Read the header
+            FileHeader hdr_enc = readFileHeader(fin_enc);
+
+            // 3. Read the ciphertext (rest of the file after header)
+            std::vector<uint8_t> ciphertext_enc(
+                (std::istreambuf_iterator<char>(fin_enc)),
+                (std::istreambuf_iterator<char>())
+            );
+            fin_enc.close();
+
+            // 4. Serialize the header with zeroed HMAC for HMAC computation
+            FileHeader hdr_enc_for_hmac = hdr_enc;
+            std::fill(hdr_enc_for_hmac.hmac.begin(), hdr_enc_for_hmac.hmac.end(), 0x00);
+            std::vector<uint8_t> headerData_enc = serializeFileHeader(hdr_enc_for_hmac);
+
+            // 5. Convert key_input to vector<uint8_t>
+            std::vector<uint8_t> keyVec_enc(key_input.begin(), key_input.end());
+
+            // 6. Compute HMAC
+            auto hmac_enc = createHMAC(headerData_enc, ciphertext_enc, keyVec_enc);
+
+            // 7. Update the HMAC field in the original header
+            hdr_enc.hmac = std::array<uint8_t, 32>();
+            std::copy(hmac_enc.begin(), hmac_enc.end(), hdr_enc.hmac.begin());
+
+            // 8. Rewrite the header with the HMAC
+            std::ofstream fout_enc(encFile, std::ios::binary | std::ios::in | std::ios::out);
+            if (!fout_enc.is_open()) {
+                throw std::runtime_error("Cannot reopen encrypted file for HMAC writing: " + encFile);
+            }
+            fout_enc.seekp(0, std::ios::beg);
+            writeFileHeader(fout_enc, hdr_enc);
+            fout_enc.close();
+
+
+            // Test read back
+            std::ifstream test_enc(encFile, std::ios::binary);
+            auto test_hdr = readFileHeader(test_enc);
+            test_enc.close();
+
+            std::cerr << "[Enc] HMAC computed and stored successfully. HMAC first 4 bytes: "
+                      << (int)test_hdr.hmac[0] << " " << (int)test_hdr.hmac[1] << " "
+                      << (int)test_hdr.hmac[2] << " " << (int)test_hdr.hmac[3] << "\n";
         }
 
         return 0;

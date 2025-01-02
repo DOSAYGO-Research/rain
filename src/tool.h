@@ -1,6 +1,7 @@
 #pragma once
 #include <atomic> // for std::atomic
 #include <iostream>
+#include <array>
 #include <fstream>
 #include <vector>
 #include <string>
@@ -33,7 +34,7 @@ static std::mutex cerr_mutex;
 #include "cxxopts.hpp"
 #include "common.h"
 
-#define VERSION "1.5.0"
+#define VERSION "1.5.1"
 
 uint32_t MagicNumber = 0x59524352; // RCRY
 
@@ -82,6 +83,20 @@ uint32_t MagicNumber = 0x59524352; // RCRY
   };
 
 // Prototypes
+  // HMAC computation and verification
+  std::vector<uint8_t> createHMAC(
+    const std::vector<uint8_t> &headerData,
+    const std::vector<uint8_t> &ciphertext,
+    const std::vector<uint8_t> &key
+  );
+
+  bool verifyHMAC(
+    const std::vector<uint8_t> &headerData,
+    const std::vector<uint8_t> &ciphertext,
+    const std::vector<uint8_t> &key,
+    const std::vector<uint8_t> &hmacToCheck
+  );
+
   // Add a forward declaration for our new function
   void usage();
 
@@ -194,7 +209,7 @@ uint32_t MagicNumber = 0x59524352; // RCRY
     std::vector<char> buffer(seed_str.begin(), seed_str.end());
     std::vector<uint8_t> hash_output(8); // 64 bits = 8 bytes
     // We'll use 64-bit rainstorm for string -> seed
-    rainstorm::rainstorm<64, bswap>(buffer.data(), buffer.size(), 0, hash_output.data());
+    rainbow::rainbow<64, bswap>(buffer.data(), buffer.size(), 0, hash_output.data());
     uint64_t seed = 0;
     std::memcpy(&seed, hash_output.data(), 8);
     return seed;
@@ -285,6 +300,47 @@ uint32_t MagicNumber = 0x59524352; // RCRY
       in.setstate(std::ios_base::failbit);
     }
     return in;
+  }
+
+// HMAC
+  static const size_t HMAC_SIZE = 32; // 256 bits for Rainstorm
+
+  std::vector<uint8_t> createHMAC(
+    const std::vector<uint8_t> &headerData,
+    const std::vector<uint8_t> &ciphertext,
+    const std::vector<uint8_t> &key
+  ) {
+    // 1) Create a buffer for the concatenation
+    std::vector<uint8_t> buffer;
+    buffer.reserve(headerData.size() + ciphertext.size() + key.size());
+
+    // 2) Concatenate header data, ciphertext, and key
+    buffer.insert(buffer.end(), headerData.begin(), headerData.end());
+    buffer.insert(buffer.end(), ciphertext.begin(), ciphertext.end());
+    buffer.insert(buffer.end(), key.begin(), key.end());
+
+    // 3) Hash the concatenated buffer
+    std::vector<uint8_t> hmac(HMAC_SIZE);
+    rainstorm::rainstorm<256, false>(buffer.data(), buffer.size(), 0, hmac.data());
+    return hmac;
+  }
+
+  bool verifyHMAC(
+    const std::vector<uint8_t> &headerData,
+    const std::vector<uint8_t> &ciphertext,
+    const std::vector<uint8_t> &key,
+    const std::vector<uint8_t> &hmacToCheck
+  ) {
+    // Recompute the HMAC
+    auto computedHMAC = createHMAC(headerData, ciphertext, key);
+
+    // Compare with the provided HMAC (constant-time comparison)
+    if (computedHMAC.size() != hmacToCheck.size()) return false;
+    bool equal = true;
+    for (size_t i = 0; i < computedHMAC.size(); i++) {
+      if (computedHMAC[i] != hmacToCheck[i]) equal = false;
+    }
+    return equal;
   }
 
 // Stream retrieval (stdin vs file)
