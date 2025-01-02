@@ -43,3 +43,26 @@ private:
 
 #endif // TOOL_H
 
+
+
+----
+
+Makefile
+
+
+
+# Detect if libsodium is installed
+LIBSODIUM_CFLAGS = $(shell pkg-config --cflags libsodium 2>/dev/null)
+LIBSODIUM_LDFLAGS = $(shell pkg-config --libs libsodium 2>/dev/null)
+
+# Check if libsodium is available
+ifdef LIBSODIUM_LDFLAGS
+  CXXFLAGS += $(LIBSODIUM_CFLAGS) -DSODIUM_AVAILABLE
+  LDFLAGS += $(LIBSODIUM_LDFLAGS)
+  $(info Using libsodium for secure random generation.)
+else
+  $(info Libsodium not found. Using fallback random generator.)
+endif
+
+
+
