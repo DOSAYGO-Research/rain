@@ -1,6 +1,7 @@
 #pragma once
 #include <atomic> // for std::atomic
 #include <iostream>
+#include <array>
 #include <fstream>
 #include <vector>
 #include <string>
@@ -33,7 +34,7 @@ static std::mutex cerr_mutex;
 #include "cxxopts.hpp"
 #include "common.h"
 
-#define VERSION "1.5.0"
+#define VERSION "1.5.1"
 
 uint32_t MagicNumber = 0x59524352; // RCRY
 
@@ -82,6 +83,20 @@ uint32_t MagicNumber = 0x59524352; // RCRY
   };
 
 // Prototypes
+  // HMAC computation and verification
+  std::vector<uint8_t> createHMAC(
+    const std::vector<uint8_t> &headerData,
+    const std::vector<uint8_t> &ciphertext,
+    const std::vector<uint8_t> &key
+  );
+
+  bool verifyHMAC(
+    const std::vector<uint8_t> &headerData,
+    const std::vector<uint8_t> &ciphertext,
+    const std::vector<uint8_t> &key,
+    const std::vector<uint8_t> &hmacToCheck
+  );
+
   // Add a forward declaration for our new function
   void usage();
 
@@ -194,7 +209,7 @@ uint32_t MagicNumber = 0x59524352; // RCRY
     std::vector<char> buffer(seed_str.begin(), seed_str.end());
     std::vector<uint8_t> hash_output(8); // 64 bits = 8 bytes
     // We'll use 64-bit rainstorm for string -> seed
-    rainstorm::rainstorm<64, bswap>(buffer.data(), buffer.size(), 0, hash_output.data());
+    rainbow::rainbow<64, bswap>(buffer.data(), buffer.size(), 0, hash_output.data());
     uint64_t seed = 0;
     std::memcpy(&seed, hash_output.data(), 8);
     return seed;
@@ -285,6 +300,47 @@ uint32_t MagicNumber = 0x59524352; // RCRY
       in.setstate(std::ios_base::failbit);
     }
     return in;
+  }
+
+// HMAC
+  static const size_t HMAC_SIZE = 32; // 256 bits for Rainstorm
+
+  std::vector<uint8_t> createHMAC(
+    const std::vector<uint8_t> &headerData,
+    const std::vector<uint8_t> &ciphertext,
+    const std::vector<uint8_t> &key
+  ) {
+    // 1) Create a buffer for the concatenation
+    std::vector<uint8_t> buffer;
+    buffer.reserve(headerData.size() + ciphertext.size() + key.size());
+
+    // 2) Concatenate header data, ciphertext, and key
+    buffer.insert(buffer.end(), headerData.begin(), headerData.end());
+    buffer.insert(buffer.end(), ciphertext.begin(), ciphertext.end());
+    buffer.insert(buffer.end(), key.begin(), key.end());
+
+    // 3) Hash the concatenated buffer
+    std::vector<uint8_t> hmac(HMAC_SIZE);
+    rainstorm::rainstorm<256, false>(buffer.data(), buffer.size(), 0, hmac.data());
+    return hmac;
+  }
+
+  bool verifyHMAC(
+    const std::vector<uint8_t> &headerData,
+    const std::vector<uint8_t> &ciphertext,
+    const std::vector<uint8_t> &key,
+    const std::vector<uint8_t> &hmacToCheck
+  ) {
+    // Recompute the HMAC
+    auto computedHMAC = createHMAC(headerData, ciphertext, key);
+
+    // Compare with the provided HMAC (constant-time comparison)
+    if (computedHMAC.size() != hmacToCheck.size()) return false;
+    bool equal = true;
+    for (size_t i = 0; i < computedHMAC.size(); i++) {
+      if (computedHMAC[i] != hmacToCheck[i]) equal = false;
+    }
+    return equal;
   }
 
 // Stream retrieval (stdin vs file)
@@ -744,6 +800,7 @@ uint32_t MagicNumber = 0x59524352; // RCRY
   static const int DE_ITERATIONS = 1;
 
   // ADDED: Derive PRK with iterations
+  /*
   static std::vector<uint8_t> derivePRK(
     const std::vector<uint8_t> &seed,
     const std::vector<uint8_t> &salt,
@@ -774,6 +831,76 @@ uint32_t MagicNumber = 0x59524352; // RCRY
       
       return prk;
   }
+  */
+
+  static std::vector<uint8_t> derivePRK(
+    const std::vector<uint8_t> &seed,
+    const std::vector<uint8_t> &salt,
+    const std::vector<uint8_t> &ikm,
+    HashAlgorithm algot,
+    uint32_t hash_bits,
+    bool debug = false
+  ) {
+    // Combine salt || ikm || info
+    std::vector<uint8_t> combined;
+    combined.reserve(salt.size() + ikm.size() + KDF_INFO_STRING.size());
+    combined.insert(combined.end(), salt.begin(), salt.end());
+    combined.insert(combined.end(), ikm.begin(), ikm.end());
+    combined.insert(combined.end(), KDF_INFO_STRING.begin(), KDF_INFO_STRING.end());
+
+    // PRK is expected to be (hash_bits / 8) bytes
+    size_t prkSize = hash_bits / 8;
+    std::vector<uint8_t> prk(prkSize, 0);
+
+    // temp is initialized to the combined salt || ikm || info
+    std::vector<uint8_t> temp(combined);
+
+    // Convert first 8 bytes of seed vector to uint64_t (little-endian)
+    uint64_t seed_num = 0;
+    for (size_t j = 0; j < std::min(static_cast<size_t>(8), seed.size()); ++j) {
+      seed_num |= static_cast<uint64_t>(seed[j]) << (j * 8);
+    }
+
+    if (debug) {
+      std::cerr << "[derivePRK] hash_bits: " << hash_bits << "\n";
+      std::cerr << "[derivePRK] prkSize (expected): " << prkSize << "\n";
+      std::cerr << "[derivePRK] combined.size(): " << combined.size() << "\n";
+      std::cerr << "[derivePRK] seed_num (0x" << std::hex << seed_num << std::dec << "), seed.size(): " << seed.size() << "\n";
+      std::cerr << "[derivePRK] Beginning KDF iterations: " << KDF_ITERATIONS << "\n";
+    }
+
+    // Iterate the hash function KDF_ITERATIONS times
+    for (int i = 0; i < KDF_ITERATIONS; ++i) {
+      // Call your hashing function
+      invokeHash<false>(algot, seed_num, temp, prk, hash_bits);
+
+      // prk is now the result of invokeHash
+      temp = prk; // Next iteration takes the output of the previous
+
+      if (debug) {
+        std::cerr << "[derivePRK] Iteration " << i + 1
+                  << " completed. prk.size(): " << prk.size() << "\n";
+        // (Optional) print the first few bytes of prk
+        std::cerr << "[derivePRK] PRK first 16 bytes: ";
+        for (size_t x = 0; x < std::min<size_t>(16, prk.size()); ++x) {
+          std::cerr << std::hex << static_cast<int>(prk[x]) << " ";
+        }
+        std::cerr << std::dec << "\n";
+      }
+    }
+
+    if (debug) {
+      std::cerr << "[derivePRK] Final PRK size: " << prk.size() << "\n";
+      std::cerr << "[derivePRK] Final PRK first 32 bytes: ";
+      for (size_t x = 0; x < std::min<size_t>(32, prk.size()); ++x) {
+        std::cerr << std::hex << static_cast<int>(prk[x]) << " ";
+      }
+      std::cerr << std::dec << "\n";
+    }
+
+    return prk;
+  }
+
 
   // ADDED: Extend Output with iterations and counter
   static std::vector<uint8_t> extendOutputKDF(

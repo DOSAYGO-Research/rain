@@ -1,5 +1,6 @@
+// file-header.h
 
-// ADDED: Unified FileHeader struct to include IV and Salt
+// ADDED: Unified FileHeader struct to include IV, Salt, and HMAC
 struct FileHeader {
     uint32_t magic;             // MagicNumber
     uint8_t version;            // Version
@@ -14,6 +15,7 @@ struct FileHeader {
     std::vector<uint8_t> salt;  // Salt data
     uint8_t searchModeEnum;     // Search mode enum (0x00 - 0x05 for block ciphers, 0xFF for stream)
     uint64_t originalSize;      // Compressed plaintext size
+    std::array<uint8_t, 32> hmac; // HMAC (256-bit)
 };
 
 // Updated function to write the unified FileHeader
@@ -39,6 +41,9 @@ static void writeFileHeader(std::ofstream &out, const FileHeader &hdr) {
 
     out.write(reinterpret_cast<const char*>(&hdr.searchModeEnum), sizeof(hdr.searchModeEnum));
     out.write(reinterpret_cast<const char*>(&hdr.originalSize), sizeof(hdr.originalSize));
+
+    // ADDED: Initialize HMAC field to zeros before writing
+    out.write(reinterpret_cast<const char*>(hdr.hmac.data()), hdr.hmac.size());
 }
 
 // Updated function to read the unified FileHeader
@@ -67,6 +72,9 @@ static FileHeader readFileHeader(std::ifstream &in) {
 
     in.read(reinterpret_cast<char*>(&hdr.searchModeEnum), sizeof(hdr.searchModeEnum));
     in.read(reinterpret_cast<char*>(&hdr.originalSize), sizeof(hdr.originalSize));
+
+    // ADDED: Read HMAC field
+    in.read(reinterpret_cast<char*>(hdr.hmac.data()), hdr.hmac.size());
 
     return hdr;
 }
@@ -120,7 +128,61 @@ static void showFileFullInfo(const std::string &inFilename) {
     }
     std::cout << "Compressed Plaintext Size: " << hdr.originalSize << " bytes\n";
     std::cout << "Search Mode Enum: 0x" << std::hex << static_cast<int>(hdr.searchModeEnum) << std::dec << "\n";
+    std::cout << "HMAC: ";
+    for (auto b : hdr.hmac) {
+        std::cout << std::hex << std::setw(2) << std::setfill('0')
+                  << static_cast<int>(b) << " ";
+    }
+    std::cout << std::dec << "\n";
     std::cout << "===============================\n";
 }
 
+// tool.cpp
+
+// Function to serialize FileHeader
+std::vector<uint8_t> serializeFileHeader(const FileHeader &hdr) {
+    std::vector<uint8_t> data;
+    data.reserve(
+        sizeof(hdr.magic) + sizeof(hdr.version) + sizeof(hdr.cipherMode) +
+        sizeof(hdr.blockSize) + sizeof(hdr.nonceSize) + sizeof(hdr.hashSizeBits) +
+        sizeof(hdr.outputExtension) + 1 + hdr.hashName.size() +
+        sizeof(hdr.iv) + sizeof(hdr.saltLen) + hdr.salt.size() +
+        sizeof(hdr.searchModeEnum) + sizeof(hdr.originalSize) +
+        hdr.hmac.size()
+    );
+
+    // Helper lambda to append bytes
+    auto append = [&](const void* ptr, size_t size) {
+        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(ptr);
+        data.insert(data.end(), bytes, bytes + size);
+    };
+
+    append(&hdr.magic, sizeof(hdr.magic));
+    append(&hdr.version, sizeof(hdr.version));
+    append(&hdr.cipherMode, sizeof(hdr.cipherMode));
+    append(&hdr.blockSize, sizeof(hdr.blockSize));
+    append(&hdr.nonceSize, sizeof(hdr.nonceSize));
+    append(&hdr.hashSizeBits, sizeof(hdr.hashSizeBits));
+    append(&hdr.outputExtension, sizeof(hdr.outputExtension));
+
+    uint8_t hnLen = static_cast<uint8_t>(hdr.hashName.size());
+    append(&hnLen, sizeof(hnLen));
+    if (hnLen > 0) {
+        data.insert(data.end(), hdr.hashName.begin(), hdr.hashName.end());
+    }
+
+    append(&hdr.iv, sizeof(hdr.iv));
+
+    append(&hdr.saltLen, sizeof(hdr.saltLen));
+    if (hdr.saltLen > 0) {
+        data.insert(data.end(), hdr.salt.begin(), hdr.salt.end());
+    }
+
+    append(&hdr.searchModeEnum, sizeof(hdr.searchModeEnum));
+    append(&hdr.originalSize, sizeof(hdr.originalSize));
+
+    append(&hdr.hmac, hdr.hmac.size());
+
+    return data;
+}
 

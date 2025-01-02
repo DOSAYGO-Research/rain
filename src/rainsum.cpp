@@ -66,19 +66,63 @@ int main(int argc, char** argv) {
 
         // Handle help and version immediately
         if (result.count("help")) {
-            std::cout << options.help() << "\n";
+            std::cerr << options.help() << "\n";
             return 0;
         }
 
         if (result.count("version")) {
-            std::cout << "rainsum version: " << VERSION << "\n"; // Replace with actual VERSION
+            std::cerr << "rainsum version: " << VERSION << "\n"; // Replace with actual VERSION
             return 0;
         }
+
+        // ADDED: verbose
+        bool verbose = result["verbose"].as<bool>();
+
 
         // Access and validate options
 
         // Hash Size
         uint32_t hash_size = result["size"].as<uint32_t>();
+
+        // Determine Mode
+        std::string modeStr = result["mode"].as<std::string>();
+        Mode mode;
+        if (modeStr == "digest") mode = Mode::Digest;
+        else if (modeStr == "stream") mode = Mode::Stream;
+        else if (modeStr == "block-enc") mode = Mode::BlockEnc;
+        else if (modeStr == "stream-enc") mode = Mode::StreamEnc;
+        else if (modeStr == "dec") mode = Mode::Dec;
+        else if (modeStr == "info") mode = Mode::Info;
+        else throw std::runtime_error("Invalid mode: " + modeStr);
+
+        // Determine Hash Algorithm
+        std::string algorithm = result["algorithm"].as<std::string>();
+        HashAlgorithm algot = getHashAlgorithm(algorithm);
+        if (algot == HashAlgorithm::Unknown) {
+            throw std::runtime_error("Unsupported algorithm string: " + algorithm);
+        }
+
+        // Validate Hash Size based on Algorithm
+        if (algot == HashAlgorithm::Rainbow) {
+            if (hash_size == 512) {
+                hash_size = 256;
+            }
+            if (hash_size != 64 && hash_size != 128 && hash_size != 256) {
+                throw std::runtime_error("Invalid size for Rainbow (must be 64, 128, or 256).");
+            }
+            if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
+              algot = HashAlgorithm::Rainstorm;
+              hash_size = 512;
+            }
+        }
+        else if (algot == HashAlgorithm::Rainstorm) {
+            if (hash_size != 64 && hash_size != 128 && hash_size != 256 && hash_size != 512) {
+                throw std::runtime_error("Invalid size for Rainstorm (must be 64, 128, 256, or 512).");
+            }
+            if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
+              hash_size = 512;
+            }
+        }
 
         // Block Size
         uint8_t blockSize = result["block-size"].as<uint8_t>();
@@ -108,84 +152,74 @@ int main(int argc, char** argv) {
         // Convert Seed (either numeric or hex string)
         std::string seed_str = result["seed"].as<std::string>();
         uint64_t seed = 0;
-        if (!seed_str.empty()) {
-            try {
-                if (seed_str.find("0x") == 0 || seed_str.find("0X") == 0) {
-                    seed = std::stoull(seed_str.substr(2), nullptr, 16);
-                }
-                else {
-                    seed = std::stoull(seed_str, nullptr, 10);
-                }
+        bool userProvidedSeed = false;
+        if (!seed_str.empty() && seed_str != "0x0") {
+          userProvidedSeed = true;
+          try {
+            if (seed_str.find("0x") == 0 || seed_str.find("0X") == 0) {
+              seed = std::stoull(seed_str.substr(2), nullptr, 16);
+            } else {
+              seed = std::stoull(seed_str, nullptr, 10);
             }
-            catch (...) {
-                // If not a valid number, hash the string to 64 bits
-                seed = hash_string_to_64_bit(seed_str); // Assuming this function exists in tool.h
-            }
+          }
+          catch (...) {
+            // If not a valid number, hash the string to 64 bits
+            seed = hash_string_to_64_bit(seed_str);
+          }
         }
 
-        // Later in your main function, parse and convert the salt
+        // If user did NOT provide seed, generate a random one
+        if (!userProvidedSeed && mode != Mode::Digest) {
+          // A simple example using std::random_device + Mersenne Twister
+          std::random_device rd;
+          std::mt19937_64 rng(rd());
+          seed = rng();  // 64-bit random
+          if (verbose) {
+            std::cerr << "[Info] No seed provided; generated random seed: 0x"
+                      << std::hex << seed << std::dec << "\n";
+          }
+        }
+
+        // SALT handling:
         std::string salt_str = result["salt"].as<std::string>();
-        std::vector<uint8_t> salt; // Existing salt vector
+        std::vector<uint8_t> salt;
+        bool userProvidedSalt = false;
+
         if (!salt_str.empty()) {
-            if (salt_str.find("0x") == 0 || salt_str.find("0X") == 0) {
-                // Hex string
-                salt_str = salt_str.substr(2);
-                if (salt_str.size() % 2 != 0) {
-                    throw std::runtime_error("Salt hex string must have even length.");
-                }
-                for (size_t i = 0; i < salt_str.size(); i += 2) {
-                    uint8_t byte = static_cast<uint8_t>(std::stoul(salt_str.substr(i, 2), nullptr, 16));
-                    salt.push_back(byte);
-                }
+          userProvidedSalt = true;
+          if (salt_str.find("0x") == 0 || salt_str.find("0X") == 0) {
+            // Hex string
+            salt_str = salt_str.substr(2);
+            if (salt_str.size() % 2 != 0) {
+              throw std::runtime_error("Salt hex string must have even length.");
             }
-            else {
-                // Regular string
-                salt.assign(salt_str.begin(), salt_str.end());
+            for (size_t i = 0; i < salt_str.size(); i += 2) {
+              uint8_t byte = static_cast<uint8_t>(std::stoul(salt_str.substr(i, 2), nullptr, 16));
+              salt.push_back(byte);
             }
-        }
-        else {
-            // Assign default zeroed salt to the existing salt vector
-            salt.assign(hash_size / 8, 0x00); // Or another method
+          } else {
+            // Regular string
+            salt.assign(salt_str.begin(), salt_str.end());
+          }
         }
 
-        // Determine Mode
-        std::string modeStr = result["mode"].as<std::string>();
-        Mode mode;
-        if (modeStr == "digest") mode = Mode::Digest;
-        else if (modeStr == "stream") mode = Mode::Stream;
-        else if (modeStr == "block-enc") mode = Mode::BlockEnc;
-        else if (modeStr == "stream-enc") mode = Mode::StreamEnc;
-        else if (modeStr == "dec") mode = Mode::Dec;
-        else if (modeStr == "info") mode = Mode::Info;
-        else throw std::runtime_error("Invalid mode: " + modeStr);
-
-        // Determine Hash Algorithm
-        std::string algorithm = result["algorithm"].as<std::string>();
-        HashAlgorithm algot = getHashAlgorithm(algorithm);
-        if (algot == HashAlgorithm::Unknown) {
-            throw std::runtime_error("Unsupported algorithm string: " + algorithm);
-        }
-
-        // Validate Hash Size based on Algorithm
-        if (algot == HashAlgorithm::Rainbow) {
-            if (hash_size == 512) {
-                hash_size = 256;
+        // If user did NOT provide salt, generate random salt with size 32 (or hash_size/8, your choice)
+        if (!userProvidedSalt && mode != Mode::Digest) {
+          // For example, 32 random bytes:
+          const size_t saltLen = 32;
+          std::random_device rd;
+          std::mt19937_64 rng(rd());
+          salt.resize(saltLen);
+          for (size_t i = 0; i < saltLen; ++i) {
+            salt[i] = static_cast<uint8_t>(rng());
+          }
+          if (verbose) {
+            std::cerr << "[Info] No salt provided; generated random 32-byte salt:\n  ";
+            for (auto &b : salt) {
+              std::cerr << std::hex << (int)b << " ";
             }
-            if (hash_size != 64 && hash_size != 128 && hash_size != 256) {
-                throw std::runtime_error("Invalid size for Rainbow (must be 64, 128, or 256).");
-            }
-            if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc ) {
-              algot = HashAlgorithm::Rainstorm;
-              hash_size = 512;
-            }
-        }
-        else if (algot == HashAlgorithm::Rainstorm) {
-            if (hash_size != 64 && hash_size != 128 && hash_size != 256 && hash_size != 512) {
-                throw std::runtime_error("Invalid size for Rainstorm (must be 64, 128, 256, or 512).");
-            }
-            if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc ) {
-              hash_size = 512;
-            }
+            std::cerr << std::dec << "\n";
+          }
         }
 
         // Test Vectors
@@ -196,9 +230,11 @@ int main(int argc, char** argv) {
 
         // Adjust output_length based on mode
         if (mode == Mode::Digest) {
+            // digest mode output_length is just the digest size
             output_length = hash_size / 8;
         }
         else if (mode == Mode::Stream) {
+            // stream mode is hash output in bytes by output_length because output length is then iterations of hash
             output_length *= hash_size / 8;
         }
 
@@ -219,9 +255,6 @@ int main(int argc, char** argv) {
         }
 
         std::string password = result["password"].as<std::string>();
-
-        // ADDED: verbose
-        bool verbose = result["verbose"].as<bool>();
 
         // Handle Mining Modes
         if (mine_mode != MineMode::None) {
@@ -275,6 +308,10 @@ int main(int argc, char** argv) {
 
         // Normal Hashing or Encryption/Decryption
         std::string outpath = result["output-file"].as<std::string>();
+        std::string key_input;
+        // We'll write ciphertext to inpath + ".rc"
+        std::string encFile = inpath + ".rc";
+
 
         if (mode == Mode::Digest) {
             // Just a normal digest
@@ -307,7 +344,6 @@ int main(int argc, char** argv) {
             if (inpath.empty()) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
-            std::string key_input;
             if (!password.empty()) {
                 key_input = password;
             }
@@ -315,14 +351,11 @@ int main(int argc, char** argv) {
                 key_input = promptForKey("Enter encryption key: ");
             }
 
-            // We'll write ciphertext to inpath + ".rc"
-            std::string encFile = inpath + ".rc";
-
             // Check if encFile exists and overwrite it with zeros if it does
             try {
                 overwriteFileWithZeros(encFile);
                 if (std::filesystem::exists(encFile)) {
-                    std::cout << "[Info] Existing encrypted file '" << encFile << "' has been securely overwritten with zeros.\n";
+                    std::cerr << "[Info] Existing encrypted file '" << encFile << "' has been securely overwritten with zeros.\n";
                 }
             }
             catch (const std::exception &e) {
@@ -331,13 +364,12 @@ int main(int argc, char** argv) {
 
             // ADDED: Call the existing puzzleEncryptFileWithHeader with updated header
             puzzleEncryptFileWithHeader(inpath, encFile, key_input, algot, hash_size, seed, salt, blockSize, nonceSize, searchMode, verbose, deterministicNonce, output_extension);
-            std::cout << "[Enc] Wrote encrypted file to: " << encFile << "\n";
+            std::cerr << "[Enc] Wrote encrypted file to: " << encFile << "\n";
         }
         else if (mode == Mode::StreamEnc) {
             if (inpath.empty()) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
-            std::string key_input;
             if (!password.empty()) {
                 key_input = password;
             }
@@ -345,14 +377,11 @@ int main(int argc, char** argv) {
                 key_input = promptForKey("Enter encryption key: ");
             }
 
-            // We'll write ciphertext to inpath + ".rc"
-            std::string encFile = inpath + ".rc";
-
             // Check if encFile exists and overwrite it with zeros if it does
             try {
                 overwriteFileWithZeros(encFile);
                 if (std::filesystem::exists(encFile)) {
-                    std::cout << "[Info] Existing encrypted file '" << encFile << "' has been securely overwritten with zeros.\n";
+                    std::cerr << "[Info] Existing encrypted file '" << encFile << "' has been securely overwritten with zeros.\n";
                 }
             }
             catch (const std::exception &e) {
@@ -371,7 +400,7 @@ int main(int argc, char** argv) {
                 output_extension,
                 verbose
             );
-            std::cout << "[StreamEnc] Wrote encrypted file to: " << encFile << "\n";
+            std::cerr << "[StreamEnc] Wrote encrypted file to: " << encFile << "\n";
         }
         else if (mode == Mode::Dec) {
             if (inpath.empty()) {
@@ -388,39 +417,118 @@ int main(int argc, char** argv) {
             // We'll write plaintext to inpath + ".dec"
             std::string decFile = inpath + ".dec";
 
-            // ADDED: Check cipherMode from header
-            std::ifstream fin(inpath, std::ios::binary);
-            if (!fin.is_open()) {
+            // ======== HMAC Verification ========
+            // 1. Open the encrypted file to read header and ciphertext
+            std::ifstream fin_dec(inpath, std::ios::binary);
+            if (!fin_dec.is_open()) {
                 throw std::runtime_error("[Dec] Cannot open ciphertext file: " + inpath);
             }
-            FileHeader hdr = readFileHeader(fin);
-            fin.close();
 
-            if (hdr.magic != MagicNumber) {
+            // 2. Read the header
+            FileHeader hdr_dec = readFileHeader(fin_dec);
+
+            // 3. Read the ciphertext (rest of the file after header)
+            std::vector<uint8_t> ciphertext_dec(
+                (std::istreambuf_iterator<char>(fin_dec)),
+                (std::istreambuf_iterator<char>())
+            );
+            fin_dec.close();
+
+            // 4. Backup the stored HMAC
+            std::vector<uint8_t> storedHMAC_vec(hdr_dec.hmac.begin(), hdr_dec.hmac.end());
+
+            // 5. Serialize the header with zeroed HMAC for HMAC computation
+            FileHeader hdr_dec_for_hmac = hdr_dec;
+            std::fill(hdr_dec_for_hmac.hmac.begin(), hdr_dec_for_hmac.hmac.end(), 0x00);
+            std::vector<uint8_t> headerData_dec = serializeFileHeader(hdr_dec_for_hmac);
+
+            // 6. Convert key_input to vector<uint8_t>
+            std::vector<uint8_t> keyVec_dec(key_input.begin(), key_input.end());
+
+            // 7. Compute HMAC
+            auto computedHMAC_dec = createHMAC(headerData_dec, ciphertext_dec, keyVec_dec);
+
+            // 8. Verify HMAC
+            if (!verifyHMAC(headerData_dec, ciphertext_dec, keyVec_dec, storedHMAC_vec)) {
+                throw std::runtime_error("[Dec] HMAC verification failed! File may be corrupted or tampered with.");
+            }
+            std::cerr << "[Dec] HMAC verification succeeded.\n";
+
+            if (hdr_dec.magic != MagicNumber) {
                 throw std::runtime_error("[Dec] Invalid magic number in header.");
             }
 
-            if (hdr.cipherMode == 0x10) { // Stream Cipher Mode
+            if (hdr_dec.cipherMode == 0x10) { // Stream Cipher Mode
                 // ADDED: Stream Decryption
                 streamDecryptFileWithHeader(
                     inpath,
                     decFile,
                     key_input,
-                    algot,
-                    hash_size,
-                    output_extension,
                     verbose
                 );
-                std::cout << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
+                std::cerr << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
             }
-            else if (hdr.cipherMode == 0x11) { // Block Cipher Mode
+            else if (hdr_dec.cipherMode == 0x11) { // Block Cipher Mode
                 // ADDED: Block Decryption (integration with tool.h assumed)
                 puzzleDecryptFileWithHeader(inpath, decFile, key_input);
-                std::cout << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
+                std::cerr << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
             }
             else {
                 throw std::runtime_error("[Dec] Unknown cipher mode in header.");
             }
+        }
+
+        if ( mode == Mode::StreamEnc || mode == Mode::BlockEnc ) {
+            // ======== HMAC Creation ========
+            // 1. Open the encrypted file to read header and ciphertext
+            std::ifstream fin_enc(encFile, std::ios::binary);
+            if (!fin_enc.is_open()) {
+                throw std::runtime_error("Cannot reopen encrypted file for HMAC computation: " + encFile);
+            }
+
+            // 2. Read the header
+            FileHeader hdr_enc = readFileHeader(fin_enc);
+
+            // 3. Read the ciphertext (rest of the file after header)
+            std::vector<uint8_t> ciphertext_enc(
+                (std::istreambuf_iterator<char>(fin_enc)),
+                (std::istreambuf_iterator<char>())
+            );
+            fin_enc.close();
+
+            // 4. Serialize the header with zeroed HMAC for HMAC computation
+            FileHeader hdr_enc_for_hmac = hdr_enc;
+            std::fill(hdr_enc_for_hmac.hmac.begin(), hdr_enc_for_hmac.hmac.end(), 0x00);
+            std::vector<uint8_t> headerData_enc = serializeFileHeader(hdr_enc_for_hmac);
+
+            // 5. Convert key_input to vector<uint8_t>
+            std::vector<uint8_t> keyVec_enc(key_input.begin(), key_input.end());
+
+            // 6. Compute HMAC
+            auto hmac_enc = createHMAC(headerData_enc, ciphertext_enc, keyVec_enc);
+
+            // 7. Update the HMAC field in the original header
+            hdr_enc.hmac = std::array<uint8_t, 32>();
+            std::copy(hmac_enc.begin(), hmac_enc.end(), hdr_enc.hmac.begin());
+
+            // 8. Rewrite the header with the HMAC
+            std::ofstream fout_enc(encFile, std::ios::binary | std::ios::in | std::ios::out);
+            if (!fout_enc.is_open()) {
+                throw std::runtime_error("Cannot reopen encrypted file for HMAC writing: " + encFile);
+            }
+            fout_enc.seekp(0, std::ios::beg);
+            writeFileHeader(fout_enc, hdr_enc);
+            fout_enc.close();
+
+
+            // Test read back
+            std::ifstream test_enc(encFile, std::ios::binary);
+            auto test_hdr = readFileHeader(test_enc);
+            test_enc.close();
+
+            std::cerr << "[Enc] HMAC computed and stored successfully. HMAC first 4 bytes: "
+                      << (int)test_hdr.hmac[0] << " " << (int)test_hdr.hmac[1] << " "
+                      << (int)test_hdr.hmac[2] << " " << (int)test_hdr.hmac[3] << "\n";
         }
 
         return 0;

@@ -1,10 +1,20 @@
 cipher improvement
 
+- test research construct
+    weak hash -- digest mining construction --> block cipher --- davies meyer construction ---> strong hash 
+  by prototyping in js
+- let key material come from a file not just a password or -P command line arg
+- write tests, including hmac testing tampering tests
 - implement a js version of enc / dec
 
 Later maybe
-- test research construct
-    weak hash -- digest mining construction --> block cipher --- davies meyer construction ---> strong hash 
+
+- use 'more secure' randomness source
+
+- ensure key privacy in memory, by checking raw keys:
+  - Are wiped from memory after use (consider std::fill or explicit_bzero for zeroing memory).
+  - Avoid storing plaintext keys in memory longer than necessary.
+- stream input in for compress / decompress and stream and block ciphers. Don't just read it all in, it's crass
 
 - ensure we print out the inc nonce for mining and rand nonce for mining (right now we just show the iter count, and lose the rand nonce)
 
