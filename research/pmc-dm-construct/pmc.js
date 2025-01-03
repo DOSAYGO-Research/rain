@@ -37,7 +37,7 @@ function splitIntoBlocks(plaintext, blockSize) {
  * @returns {Promise<object[]>} List of encrypted blocks containing <nonce, indices>.
  */
 export async function pmcEncrypt(plaintext, key, blockSize = 3, mode = 'scatter') {
-  const maxAttempts = 100000;
+  const maxAttempts = 1_000_000;
   const blocks = splitIntoBlocks(plaintext, blockSize);
   const result = [];
 
