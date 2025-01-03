@@ -1,6 +1,6 @@
 // src/pmc.js
 import crypto from 'crypto';
-import { weakHash1 as weakHash } from './hashFunctions.js';
+import { weakHash as weakHash } from './hashFunctions.js';
 
 console.log({weakHash: weakHash.toString()});
 
