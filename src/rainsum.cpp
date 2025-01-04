@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
         options.add_options()
             ("m,mode", "Mode: digest, stream, block-enc, stream-enc, dec, info",
                 cxxopts::value<std::string>()->default_value("digest"))
-            ("a,algorithm", "Specify the hash algorithm to use (rainbow, rainstorm, rainbow-rp, rainstorm-nis1)",
+            ("a,algorithm", "Specify the hash algorithm to use (rainbow, rainstorm, rainbow_rp, rainstorm_nis2_v1)",
                 cxxopts::value<std::string>()->default_value("bow"))
             ("s,size", "Specify the size of the hash (e.g., 64, 128, 256, 512)",
                 cxxopts::value<uint32_t>()->default_value("256"))
@@ -111,11 +111,32 @@ int main(int argc, char** argv) {
                 throw std::runtime_error("Invalid size for Rainbow (must be 64, 128, or 256).");
             }
             if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
-              algot = HashAlgorithm::Rainstorm;
+              algot = HashAlgorithm::Rainstorm_NIS2_v1;
+              hash_size = 512;
+            }
+        }
+        if (algot == HashAlgorithm::Rainbow_RP) {
+            if (hash_size == 512) {
+                hash_size = 256;
+            }
+            if (hash_size != 64 && hash_size != 128 && hash_size != 256) {
+                throw std::runtime_error("Invalid size for Rainbow (must be 64, 128, or 256).");
+            }
+            if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
+              algot = HashAlgorithm::Rainstorm_NIS2_v1;
               hash_size = 512;
             }
         }
         else if (algot == HashAlgorithm::Rainstorm) {
+            if (hash_size != 64 && hash_size != 128 && hash_size != 256 && hash_size != 512) {
+                throw std::runtime_error("Invalid size for Rainstorm (must be 64, 128, 256, or 512).");
+            }
+            if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
+              algot = HashAlgorithm::Rainstorm_NIS2_v1;
+              hash_size = 512;
+            }
+        }
+        else if (algot == HashAlgorithm::Rainstorm_NIS2_v1) {
             if (hash_size != 64 && hash_size != 128 && hash_size != 256 && hash_size != 512) {
                 throw std::runtime_error("Invalid size for Rainstorm (must be 64, 128, 256, or 512).");
             }

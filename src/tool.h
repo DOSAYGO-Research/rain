@@ -30,7 +30,9 @@
 static std::mutex cerr_mutex;
 
 #include "rainbow.cpp"
+#include "rainbow_rp.cpp"
 #include "rainstorm.cpp"
+#include "rainstorm_nis2_v1.cpp"
 #include "cxxopts.hpp"
 #include "common.h"
 
@@ -78,7 +80,9 @@ uint32_t MagicNumber = 0x59524352; // RCRY
 
   enum class HashAlgorithm {
     Rainbow,
+    Rainbow_RP,
     Rainstorm,
+    Rainstorm_NIS2_v1,
     Unknown
   };
 
@@ -360,17 +364,23 @@ uint32_t MagicNumber = 0x59524352; // RCRY
   std::string hashAlgoToString(const HashAlgorithm& algo) {
     switch(algo) {
       case HashAlgorithm::Rainbow:   return "Rainbow";
+      case HashAlgorithm::Rainbow_RP:   return "Rainbow_RP";
       case HashAlgorithm::Rainstorm: return "Rainstorm";
+      case HashAlgorithm::Rainstorm_NIS2_v1: return "Rainstorm_NIS2_v1";
       default:
-        throw std::runtime_error("Unknown hash algorithm value (expected rainbow or rainstorm)");
+        throw std::runtime_error("Unknown hash algorithm value (expected rainbow, rainbow_rp, rainstorm or rainstorm_nis2_v1)");
     }
   }
 
   HashAlgorithm getHashAlgorithm(const std::string& algorithm) {
     if (algorithm == "rainbow" || algorithm == "bow") {
       return HashAlgorithm::Rainbow;
+    } else if (algorithm == "rainbow_rp" || algorithm == "bow_rp") {
+      return HashAlgorithm::Rainbow_RP;
     } else if (algorithm == "rainstorm" || algorithm == "storm") {
       return HashAlgorithm::Rainstorm;
+    } else if (algorithm == "rainstorm_nis2_v1" || algorithm == "storm_nis2_v1") {
+      return HashAlgorithm::Rainstorm_NIS2_v1;
     } else {
       return HashAlgorithm::Unknown;
     }
@@ -394,6 +404,20 @@ uint32_t MagicNumber = 0x59524352; // RCRY
         default:
           throw std::runtime_error("Invalid hash_size for rainbow");
       }
+    } else if (algot == HashAlgorithm::Rainbow_RP) {
+      switch(hash_size) {
+        case 64:
+          rainbow_rp::rainbow_rp<64, bswap>(buffer.data(), buffer.size(), seed, temp_out.data());
+          break;
+        case 128:
+          rainbow_rp::rainbow_rp<128, bswap>(buffer.data(), buffer.size(), seed, temp_out.data());
+          break;
+        case 256:
+          rainbow_rp::rainbow_rp<256, bswap>(buffer.data(), buffer.size(), seed, temp_out.data());
+          break;
+        default:
+          throw std::runtime_error("Invalid hash_size for rainbow_rp");
+      }
     } else if (algot == HashAlgorithm::Rainstorm) {
       switch(hash_size) {
         case 64:
@@ -410,6 +434,23 @@ uint32_t MagicNumber = 0x59524352; // RCRY
           break;
         default:
           throw std::runtime_error("Invalid hash_size for rainstorm");
+      }
+    } else if (algot == HashAlgorithm::Rainstorm_NIS2_v1) {
+      switch(hash_size) {
+        case 64:
+          rainstorm_nis2_v1::rainstorm_nis2_v1<64, bswap>(buffer.data(), buffer.size(), seed, temp_out.data());
+          break;
+        case 128:
+          rainstorm_nis2_v1::rainstorm_nis2_v1<128, bswap>(buffer.data(), buffer.size(), seed, temp_out.data());
+          break;
+        case 256:
+          rainstorm_nis2_v1::rainstorm_nis2_v1<256, bswap>(buffer.data(), buffer.size(), seed, temp_out.data());
+          break;
+        case 512:
+          rainstorm_nis2_v1::rainstorm_nis2_v1<512, bswap>(buffer.data(), buffer.size(), seed, temp_out.data());
+          break;
+        default:
+          throw std::runtime_error("Invalid hash_size for rainstorm_nis2_v1");
       }
     } else {
       throw std::runtime_error("Invalid algorithm: " + hashAlgoToString(algot));
@@ -630,9 +671,15 @@ uint32_t MagicNumber = 0x59524352; // RCRY
         if (algot == HashAlgorithm::Rainbow) {
           state = std::make_unique<rainbow::HashState>(
                     rainbow::HashState::initialize(seed, input_length, size));
+        } else if (algot == HashAlgorithm::Rainbow_RP) {
+          state = std::make_unique<rainbow_rp::HashState>(
+                    rainbow_rp::HashState::initialize(seed, input_length, size));
         } else if (algot == HashAlgorithm::Rainstorm) {
           state = std::make_unique<rainstorm::HashState>(
                     rainstorm::HashState::initialize(seed, input_length, size));
+        } else if (algot == HashAlgorithm::Rainstorm_NIS2_v1) {
+          state = std::make_unique<rainstorm_nis2_v1::HashState>(
+                    rainstorm_nis2_v1::HashState::initialize(seed, input_length, size));
         } else {
           throw std::runtime_error("Invalid algorithm: " + hashAlgoToString(algot));
         }

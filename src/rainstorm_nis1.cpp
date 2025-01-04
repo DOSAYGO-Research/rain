@@ -1,5 +1,3 @@
-#define __STORMVERSION__ "1.5.0"
-
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -19,7 +17,7 @@
 
 #include "common.h"
 
-namespace rainstorm {
+namespace rainstorm_nis1 {
   // Frank's fixes: use static constexpr for these constants
   static constexpr int ROUNDS = 4;
   static constexpr int FINAL_ROUNDS = 2;
@@ -169,7 +167,7 @@ namespace rainstorm {
   };
 
   template <uint32_t hashsize, bool bswap>
-  static void rainstorm(const void* in, const size_t len, const seed_t seed, void* out) {
+  static void rainstorm_nis1(const void* in, const size_t len, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[16] = {
       seed + len + 1,
@@ -233,20 +231,20 @@ namespace rainstorm {
 
 #ifdef __EMSCRIPTEN__
 extern "C" {
-  KEEPALIVE void rainstormHash64(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm::rainstorm<64, false>(in, len, seed, out);
+  KEEPALIVE void rainstorm_nis1Hash64(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm_nis1::rainstorm_nis1<64, false>(in, len, seed, out);
   }
 
-  KEEPALIVE void rainstormHash128(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm::rainstorm<128, false>(in, len, seed, out);
+  KEEPALIVE void rainstorm_nis1Hash128(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm_nis1::rainstorm_nis1<128, false>(in, len, seed, out);
   }
 
-  KEEPALIVE void rainstormHash256(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm::rainstorm<256, false>(in, len, seed, out);
+  KEEPALIVE void rainstorm_nis1Hash256(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm_nis1::rainstorm_nis1<256, false>(in, len, seed, out);
   }
 
-  KEEPALIVE void rainstormHash512(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm::rainstorm<512, false>(in, len, seed, out);
+  KEEPALIVE void rainstorm_nis1Hash512(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm_nis1::rainstorm_nis1<512, false>(in, len, seed, out);
   }
 }
 #endif

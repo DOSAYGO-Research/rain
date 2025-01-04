@@ -1,4 +1,3 @@
-#define __RAINBNOWVERSION__ "1.5.0-rp"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>

@@ -1,5 +1,3 @@
-#define __STORMVERSION__ "1.5.0-nis1"
-
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -19,7 +17,7 @@
 
 #include "common.h"
 
-namespace rainstorm_nis1 {
+namespace rainstorm_nis2_v1 {
   // Frank's fixes: use static constexpr for these constants
   static constexpr int ROUNDS = 4;
   static constexpr int FINAL_ROUNDS = 2;
@@ -39,6 +37,13 @@ namespace rainstorm_nis1 {
 
   static constexpr uint64_t CTR_LEFT  = UINT64_C(0xefcdab8967452301);
   static constexpr uint64_t CTR_RIGHT = UINT64_C(0x1032547698badcfe);
+
+  static inline void compress1( uint64_t * h, const uint64_t * start, const seed_t seed ) {
+    for (int i = 0, j = 1; i < 15; i++, j++) {
+        h[i] += h[j] - K[h[j]&15];
+        h[j] = start[j] ^ seed;
+    }
+  }
 
   static inline void weakfunc(uint64_t* h, const uint64_t* data, bool left) {
     uint64_t ctr;
@@ -70,6 +75,7 @@ namespace rainstorm_nis1 {
   }
 
   struct HashState : IHashState {
+    uint64_t  start[16];
     uint64_t  h[16];
     seed_t    seed;
     size_t    len;             
@@ -82,22 +88,24 @@ namespace rainstorm_nis1 {
     static HashState initialize(const seed_t seed, size_t olen, uint32_t hashsize) {
       HashState state;
 
-      state.h[0]  = seed + olen + 1;
-      state.h[1]  = seed + olen + 2;
-      state.h[2]  = seed + olen + 2;
-      state.h[3]  = seed + olen + 3;
-      state.h[4]  = seed + olen + 5;
-      state.h[5]  = seed + olen + 7;
-      state.h[6]  = seed + olen + 11;
-      state.h[7]  = seed + olen + 13;
-      state.h[8]  = seed + olen + 17;
-      state.h[9]  = seed + olen + 19;
-      state.h[10] = seed + olen + 23;
-      state.h[11] = seed + olen + 29;
-      state.h[12] = seed + olen + 31;
-      state.h[13] = seed + olen + 37;
-      state.h[14] = seed + olen + 41;
-      state.h[15] = seed + olen + 43;
+      state.start[0]  = seed + olen + 1;
+      state.start[1]  = seed + olen + 2;
+      state.start[2]  = seed + olen + 2;
+      state.start[3]  = seed + olen + 3;
+      state.start[4]  = seed + olen + 5;
+      state.start[5]  = seed + olen + 7;
+      state.start[6]  = seed + olen + 11;
+      state.start[7]  = seed + olen + 13;
+      state.start[8]  = seed + olen + 17;
+      state.start[9]  = seed + olen + 19;
+      state.start[10] = seed + olen + 23;
+      state.start[11] = seed + olen + 29;
+      state.start[12] = seed + olen + 31;
+      state.start[13] = seed + olen + 37;
+      state.start[14] = seed + olen + 41;
+      state.start[15] = seed + olen + 43;
+      
+      std::memcpy(state.h, state.start, sizeof(state.start));
 
       state.len = 0;  
       state.seed = seed;
@@ -122,6 +130,8 @@ namespace rainstorm_nis1 {
           weakfunc(this->h, temp, i & 1);
         }
 
+        compress1(this->h, this->start, seed);
+
         chunk += 64;
         chunk_len -= 64;
         this->len += 64;
@@ -134,6 +144,8 @@ namespace rainstorm_nis1 {
         // Frank's fix: Don't perform the length encoding that can cause issues:
         // temp[lenRemaining >> 3] |= (uint64_t)(lenRemaining << ((lenRemaining&7)*8)); 
         // was removed in Frank's code.
+
+        compress1(this->h, this->start, seed);
 
         for (int i = 0; i < ROUNDS; i++) {
           weakfunc(this->h, temp, i & 1);
@@ -169,7 +181,7 @@ namespace rainstorm_nis1 {
   };
 
   template <uint32_t hashsize, bool bswap>
-  static void rainstorm_nis1(const void* in, const size_t len, const seed_t seed, void* out) {
+  static void rainstorm_nis2_v1(const void* in, const size_t len, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[16] = {
       seed + len + 1,
@@ -233,20 +245,20 @@ namespace rainstorm_nis1 {
 
 #ifdef __EMSCRIPTEN__
 extern "C" {
-  KEEPALIVE void rainstorm_nis1Hash64(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm_nis1::rainstorm_nis1<64, false>(in, len, seed, out);
+  KEEPALIVE void rainstormHash64(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm::rainstorm<64, false>(in, len, seed, out);
   }
 
-  KEEPALIVE void rainstorm_nis1Hash128(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm_nis1::rainstorm_nis1<128, false>(in, len, seed, out);
+  KEEPALIVE void rainstormHash128(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm::rainstorm<128, false>(in, len, seed, out);
   }
 
-  KEEPALIVE void rainstorm_nis1Hash256(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm_nis1::rainstorm_nis1<256, false>(in, len, seed, out);
+  KEEPALIVE void rainstormHash256(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm::rainstorm<256, false>(in, len, seed, out);
   }
 
-  KEEPALIVE void rainstorm_nis1Hash512(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm_nis1::rainstorm_nis1<512, false>(in, len, seed, out);
+  KEEPALIVE void rainstormHash512(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainstorm::rainstorm<512, false>(in, len, seed, out);
   }
 }
 #endif
