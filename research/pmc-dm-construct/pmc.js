@@ -2,15 +2,26 @@
 import crypto from 'crypto';
 import { weakHash as weakHash } from './hashFunctions.js';
 
-console.log({weakHash: weakHash.toString()});
+const state = {
+  detNonce: 0n,
+};
 
 /**
  * Generate a random nonce using crypto.randomBytes.
  * @param {number} length - Length of the nonce in bytes.
  * @returns {string} Hexadecimal representation of the nonce.
  */
-function generateNonce(length = 8) {
-  return crypto.randomBytes(length).toString('hex');
+function generateNonce({length = 8, deterministic = false} = {}) {
+  if ( deterministic ) {
+    return crypto.randomBytes(length).toString('hex');
+  } else {
+    const hexNonce = (state.detNonce++).toString(16);
+    return hexNonce.padStart(hexNonce.length+hexNonce.length%2,'0');
+  }
+}
+
+function resetNonce() {
+  state.detNonce = 0n;
 }
 
 /**
@@ -36,16 +47,19 @@ function splitIntoBlocks(plaintext, blockSize) {
  * @param {string} mode - Mining mode ('scatter', 'prefix', 'sequence').
  * @returns {Promise<object[]>} List of encrypted blocks containing <nonce, indices>.
  */
-export async function pmcEncrypt(plaintext, key, blockSize = 3, mode = 'scatter') {
-  const maxAttempts = 1_000_000;
+export async function pmcEncrypt(plaintext, key, {blockSize = 3, mode = 'scatter', deterministicNonce = false} = {}) {
+  const maxAttempts = 20_000_000;
   const blocks = splitIntoBlocks(plaintext, blockSize);
   const result = [];
+  if ( deterministicNonce ) {
+    resetNonce();
+  }
 
   for (const block of blocks) {
     let mined = false;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const nonce = generateNonce();
+      const nonce = generateNonce({deterministic: deterministicNonce});
       const digest = weakHash(key + nonce);
 
       let indices = [];
