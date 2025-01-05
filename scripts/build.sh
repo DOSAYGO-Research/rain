@@ -5,6 +5,7 @@ if [ ! -f src/cxxopts.hpp ]; then
 fi
 
 export PATH="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:${PATH}"
+echo "You need emsdk to build wasm"
 cd ../emsdk
 source ./emsdk_env.sh
 

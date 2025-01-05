@@ -1,4 +1,6 @@
-#define __STORMVERSION__ "1.3.0"
+#define __STORMVERSION__ "2.0.0"
+// v2 is NIS2-v1 - non invertible state, v1 - passess all normal smhasher tests. BadSeeds not tested yet.
+// includes a compress step on each ingest to make it harder to invert the state even given knowledge of it
 
 #include <cstdint>
 #include <cstdlib>
@@ -69,7 +71,15 @@ namespace rainstorm {
     }
   }
 
+  static inline void compress1( uint64_t * h, const uint64_t * start, const seed_t seed ) {
+    for (int i = 0, j = 1; i < 15; i++, j++) {
+        h[i] += h[j] - K[h[j]&15];
+        h[j] = start[j] ^ seed;
+    }
+  }
+
   struct HashState : IHashState {
+    uint64_t  start[16];
     uint64_t  h[16];
     seed_t    seed;
     size_t    len;             
@@ -82,22 +92,22 @@ namespace rainstorm {
     static HashState initialize(const seed_t seed, size_t olen, uint32_t hashsize) {
       HashState state;
 
-      state.h[0]  = seed + olen + 1;
-      state.h[1]  = seed + olen + 2;
-      state.h[2]  = seed + olen + 2;
-      state.h[3]  = seed + olen + 3;
-      state.h[4]  = seed + olen + 5;
-      state.h[5]  = seed + olen + 7;
-      state.h[6]  = seed + olen + 11;
-      state.h[7]  = seed + olen + 13;
-      state.h[8]  = seed + olen + 17;
-      state.h[9]  = seed + olen + 19;
-      state.h[10] = seed + olen + 23;
-      state.h[11] = seed + olen + 29;
-      state.h[12] = seed + olen + 31;
-      state.h[13] = seed + olen + 37;
-      state.h[14] = seed + olen + 41;
-      state.h[15] = seed + olen + 43;
+      state.h[0]  = state.start[0] = seed + olen + 1;
+      state.h[1]  = state.start[1] = seed + olen + 2;
+      state.h[2]  = state.start[2] = seed + olen + 2;
+      state.h[3]  = state.start[3] = seed + olen + 3;
+      state.h[4]  = state.start[4] = seed + olen + 5;
+      state.h[5]  = state.start[5] = seed + olen + 7;
+      state.h[6]  = state.start[6] = seed + olen + 11;
+      state.h[7]  = state.start[7] = seed + olen + 13;
+      state.h[8]  = state.start[8] = seed + olen + 17;
+      state.h[9]  = state.start[9] = seed + olen + 19;
+      state.h[10] = state.start[10] = seed + olen + 23;
+      state.h[11] = state.start[11] = seed + olen + 29;
+      state.h[12] = state.start[12] = seed + olen + 31;
+      state.h[13] = state.start[13] = seed + olen + 37;
+      state.h[14] = state.start[14] = seed + olen + 41;
+      state.h[15] = state.start[15] = seed + olen + 43;
 
       state.len = 0;  
       state.seed = seed;
@@ -122,6 +132,8 @@ namespace rainstorm {
           weakfunc(this->h, temp, i & 1);
         }
 
+        compress1(this->h, this->start, sizeof(this->start));
+
         chunk += 64;
         chunk_len -= 64;
         this->len += 64;
@@ -134,6 +146,8 @@ namespace rainstorm {
         // Frank's fix: Don't perform the length encoding that can cause issues:
         // temp[lenRemaining >> 3] |= (uint64_t)(lenRemaining << ((lenRemaining&7)*8)); 
         // was removed in Frank's code.
+
+        compress1(this->h, this->start, sizeof(this->start));
 
         for (int i = 0; i < ROUNDS; i++) {
           weakfunc(this->h, temp, i & 1);
