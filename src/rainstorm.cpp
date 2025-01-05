@@ -73,7 +73,7 @@ namespace rainstorm {
 
   static inline void compress1( uint64_t * h, const uint64_t * start, const seed_t seed ) {
     for (int i = 0, j = 1; i < 15; i++, j++) {
-        h[i] += h[j] - K[h[j]&15];
+        h[i] += h[j] - K[h[i]&7];
         h[j] = start[j] ^ seed;
     }
   }
