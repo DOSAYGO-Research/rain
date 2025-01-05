@@ -19,7 +19,6 @@
 #include <memory>
 #include <thread>
 #include <iterator>
-#include <zlib.h>
 #include <stdexcept>
 // only define USE_FILESYSTEM if it is supported and needed
 #include <sys/stat.h>
@@ -27,12 +26,13 @@
 #include <filesystem>
 #endif
 #include <mutex>
+#include "/opt/homebrew/opt/zlib/include/zlib.h"
 static std::mutex cerr_mutex;
 
-#include "rainbow.cpp"
-#include "rainbow_rp.cpp"
-#include "rainstorm.cpp"
-#include "rainstorm_nis2_v1.cpp"
+#include "rainbow.hpp"
+#include "rainbow_rp.hpp"
+#include "rainstorm.hpp"
+#include "rainstorm_nis2_v1.hpp"
 #include "cxxopts.hpp"
 #include "common.h"
 
