@@ -132,7 +132,7 @@ namespace rainstorm {
           weakfunc(this->h, temp, i & 1);
         }
 
-        compress1(this->h, this->start, sizeof(this->start));
+        compress1(this->h, this->start, seed);
 
         chunk += 64;
         chunk_len -= 64;
@@ -147,7 +147,7 @@ namespace rainstorm {
         // temp[lenRemaining >> 3] |= (uint64_t)(lenRemaining << ((lenRemaining&7)*8)); 
         // was removed in Frank's code.
 
-        compress1(this->h, this->start, sizeof(this->start));
+        compress1(this->h, this->start, seed);
 
         for (int i = 0; i < ROUNDS; i++) {
           weakfunc(this->h, temp, i & 1);
@@ -185,6 +185,24 @@ namespace rainstorm {
   template <uint32_t hashsize, bool bswap>
   static void rainstorm(const void* in, const size_t len, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
+    const uint64_t start[16] = {
+      seed + len + 1,
+      seed + len + 2,
+      seed + len + 2,
+      seed + len + 3,
+      seed + len + 5,
+      seed + len + 7,
+      seed + len + 11,
+      seed + len + 13,
+      seed + len + 17,
+      seed + len + 19,
+      seed + len + 23,
+      seed + len + 29,
+      seed + len + 31,
+      seed + len + 37,
+      seed + len + 41,
+      seed + len + 43
+    };
     uint64_t h[16] = {
       seed + len + 1,
       seed + len + 2,
@@ -216,6 +234,8 @@ namespace rainstorm {
         weakfunc(h, temp, i & 1);
       }
 
+      compress1(h, start, seed);
+
       data += 64;
       lenRemaining -= 64;
     }
@@ -224,6 +244,8 @@ namespace rainstorm {
     memcpy(temp, data, lenRemaining);
     // Frank's fix: remove the length encoding line that can cause issues
     // temp[lenRemaining >> 3] |= (uint64_t)(lenRemaining << ((lenRemaining&7)*8));
+
+    compress1(h, start, seed);
 
     for (int i = 0; i < ROUNDS; i++) {
       weakfunc(h, temp, i & 1);
