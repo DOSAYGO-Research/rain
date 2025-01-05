@@ -640,9 +640,6 @@ async function createWasm() {
 
   var stackSave = () => _emscripten_stack_get_current();
 
-  var __abort_js = () =>
-      abort('');
-
   var getHeapMax = () =>
       // Stay one Wasm page short of 4GB: while e.g. Chrome is able to allocate
       // full 4GB Wasm memories, the size will wrap back to 0 bytes in Wasm side
@@ -957,27 +954,18 @@ async function createWasm() {
 
 var wasmImports = {
   /** @export */
-  _abort_js: __abort_js,
-  /** @export */
   emscripten_resize_heap: _emscripten_resize_heap
 };
 var wasmExports;
 createWasm();
 var ___wasm_call_ctors = () => (___wasm_call_ctors = wasmExports['__wasm_call_ctors'])();
-var _rainbowHash64 = Module['_rainbowHash64'] = (a0, a1, a2, a3) => (_rainbowHash64 = Module['_rainbowHash64'] = wasmExports['rainbowHash64'])(a0, a1, a2, a3);
-var _rainbowHash128 = Module['_rainbowHash128'] = (a0, a1, a2, a3) => (_rainbowHash128 = Module['_rainbowHash128'] = wasmExports['rainbowHash128'])(a0, a1, a2, a3);
-var _rainbowHash256 = Module['_rainbowHash256'] = (a0, a1, a2, a3) => (_rainbowHash256 = Module['_rainbowHash256'] = wasmExports['rainbowHash256'])(a0, a1, a2, a3);
-var _rainbow_rpHash64 = Module['_rainbow_rpHash64'] = (a0, a1, a2, a3) => (_rainbow_rpHash64 = Module['_rainbow_rpHash64'] = wasmExports['rainbow_rpHash64'])(a0, a1, a2, a3);
-var _rainbow_rpHash128 = Module['_rainbow_rpHash128'] = (a0, a1, a2, a3) => (_rainbow_rpHash128 = Module['_rainbow_rpHash128'] = wasmExports['rainbow_rpHash128'])(a0, a1, a2, a3);
-var _rainbow_rpHash256 = Module['_rainbow_rpHash256'] = (a0, a1, a2, a3) => (_rainbow_rpHash256 = Module['_rainbow_rpHash256'] = wasmExports['rainbow_rpHash256'])(a0, a1, a2, a3);
 var _rainstormHash64 = Module['_rainstormHash64'] = (a0, a1, a2, a3) => (_rainstormHash64 = Module['_rainstormHash64'] = wasmExports['rainstormHash64'])(a0, a1, a2, a3);
 var _rainstormHash128 = Module['_rainstormHash128'] = (a0, a1, a2, a3) => (_rainstormHash128 = Module['_rainstormHash128'] = wasmExports['rainstormHash128'])(a0, a1, a2, a3);
 var _rainstormHash256 = Module['_rainstormHash256'] = (a0, a1, a2, a3) => (_rainstormHash256 = Module['_rainstormHash256'] = wasmExports['rainstormHash256'])(a0, a1, a2, a3);
 var _rainstormHash512 = Module['_rainstormHash512'] = (a0, a1, a2, a3) => (_rainstormHash512 = Module['_rainstormHash512'] = wasmExports['rainstormHash512'])(a0, a1, a2, a3);
-var _rainstorm_nis2_v1Hash64 = Module['_rainstorm_nis2_v1Hash64'] = (a0, a1, a2, a3) => (_rainstorm_nis2_v1Hash64 = Module['_rainstorm_nis2_v1Hash64'] = wasmExports['rainstorm_nis2_v1Hash64'])(a0, a1, a2, a3);
-var _rainstorm_nis2_v1Hash128 = Module['_rainstorm_nis2_v1Hash128'] = (a0, a1, a2, a3) => (_rainstorm_nis2_v1Hash128 = Module['_rainstorm_nis2_v1Hash128'] = wasmExports['rainstorm_nis2_v1Hash128'])(a0, a1, a2, a3);
-var _rainstorm_nis2_v1Hash256 = Module['_rainstorm_nis2_v1Hash256'] = (a0, a1, a2, a3) => (_rainstorm_nis2_v1Hash256 = Module['_rainstorm_nis2_v1Hash256'] = wasmExports['rainstorm_nis2_v1Hash256'])(a0, a1, a2, a3);
-var _rainstorm_nis2_v1Hash512 = Module['_rainstorm_nis2_v1Hash512'] = (a0, a1, a2, a3) => (_rainstorm_nis2_v1Hash512 = Module['_rainstorm_nis2_v1Hash512'] = wasmExports['rainstorm_nis2_v1Hash512'])(a0, a1, a2, a3);
+var _rainbowHash64 = Module['_rainbowHash64'] = (a0, a1, a2, a3) => (_rainbowHash64 = Module['_rainbowHash64'] = wasmExports['rainbowHash64'])(a0, a1, a2, a3);
+var _rainbowHash128 = Module['_rainbowHash128'] = (a0, a1, a2, a3) => (_rainbowHash128 = Module['_rainbowHash128'] = wasmExports['rainbowHash128'])(a0, a1, a2, a3);
+var _rainbowHash256 = Module['_rainbowHash256'] = (a0, a1, a2, a3) => (_rainbowHash256 = Module['_rainbowHash256'] = wasmExports['rainbowHash256'])(a0, a1, a2, a3);
 var _malloc = Module['_malloc'] = (a0) => (_malloc = Module['_malloc'] = wasmExports['malloc'])(a0);
 var _free = Module['_free'] = (a0) => (_free = Module['_free'] = wasmExports['free'])(a0);
 var __emscripten_stack_restore = (a0) => (__emscripten_stack_restore = wasmExports['_emscripten_stack_restore'])(a0);

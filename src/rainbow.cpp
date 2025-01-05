@@ -1,4 +1,5 @@
-#pragma once
+#define __RAINBNOWVERSION__ "2.0.0"
+// includes the complete flow via mixB in response to a lack of backwards flow identified by Reiner Pope
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -13,7 +14,7 @@
 
 #include "common.h"
 
-namespace rainbow_rp {
+namespace rainbow {
   static const uint64_t P = UINT64_C(0xFFFFFFFFFFFFFFFF) - 58;
   static const uint64_t Q = UINT64_C(13166748625691186689);
   static const uint64_t R = UINT64_C(1573836600196043749);
@@ -62,7 +63,7 @@ namespace rainbow_rp {
     b = ROTR64(b, 23);
     b *= S;
 
-    s[1] = b; s[2] = a; // this is the RP change based on a incomplete flow discovered by Reiner Pope in December 2024
+    s[1] = b; s[2] = a;
   }
 
   // Streaming state structure if needed (mirroring your original style)
@@ -183,7 +184,7 @@ namespace rainbow_rp {
 
   // Single-call version with no streaming needed
   template <uint32_t hashsize, bool bswap>
-  static void rainbow_rp(const void* in, const size_t olen, const seed_t seed, void* out) {
+  static void rainbow(const void* in, const size_t olen, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[4] = {
       seed + olen + 1,
@@ -276,16 +277,16 @@ namespace rainbow_rp {
 
 #ifdef __EMSCRIPTEN__
 extern "C" {
-  KEEPALIVE void rainbow_rpHash64(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainbow_rp::rainbow_rp<64, false>(in, len, seed, out);
+  KEEPALIVE void rainbowHash64(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainbow::rainbow<64, false>(in, len, seed, out);
   }
 
-  KEEPALIVE void rainbow_rpHash128(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainbow_rp::rainbow_rp<128, false>(in, len, seed, out);
+  KEEPALIVE void rainbowHash128(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainbow::rainbow<128, false>(in, len, seed, out);
   }
 
-  KEEPALIVE void rainbow_rpHash256(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainbow_rp::rainbow_rp<256, false>(in, len, seed, out);
+  KEEPALIVE void rainbowHash256(const void* in, const size_t len, const seed_t seed, void* out) {
+    rainbow::rainbow<256, false>(in, len, seed, out);
   }
 }
 #endif
