@@ -5,7 +5,7 @@ EMCC = emcc
 # Flags
 CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O3 -march=native
 CXXFLAGS += -isysroot $(shell xcrun --show-sdk-path)
-CXXFLAGS += -fopenmp -I/opt/homebrew/opt/llvm/include
+CXXFLAGS += -fsanitize=thread -fopenmp -I/opt/homebrew/opt/llvm/include
 CXXFLAGS += -I/opt/homebrew/opt/zlib/include
 DEPFLAGS = -MMD -MF $(@:.o=.d)
 
