@@ -1,4 +1,5 @@
-#define __RAINBNOWVERSION__ "1.5.0"
+#define __RAINBNOWVERSION__ "2.0.0"
+// includes the complete flow via mixB in response to a lack of backwards flow identified by Reiner Pope
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -62,7 +63,7 @@ namespace rainbow {
     b = ROTR64(b, 23);
     b *= S;
 
-    s[1] = a; s[2] = b;
+    s[1] = b; s[2] = a;
   }
 
   // Streaming state structure if needed (mirroring your original style)
