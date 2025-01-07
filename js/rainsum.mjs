@@ -113,8 +113,16 @@ async function hashAnything(mode, algorithm, seed, inputPath, outputPath, size) 
       try {
         const parsedInfo = JSON.parse(info);
         console.log("=== File Header Info ===");
+        for( const [key, value] of Object.entries(parsedInfo) ) {
+          if ( typeof value == 'string' && value.startsWith('0x') ) {
+            if ( value.length < 8 ) {
+              parsedInfo[key] = parseInt(value);
+            }
+          }
+        }
         console.log(JSON.stringify(parsedInfo, null, 2));
       } catch (e) {
+        console.warn(e);
         console.log("Error parsing header info:", info);
       }
     } else {

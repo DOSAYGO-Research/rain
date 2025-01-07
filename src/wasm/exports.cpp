@@ -97,23 +97,23 @@ char* wasmGetFileHeaderInfo(const uint8_t* data, size_t size) {
     ss << "\"magic\":\"0x" << hdr.magic << "\",";
     ss << "\"version\":" << (int)hdr.version << ",";
     ss << "\"cipherMode\":\"0x" << (int)hdr.cipherMode << "\",";
-    ss << "\"blockSize\":" << (int)hdr.blockSize << ",";
-    ss << "\"nonceSize\":" << (int)hdr.nonceSize << ",";
-    ss << "\"hashSizeBits\":" << hdr.hashSizeBits << ",";
-    ss << "\"outputExtension\":" << hdr.outputExtension << ",";
+    ss << "\"blockSize\":\"0x" << (int)hdr.blockSize << "\",";
+    ss << "\"nonceSize\":\"0x" << (int)hdr.nonceSize << "\",";
+    ss << "\"hashSizeBits\":\"0x" << hdr.hashSizeBits << "\",";
+    ss << "\"outputExtension\":\"0x" << hdr.outputExtension << "\",";
     ss << "\"hashName\":\"" << hdr.hashName << "\",";
     ss << "\"iv\":\"0x" << hdr.iv << "\",";
-    ss << "\"saltLen\":" << (int)hdr.saltLen << ",";
+    ss << "\"saltLen\":\"0x" << (int)hdr.saltLen << "\",";
     ss << "\"salt\":\"";
     for (auto b : hdr.salt) {
-      ss << (int)b << " ";
+      ss << std::setw(2) << std::setfill('0') << (int)b << "";
     }
     ss << "\",";
     ss << "\"searchModeEnum\":\"0x" << (int)hdr.searchModeEnum << "\",";
-    ss << "\"originalSize\":" << hdr.originalSize << ",";
+    ss << "\"originalSize\":\"0x" << hdr.originalSize << "\",";
     ss << "\"hmac\":\"";
     for (auto b : hdr.hmac) {
-      ss << std::setw(2) << std::setfill('0') << (int)b << " ";
+      ss << std::setw(2) << std::setfill('0') << (int)b << "";
     }
     ss << "\"}";  // End JSON-ish
 

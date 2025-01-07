@@ -1060,6 +1060,7 @@ async function createWasm() {
   var UTF8ToString = (ptr, maxBytesToRead) => {
       return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead) : '';
     };
+  Module['UTF8ToString'] = UTF8ToString;
   
     /**
      * @param {string|null=} returnType
@@ -1133,6 +1134,7 @@ async function createWasm() {
       }
       return (...args) => ccall(ident, returnType, argTypes, args, opts);
     };
+
 
 
 var wasmImports = {

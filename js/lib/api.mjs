@@ -174,7 +174,7 @@ export async function getFileHeaderInfo(buffer) {
   if (!rain.loaded) {
     await loadRain();
   }
-  const { wasmExports: { wasmGetFileHeaderInfo, wasmFree, malloc: _malloc, free: _free, UTF8ToString } } = rain;
+  const { wasmExports: { wasmGetFileHeaderInfo, wasmFree, malloc: _malloc, free: _free }, UTF8ToString } = rain;
 
   // Allocate memory in WASM for the buffer
   const bufferPtr = _malloc(buffer.length);
