@@ -17,6 +17,7 @@ EMCCFLAGS = -O3 -s WASM=1 \
   -s EXPORTED_RUNTIME_METHODS="['wasmExports','ccall','cwrap']" \
   -s WASM_BIGINT=1 \
   -s ALLOW_MEMORY_GROWTH=1 \
+	-s USE_ZLIB=1 \
   -g
 
 # Directories
@@ -31,7 +32,7 @@ DEPS = $(OBJS:.o=.d)
 
 STORM_WASM_SOURCE = src/rainstorm.cpp
 BOW_WASM_SOURCE   = src/rainbow.cpp
-HEADER_WASM_SOURCE = src/file-header.cpp  # or wherever your wasm bridging is
+HEADER_WASM_SOURCE = src/wasm/exports.cpp  # or wherever your wasm bridging is
 WASM_OUTPUT = docs/rain.wasm
 JS_OUTPUT   = docs/rain.cjs
 
