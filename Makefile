@@ -5,17 +5,19 @@ EMCC = emcc
 # Flags
 CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O3 -march=native
 CXXFLAGS += -isysroot $(shell xcrun --show-sdk-path)
-# for omp thread debugging
-#CXXFLAGS += -g -fsanitize=address -fopenmp -I/opt/homebrew/opt/llvm/include
 CXXFLAGS += -fopenmp -I/opt/homebrew/opt/llvm/include
 DEPFLAGS = -MMD -MF $(@:.o=.d)
 
 LDFLAGS = -fopenmp -L/opt/homebrew/opt/llvm/lib -lz -lc++
 
 # Emscripten Flags for WASM
-EMCCFLAGS = -O3 -s WASM=1 -s EXPORTED_FUNCTIONS="['_rainbowHash64', '_rainbowHash128', '_rainbowHash256', 'stringToUTF8', 'lengthBytesUTF8', '_malloc', '_free']" \
-            -s EXPORTED_RUNTIME_METHODS="['wasmExports', 'ccall', 'cwrap']" \
-            -s WASM_BIGINT=1 -s ALLOW_MEMORY_GROWTH=1 -g 
+# Include your new bridging funcs in EXPORTED_FUNCTIONS:
+EMCCFLAGS = -O3 -s WASM=1 \
+  -s EXPORTED_FUNCTIONS="['_rainbowHash64','_rainbowHash128','_rainbowHash256','stringToUTF8','lengthBytesUTF8','_malloc','_free','_wasmGetFileHeaderInfo','_wasmFree']" \
+  -s EXPORTED_RUNTIME_METHODS="['wasmExports','ccall','cwrap']" \
+  -s WASM_BIGINT=1 \
+  -s ALLOW_MEMORY_GROWTH=1 \
+  -g
 
 # Directories
 OBJDIR = rain/obj
@@ -28,9 +30,10 @@ OBJS = $(addprefix $(OBJDIR)/,$(notdir $(SRCS:.cpp=.o)))
 DEPS = $(OBJS:.o=.d)
 
 STORM_WASM_SOURCE = src/rainstorm.cpp
-BOW_WASM_SOURCE = src/rainbow.cpp
+BOW_WASM_SOURCE   = src/rainbow.cpp
+HEADER_WASM_SOURCE = src/file-header.cpp  # or wherever your wasm bridging is
 WASM_OUTPUT = docs/rain.wasm
-JS_OUTPUT = docs/rain.cjs
+JS_OUTPUT   = docs/rain.cjs
 
 # Default Target
 all: directories node_modules rainsum link rainwasm
@@ -52,7 +55,7 @@ node_modules:
 	@(test ! -d ./js/node_modules && cd js && npm i && cd ..) || :
 	@(test ! -d ./scripts/node_modules && cd scripts && npm i && cd ..) || :
 
-# Build Executable
+# Build Executable (C++ native)
 rainsum: $(OBJS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BUILDDIR)/$@ $^
 
@@ -63,10 +66,11 @@ $(OBJDIR)/%.o: src/%.cpp
 # Build WebAssembly Output
 rainwasm: $(WASM_OUTPUT) $(JS_OUTPUT)
 
-$(WASM_OUTPUT) $(JS_OUTPUT): $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
+# NOTE: Add your bridging source(s) to the compile command:
+$(WASM_OUTPUT) $(JS_OUTPUT): $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE) $(HEADER_WASM_SOURCE)
 	@[ -d docs ] || mkdir -p docs
 	@[ -d ${WASMDIR} ] || mkdir -p ${WASMDIR}
-	$(EMCC) $(EMCCFLAGS) -o docs/rain.html $(STORM_WASM_SOURCE) $(BOW_WASM_SOURCE)
+	$(EMCC) $(EMCCFLAGS) -o docs/rain.html $^
 	mv docs/rain.js $(JS_OUTPUT)
 	cp $(WASM_OUTPUT) $(JS_OUTPUT) ${WASMDIR}
 	rm docs/rain.html
@@ -86,5 +90,7 @@ install: rainsum
 # Clean Build Artifacts
 .PHONY: clean
 clean:
-	rm -rf $(OBJDIR) $(BUILDDIR) rainsum $(WASMDIR) js/node_modules scripts/node_modules $(WASM_OUTPUT) $(JS_OUTPUT)
+	rm -rf $(OBJDIR) $(BUILDDIR) rainsum \
+	  $(WASMDIR) js/node_modules scripts/node_modules \
+	  $(WASM_OUTPUT) $(JS_OUTPUT)
 
