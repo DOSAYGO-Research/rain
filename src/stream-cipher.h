@@ -85,38 +85,32 @@ static std::vector<uint8_t> streamEncryptBuffer(
   return output;
 }
 
-/**
- * @brief Buffer-based stream decryption. Assumes the input buffer has:
- *        [FileHeader][XOR'd compressed plaintext]
- *        We parse the header, XOR the data, decompress, and return plaintext.
- *
- * @param input    The input buffer containing the entire file data
- * @param key      The user password
- * @param verbose  Whether to print debug info
- * @return std::vector<uint8_t>  Decompressed plaintext bytes
- */
 static std::vector<uint8_t> streamDecryptBuffer(
   const std::vector<uint8_t> &input,
   const std::string &key,
   bool verbose
 ) {
-  // 1) Parse the FileHeader from the start of 'input'
-  //    We'll do something similar to readFileHeader, but from memory
+  // 1) Confirm we have enough data for at least the size of FileHeader in memory
   if (input.size() < sizeof(FileHeader)) {
     throw std::runtime_error("[BufferDec] Input too small to contain a FileHeader");
   }
 
-  // We can reuse the existing readFileHeader logic if we refactor it 
-  // or we parse it by hand. Here, let's parse by reusing:
-  //    a) slice out the header portion
-  //    b) use readFileHeader from a stream, or 
-  // We can do a memory-based approach for demonstration:
+  // Create a memory stream from the input buffer
+  std::istringstream memStream(
+    std::string(reinterpret_cast<const char*>(input.data()), input.size()),
+    std::ios::binary
+  );
 
-  // We know the header is variable length due to hashName, so let's do the same approach as parseFileHeader in memory
-  // The simplest approach is to create a memory stream from 'input' and readFileHeader. 
-  std::stringstream memStream(std::string(reinterpret_cast<const char*>(input.data()), input.size()), std::ios::binary);
+  // Debug: Check the stream state
+  if (verbose) {
+    std::cerr << "[DEBUG] memStream state good? " << memStream.good() << "\n";
+    std::cerr << "[DEBUG] memStream.tellg(): " << memStream.tellg() << "\n";
+  }
+
+  // 3) Read the FileHeader
   FileHeader hdr = readFileHeader(memStream);
 
+  // Check the magic
   if (hdr.magic != MagicNumber) {
     throw std::runtime_error("[BufferDec] Invalid magic number in header");
   }
@@ -130,12 +124,13 @@ static std::vector<uint8_t> streamDecryptBuffer(
     std::cerr << "[BufferDec] originalSize: " << hdr.originalSize << "\n";
   }
 
-  // 2) The remainder after the header is the ciphertext
-  size_t headerSize   = memStream.tellg(); // how many bytes we read
-  size_t cipherSize   = input.size() - headerSize;
+  // 4) The remainder after the header is the ciphertext
+  size_t headerSize = static_cast<size_t>(memStream.tellg());
+  size_t cipherSize = input.size() - headerSize;
   if (cipherSize == 0) {
     throw std::runtime_error("[BufferDec] No ciphertext data found");
   }
+
   std::vector<uint8_t> cipherData(input.begin() + headerSize, input.end());
 
   // 3) Derive PRK
