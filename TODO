@@ -1,5 +1,6 @@
 cipher improvement
 
+- ensure salt and iv is generated in JS version if not passed in
 - use 'more secure' randomness source
 - let key material come from a file not just a password or -P command line arg
 - write tests, including hmac testing tampering tests
