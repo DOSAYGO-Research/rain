@@ -298,6 +298,7 @@ extern "C" {
    * @param verbose            Verbose flag (0 or 1).
    * @param outBufferPtr       Pointer to store the output buffer address.
    * @param outBufferSizePtr   Pointer to store the output buffer size.
+   * @param errorPtr           Pointer to store the error message pointer.
    */
   EMSCRIPTEN_KEEPALIVE
   void wasmStreamDecryptBuffer(
@@ -307,7 +308,8 @@ extern "C" {
       size_t keyLength,
       int verbose,
       uint8_t** outBufferPtr,
-      size_t* outBufferSizePtr
+      size_t* outBufferSizePtr,
+      char** errorPtr // New parameter for error messages
   ) {
       try {
           // Deserialize input buffer
@@ -330,13 +332,36 @@ extern "C" {
           // Set output pointers
           *outBufferPtr = decryptedPtr;
           *outBufferSizePtr = decryptedSize;
+
+          // Indicate no error
+          *errorPtr = nullptr;
       } catch (const std::exception& e) {
           // In case of error, set output pointers to nullptr and size to 0
           *outBufferPtr = nullptr;
           *outBufferSizePtr = 0;
+
+          // Allocate memory for the error message
+          std::string errMsg = e.what();
+          size_t errLen = errMsg.length();
+          char* errCStr = (char*)malloc(errLen + 1);
+          if (errCStr) {
+              std::memcpy(errCStr, errMsg.c_str(), errLen);
+              errCStr[errLen] = '\0'; // Null-terminate
+              *errorPtr = errCStr;
+          } else {
+              *errorPtr = nullptr;
+          }
+
           // Optionally, log the error to stderr
           fprintf(stderr, "Error in wasmStreamDecryptBuffer: %s\n", e.what());
       }
+  }
+  /**
+   * Utility function to free a string allocated by WASM.
+   */
+  EMSCRIPTEN_KEEPALIVE
+  void wasmFreeString(char* strPtr) {
+      free(strPtr);
   }
 
   /**

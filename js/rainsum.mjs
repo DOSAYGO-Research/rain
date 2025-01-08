@@ -8,7 +8,8 @@ import {
   rainstormHash, 
   getFileHeaderInfo,
   streamEncryptBuffer, 
-  streamDecryptBuffer 
+  streamDecryptBuffer,
+  rain
 } from './lib/api.mjs';
 
 const testVectors = [
@@ -231,6 +232,8 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
       await hashBuffer(mode, algorithm, seed, buffer, outputStream, size, inputName);
     }
   } catch (e) {
+    const errAddress = rain.HEAPU8[e]
+    console.log(rain.UTF8ToString(errAddress));
     console.error('Error:', e);
     console.error(e.stack);
     process.exit(1);

@@ -3716,7 +3716,8 @@ var _malloc = Module['_malloc'] = (a0) => (_malloc = Module['_malloc'] = wasmExp
 var _wasmFree = Module['_wasmFree'] = (a0) => (_wasmFree = Module['_wasmFree'] = wasmExports['wasmFree'])(a0);
 var _free = Module['_free'] = (a0) => (_free = Module['_free'] = wasmExports['free'])(a0);
 var _wasmStreamEncryptBuffer = Module['_wasmStreamEncryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13) => (_wasmStreamEncryptBuffer = Module['_wasmStreamEncryptBuffer'] = wasmExports['wasmStreamEncryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
-var _wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6) => (_wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = wasmExports['wasmStreamDecryptBuffer'])(a0, a1, a2, a3, a4, a5, a6);
+var _wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7) => (_wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = wasmExports['wasmStreamDecryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7);
+var _wasmFreeString = Module['_wasmFreeString'] = (a0) => (_wasmFreeString = Module['_wasmFreeString'] = wasmExports['wasmFreeString'])(a0);
 var _wasmFreeBuffer = Module['_wasmFreeBuffer'] = (a0) => (_wasmFreeBuffer = Module['_wasmFreeBuffer'] = wasmExports['wasmFreeBuffer'])(a0);
 var __emscripten_stack_restore = (a0) => (__emscripten_stack_restore = wasmExports['_emscripten_stack_restore'])(a0);
 var __emscripten_stack_alloc = (a0) => (__emscripten_stack_alloc = wasmExports['_emscripten_stack_alloc'])(a0);
