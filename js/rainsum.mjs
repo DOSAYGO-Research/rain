@@ -179,6 +179,7 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
         throw new Error("Password is required for stream encryption.");
       }
 
+      console.log({password, saltStr, verbose, outputExtension, buffer, algorithm, size, seed});
       // Call the buffer-based encryption function
       const encryptedBuffer = await streamEncryptBuffer(
         buffer,                         // Plain data buffer
@@ -215,6 +216,8 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
         password,   // Decryption key
         verbose     // Verbose flag
       );
+
+      console.log({decryptedBuffer});
 
       // Write decrypted data to output file
       fs.writeFileSync(outputPath, decryptedBuffer);

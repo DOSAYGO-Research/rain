@@ -240,6 +240,23 @@ export async function streamEncryptBuffer(
 
     console.log({outBufferPtr, outBufferSizePtr});
     // Call the WASM encryption function
+    console.log({
+      plainDataPtr,
+      length: plainData.length,
+      passwordPtr,
+      passwordLength,
+      algorithmPtr,
+      algorithmLength,
+      hashBits,
+      seed,
+      saltPtr,
+      saltLen,
+      outputExtension,
+      verbose,
+      outBufferPtr,
+      outBufferSizePtr
+    });
+
     wasmStreamEncryptBuffer(
       plainDataPtr,
       plainData.length,
@@ -317,6 +334,15 @@ export async function streamDecryptBuffer(
   const outBufferSizePtr = _malloc(4); // Assuming 32-bit size_t; adjust if using 64-bit
 
   // Call the WASM decryption function
+  console.log({
+    encryptedPtr,
+    length: encryptedData.length,
+    passwordPtr,
+    passwordLength,
+    verbose,
+    outBufferPtr,
+    outBufferSizePtr
+  });
   wasmStreamDecryptBuffer(
     encryptedPtr,
     encryptedData.length,
