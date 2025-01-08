@@ -274,20 +274,3 @@ namespace rainbow {
     }
   }
 }
-
-#ifdef __EMSCRIPTEN__
-extern "C" {
-  KEEPALIVE void rainbowHash64(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainbow::rainbow<64, false>(in, len, seed, out);
-  }
-
-  KEEPALIVE void rainbowHash128(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainbow::rainbow<128, false>(in, len, seed, out);
-  }
-
-  KEEPALIVE void rainbowHash256(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainbow::rainbow<256, false>(in, len, seed, out);
-  }
-}
-#endif
-

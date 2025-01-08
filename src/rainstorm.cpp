@@ -266,24 +266,3 @@ namespace rainstorm {
     }
   }
 }
-
-#ifdef __EMSCRIPTEN__
-extern "C" {
-  KEEPALIVE void rainstormHash64(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm::rainstorm<64, false>(in, len, seed, out);
-  }
-
-  KEEPALIVE void rainstormHash128(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm::rainstorm<128, false>(in, len, seed, out);
-  }
-
-  KEEPALIVE void rainstormHash256(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm::rainstorm<256, false>(in, len, seed, out);
-  }
-
-  KEEPALIVE void rainstormHash512(const void* in, const size_t len, const seed_t seed, void* out) {
-    rainstorm::rainstorm<512, false>(in, len, seed, out);
-  }
-}
-#endif
-
