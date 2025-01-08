@@ -379,7 +379,6 @@ extern "C" {
 
 
 #ifdef __EMSCRIPTEN__
-
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
@@ -397,6 +396,8 @@ void wasmBlockEncryptBuffer(
   uint32_t outputExtension,
   size_t blockSize,
   size_t nonceSize,
+  const char* searchModePtr,
+  size_t searchModeLength,
   int verbose,
   int deterministicNonce,
   uint8_t** outBufferPtr,
@@ -406,6 +407,7 @@ void wasmBlockEncryptBuffer(
     // Deserialize inputs
     std::vector<uint8_t> plainData(inBufferPtr, inBufferPtr + inBufferSize);
     std::string key(keyPtr, keyLength);
+    std::string searchMode(searchModePtr, searchModeLength);
     std::string algorithm(algorithmPtr, algorithmLength);
     std::vector<uint8_t> salt(saltPtr, saltPtr + saltLen);
 
@@ -428,7 +430,7 @@ void wasmBlockEncryptBuffer(
       salt,
       blockSize,
       nonceSize,
-      algorithm, // pass the search mode if you want, or however you track it
+      searchMode, // pass the search mode if you want, or however you track it
       (verbose != 0),
       (deterministicNonce != 0),
       outputExtension

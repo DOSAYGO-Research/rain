@@ -218,7 +218,7 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
       const verbose = argv.verbose;
       
       // For demonstration, let's just pick some sample defaults
-      const blockSize = 8;
+      const blockSize = 6;
       const nonceSize = 8;
       const outputExtension = 128;
       const searchMode = 'scatter';    // or 'prefix', 'sequence', etc.

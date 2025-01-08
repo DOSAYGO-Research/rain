@@ -529,7 +529,6 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
   return decompressedData;
 }
 
-
 static void puzzleEncryptFileWithHeader(
   const std::string &inFilename,
   const std::string &outFilename,

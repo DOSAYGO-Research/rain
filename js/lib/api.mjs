@@ -446,6 +446,11 @@ export async function blockEncryptBuffer(
   HEAPU8.set(Buffer.from(password, 'utf-8'), passwordPtr);
   HEAPU8[passwordPtr + passwordLength] = 0;
 
+  const searchModeLength = Buffer.byteLength(searchMode, 'utf-8');
+  const searchModePtr = _malloc(searchModeLength + 1);
+  HEAPU8.set(Buffer.from(searchMode, 'utf-8'), searchModePtr);
+  HEAPU8[searchModePtr + searchModeLength] = 0;
+
   // Allocate memory for algorithm
   const algorithmLength = Buffer.byteLength(algorithm, 'utf-8');
   const algorithmPtr = _malloc(algorithmLength + 1);
@@ -472,6 +477,7 @@ export async function blockEncryptBuffer(
       outputExtension,
       blockSize,
       nonceSize,
+      searchModePtr, searchModeLength,
       verbose ? 1 : 0,
       deterministicNonce ? 1 : 0,
       outBufferPtr,
