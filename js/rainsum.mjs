@@ -3,12 +3,14 @@ import fs from 'fs';
 import process from 'process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { 
-  rainbowHash, 
-  rainstormHash, 
+import {
+  rainbowHash,
+  rainstormHash,
   getFileHeaderInfo,
-  streamEncryptBuffer, 
+  streamEncryptBuffer,
   streamDecryptBuffer,
+  blockEncryptBuffer,      // NEW
+  blockDecryptBuffer,      // NEW
   rain
 } from './lib/api.mjs';
 
@@ -37,9 +39,9 @@ const argv = yargs(hideBin(process.argv))
   .usage('Usage: $0 [options] [file]')
   .option('mode', {
     alias: 'm',
-    description: 'Mode: digest, stream, info, stream-enc, or dec',
+    description: 'Mode: digest, stream, info, stream-enc, block-enc, or dec',
     type: 'string',
-    choices: ['digest', 'stream', 'info', 'stream-enc', 'dec'],
+    choices: ['digest', 'stream', 'info', 'stream-enc', 'block-enc', 'dec'],
     default: 'digest',
   })
   .option('algorithm', {
@@ -210,25 +212,88 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
         console.log(`[stream-enc] Encrypted data written to: ${outputPath}`);
       }
     }
-    else if (mode === 'dec') {
-      // Handle decryption
+    else if (mode === 'block-enc') {
+      // (Or you can add more CLI flags for blockSize, nonceSize, searchMode, etc.)
       const password = argv.password || '';
       const verbose = argv.verbose;
+      
+      // For demonstration, let's just pick some sample defaults
+      const blockSize = 8;
+      const nonceSize = 8;
+      const outputExtension = 128;
+      const searchMode = 'scatter';    // or 'prefix', 'sequence', etc.
+      const deterministicNonce = false;
 
-      // Validate password
+      // Validate password and salt
+      if (!password) {
+        throw new Error("Password is required for stream encryption.");
+      }
+
+      // Call the new blockEncryptBuffer
+      const encryptedBuffer = await blockEncryptBuffer(
+        buffer,                      // Plain data
+        password,                    // Password
+        algorithm,                   // "rainbow" or "rainstorm"
+        size,                        // Hash bits
+        seed,                        // 64-bit seed (as BigInt)
+        Buffer.from('mysalt'),       // Salt
+        outputExtension,
+        blockSize,
+        nonceSize,
+        searchMode,
+        deterministicNonce,
+        verbose
+      );
+
+      fs.writeFileSync(outputPath, encryptedBuffer);
+      if (verbose) {
+        console.log(`[block-enc] Block-based encryption written to: ${outputPath}`);
+      }
+    }
+    else if (mode === 'dec') {
+      const password = argv.password || '';
+      const verbose = argv.verbose;
       if (!password) {
         throw new Error("Password is required for decryption.");
       }
 
-      // Call the buffer-based decryption function
-      const decryptedBuffer = await streamDecryptBuffer(
-        buffer,     // Encrypted data buffer
-        password,   // Decryption key
-        verbose     // Verbose flag
-      );
+      // 1) Check the file header
+      const headerInfoStr = await getFileHeaderInfo(buffer);
+      let isBlockMode = false;
 
+      try {
+        const headerJson = JSON.parse(headerInfoStr);
+        // If cipherMode is "0x11", it’s block-mode puzzle
+        if (headerJson.cipherMode === '0x11') {
+          isBlockMode = true;
+        }
+      } catch(e) {
+        // If it fails, we’ll assume it’s stream-based
+      }
 
-      // Write decrypted data to output file
+      let decryptedBuffer;
+      if (isBlockMode) {
+        // 2) Decrypt block-based
+        decryptedBuffer = await blockDecryptBuffer(
+          buffer,
+          password
+        );
+        if (verbose) {
+          console.log(`[dec] Detected block cipher mode, using block decryption.`);
+        }
+      } else {
+        // 2) Decrypt stream-based
+        decryptedBuffer = await streamDecryptBuffer(
+          buffer,
+          password,
+          verbose
+        );
+        if (verbose) {
+          console.log(`[dec] No block cipher header found, using stream decryption.`);
+        }
+      }
+
+      // 3) Write decrypted result
       fs.writeFileSync(outputPath, decryptedBuffer);
       if (verbose) {
         console.log(`[dec] Decrypted data written to: ${outputPath}`);
@@ -240,8 +305,6 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
       await hashBuffer(mode, algorithm, seed, buffer, outputStream, size, inputName);
     }
   } catch (e) {
-    const errAddress = rain.HEAPU8[e]
-    console.log(rain.UTF8ToString(errAddress));
     console.error('Error:', e);
     console.error(e.stack);
     process.exit(1);

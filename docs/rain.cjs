@@ -3569,6 +3569,17 @@ async function createWasm() {
   }
   }
 
+  function _random_get(buffer, size) {
+  try {
+  
+      randomFill(HEAPU8.subarray(buffer, buffer + size));
+      return 0;
+    } catch (e) {
+    if (typeof FS == 'undefined' || !(e.name === 'ErrnoError')) throw e;
+    return e.errno;
+  }
+  }
+
   var getCFunc = (ident) => {
       var func = Module['_' + ident]; // closure exported function
       return func;
@@ -3699,7 +3710,9 @@ var wasmImports = {
   /** @export */
   fd_seek: _fd_seek,
   /** @export */
-  fd_write: _fd_write
+  fd_write: _fd_write,
+  /** @export */
+  random_get: _random_get
 };
 var wasmExports;
 createWasm();
@@ -3719,6 +3732,8 @@ var _wasmStreamEncryptBuffer = Module['_wasmStreamEncryptBuffer'] = (a0, a1, a2,
 var _wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7) => (_wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = wasmExports['wasmStreamDecryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7);
 var _wasmFreeString = Module['_wasmFreeString'] = (a0) => (_wasmFreeString = Module['_wasmFreeString'] = wasmExports['wasmFreeString'])(a0);
 var _wasmFreeBuffer = Module['_wasmFreeBuffer'] = (a0) => (_wasmFreeBuffer = Module['_wasmFreeBuffer'] = wasmExports['wasmFreeBuffer'])(a0);
+var _wasmBlockEncryptBuffer = Module['_wasmBlockEncryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16) => (_wasmBlockEncryptBuffer = Module['_wasmBlockEncryptBuffer'] = wasmExports['wasmBlockEncryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16);
+var _wasmBlockDecryptBuffer = Module['_wasmBlockDecryptBuffer'] = (a0, a1, a2, a3, a4, a5) => (_wasmBlockDecryptBuffer = Module['_wasmBlockDecryptBuffer'] = wasmExports['wasmBlockDecryptBuffer'])(a0, a1, a2, a3, a4, a5);
 var __emscripten_stack_restore = (a0) => (__emscripten_stack_restore = wasmExports['_emscripten_stack_restore'])(a0);
 var __emscripten_stack_alloc = (a0) => (__emscripten_stack_alloc = wasmExports['_emscripten_stack_alloc'])(a0);
 var _emscripten_stack_get_current = () => (_emscripten_stack_get_current = wasmExports['emscripten_stack_get_current'])();

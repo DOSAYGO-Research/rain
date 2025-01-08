@@ -1,4 +1,5 @@
 #pragma once
+#define VERSION "3.0.0"
 #include <atomic> // for std::atomic
 #include <iostream>
 #include <array>
@@ -34,7 +35,6 @@ static std::mutex cerr_mutex;
 #include "cxxopts.hpp"
 #include "common.h"
 
-#define VERSION "2.0.0"
 
 uint32_t MagicNumber = 0x59524352; // RCRY
 

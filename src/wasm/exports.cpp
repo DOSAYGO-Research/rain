@@ -377,3 +377,102 @@ extern "C" {
 } // extern "C"
 #endif // __EMSCRIPTEN__
 
+
+#ifdef __EMSCRIPTEN__
+
+extern "C" {
+
+EMSCRIPTEN_KEEPALIVE
+void wasmBlockEncryptBuffer(
+  const uint8_t* inBufferPtr,
+  size_t inBufferSize,
+  const char* keyPtr,
+  size_t keyLength,
+  const char* algorithmPtr,
+  size_t algorithmLength,
+  uint32_t hashBits,
+  uint64_t seed,
+  const uint8_t* saltPtr,
+  size_t saltLen,
+  uint32_t outputExtension,
+  size_t blockSize,
+  size_t nonceSize,
+  int verbose,
+  int deterministicNonce,
+  uint8_t** outBufferPtr,
+  size_t* outBufferSizePtr
+) {
+  try {
+    // Deserialize inputs
+    std::vector<uint8_t> plainData(inBufferPtr, inBufferPtr + inBufferSize);
+    std::string key(keyPtr, keyLength);
+    std::string algorithm(algorithmPtr, algorithmLength);
+    std::vector<uint8_t> salt(saltPtr, saltPtr + saltLen);
+
+    HashAlgorithm algot;
+    if (algorithm == "rainbow") {
+      algot = HashAlgorithm::Rainbow;
+    } else if (algorithm == "rainstorm") {
+      algot = HashAlgorithm::Rainstorm;
+    } else {
+      throw std::runtime_error("Unsupported algorithm: " + algorithm);
+    }
+
+    // Call refactored function
+    std::vector<uint8_t> encryptedBuffer = puzzleEncryptBufferWithHeader(
+      plainData,
+      key,
+      algot,
+      hashBits,
+      seed,
+      salt,
+      blockSize,
+      nonceSize,
+      algorithm, // pass the search mode if you want, or however you track it
+      (verbose != 0),
+      (deterministicNonce != 0),
+      outputExtension
+    );
+
+    // Serialize output
+    *outBufferSizePtr = encryptedBuffer.size();
+    *outBufferPtr = (uint8_t*)malloc(*outBufferSizePtr);
+    std::memcpy(*outBufferPtr, encryptedBuffer.data(), *outBufferSizePtr);
+  } catch (const std::exception &e) {
+    fprintf(stderr, "wasmBlockEncryptBuffer error: %s\n", e.what());
+    *outBufferPtr = nullptr;
+    *outBufferSizePtr = 0;
+  }
+}
+
+EMSCRIPTEN_KEEPALIVE
+void wasmBlockDecryptBuffer(
+  const uint8_t* inBufferPtr,
+  size_t inBufferSize,
+  const char* keyPtr,
+  size_t keyLength,
+  uint8_t** outBufferPtr,
+  size_t* outBufferSizePtr
+) {
+  try {
+    // Deserialize inputs
+    std::vector<uint8_t> cipherData(inBufferPtr, inBufferPtr + inBufferSize);
+    std::string key(keyPtr, keyLength);
+
+    // Call refactored function
+    std::vector<uint8_t> decryptedData = puzzleDecryptBufferWithHeader(cipherData, key);
+
+    // Serialize output
+    *outBufferSizePtr = decryptedData.size();
+    *outBufferPtr = (uint8_t*)malloc(*outBufferSizePtr);
+    std::memcpy(*outBufferPtr, decryptedData.data(), *outBufferSizePtr);
+  } catch (const std::exception &e) {
+    fprintf(stderr, "wasmBlockDecryptBuffer error: %s\n", e.what());
+    *outBufferPtr = nullptr;
+    *outBufferSizePtr = 0;
+  }
+}
+
+} // extern "C"
+
+#endif // __EMSCRIPTEN__

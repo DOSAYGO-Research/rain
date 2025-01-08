@@ -407,6 +407,170 @@ export async function streamEncryptBuffer(
   }
 }
 
+// Just the snippet showing the new block-based API wrappers in api.mjs:
+
+/**
+ * Encrypts a buffer using the WASM block-based encryption function.
+ */
+export async function blockEncryptBuffer(
+  plainData,
+  password,
+  algorithm,      // "rainbow" or "rainstorm"
+  hashBits,
+  seed,           // 64-bit seed (as BigInt or number)
+  salt,
+  outputExtension,
+  blockSize,
+  nonceSize,
+  searchMode,     // "prefix", "sequence", "scatter", etc.
+  deterministicNonce,
+  verbose
+) {
+  if (!rain.loaded) {
+    await loadRain();
+  }
+
+  const {
+    wasmExports: { wasmBlockEncryptBuffer, wasmFreeBuffer, malloc: _malloc, free: _free },
+    HEAPU8,
+    HEAPU32
+  } = rain;
+
+  // Allocate memory for input plaintext
+  const plainDataPtr = _malloc(plainData.length);
+  HEAPU8.set(plainData, plainDataPtr);
+
+  // Allocate memory for password
+  const passwordLength = Buffer.byteLength(password, 'utf-8');
+  const passwordPtr = _malloc(passwordLength + 1);
+  HEAPU8.set(Buffer.from(password, 'utf-8'), passwordPtr);
+  HEAPU8[passwordPtr + passwordLength] = 0;
+
+  // Allocate memory for algorithm
+  const algorithmLength = Buffer.byteLength(algorithm, 'utf-8');
+  const algorithmPtr = _malloc(algorithmLength + 1);
+  HEAPU8.set(Buffer.from(algorithm, 'utf-8'), algorithmPtr);
+  HEAPU8[algorithmPtr + algorithmLength] = 0;
+
+  // Allocate memory for salt
+  const saltPtr = _malloc(salt.length);
+  HEAPU8.set(salt, saltPtr);
+
+  // Allocate memory for output pointers
+  const outBufferPtr = _malloc(4);   // Assuming 32-bit
+  const outBufferSizePtr = _malloc(4);
+
+  try {
+    // Call the WASM function
+    wasmBlockEncryptBuffer(
+      plainDataPtr, plainData.length,
+      passwordPtr, passwordLength,
+      algorithmPtr, algorithmLength,
+      hashBits,
+      seed,
+      saltPtr, salt.length,
+      outputExtension,
+      blockSize,
+      nonceSize,
+      verbose ? 1 : 0,
+      deterministicNonce ? 1 : 0,
+      outBufferPtr,
+      outBufferSizePtr
+    );
+
+    // Grab the result
+    const encryptedPtr = HEAPU32[outBufferPtr >> 2];
+    const encryptedSize = HEAPU32[outBufferSizePtr >> 2];
+
+    if (!encryptedPtr || !encryptedSize) {
+      throw new Error("Block encryption returned empty buffer.");
+    }
+
+    // Copy out the result
+    const encryptedData = Buffer.from(HEAPU8.buffer, encryptedPtr, encryptedSize);
+
+    // Free the result buffer
+    wasmFreeBuffer(encryptedPtr);
+
+    return encryptedData;
+  } finally {
+    // Clean up
+    _free(plainDataPtr);
+    _free(passwordPtr);
+    _free(algorithmPtr);
+    _free(saltPtr);
+    _free(outBufferPtr);
+    _free(outBufferSizePtr);
+  }
+}
+
+/**
+ * Decrypts a buffer using the WASM block-based decryption function.
+ */
+export async function blockDecryptBuffer(
+  cipherData,
+  password
+) {
+  if (!rain.loaded) {
+    await loadRain();
+  }
+
+  const {
+    wasmExports: { wasmBlockDecryptBuffer, wasmFreeBuffer, malloc: _malloc, free: _free },
+    HEAPU8,
+    HEAPU32
+  } = rain;
+
+  // Allocate memory for ciphertext
+  const cipherPtr = _malloc(cipherData.length);
+  HEAPU8.set(cipherData, cipherPtr);
+
+  // Allocate memory for password
+  const passwordLength = Buffer.byteLength(password, 'utf-8');
+  const passwordPtr = _malloc(passwordLength + 1);
+  HEAPU8.set(Buffer.from(password, 'utf-8'), passwordPtr);
+  HEAPU8[passwordPtr + passwordLength] = 0;
+
+  // Allocate output pointer
+  const outBufferPtr = _malloc(4);  // 32-bit
+  const outBufferSizePtr = _malloc(4);
+
+  try {
+    // Call the WASM function
+    wasmBlockDecryptBuffer(
+      cipherPtr,
+      cipherData.length,
+      passwordPtr,
+      passwordLength,
+      outBufferPtr,
+      outBufferSizePtr
+    );
+
+    // Grab the result
+    const decryptedPtr = HEAPU32[outBufferPtr >> 2];
+    const decryptedSize = HEAPU32[outBufferSizePtr >> 2];
+
+    if (!decryptedPtr || !decryptedSize) {
+      throw new Error("Block decryption returned empty buffer.");
+    }
+
+    // Copy out the result
+    const decryptedData = Buffer.from(HEAPU8.buffer, decryptedPtr, decryptedSize);
+
+    // Free the result buffer
+    wasmFreeBuffer(decryptedPtr);
+
+    return decryptedData;
+  } finally {
+    // Clean up
+    _free(cipherPtr);
+    _free(passwordPtr);
+    _free(outBufferPtr);
+    _free(outBufferSizePtr);
+  }
+}
+
+
 /**
  * Loads the WASM module and wraps the necessary functions.
  */
@@ -448,6 +612,17 @@ async function loadRain() {
       'number', 'number', 'number', 'number',
       'number', 'number', 'number', 'number'
     ]);
+
+    // Inside loadRain(), once the wasm is loaded:
+    rain.wasmBlockEncryptBuffer = cwrap('wasmBlockEncryptBuffer', null, [
+      'number','number','number','number','number','number',
+      'number','number','number','number','number','number',
+      'number','number','number','number','number','number'
+    ]);
+    rain.wasmBlockDecryptBuffer = cwrap('wasmBlockDecryptBuffer', null, [
+      'number','number','number','number','number','number'
+    ]);
+ 
     rain.wasmFreeBuffer = cwrap('wasmFreeBuffer', null, ['number']);
 
     // Wrap the new wasmFreeString function
