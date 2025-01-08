@@ -3,7 +3,7 @@
 // =================================================================
 // Stream Encryption Function
 // =================================================================
-static void streamEncryptFileWithHeader(
+ void streamEncryptFileWithHeader(
     const std::string &inFilename,
     const std::string &outFilename,
     const std::string &key,

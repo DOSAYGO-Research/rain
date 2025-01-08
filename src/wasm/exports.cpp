@@ -143,3 +143,69 @@ void wasmFree(void* ptr) {
 
 } // extern "C"
 #endif // __EMSCRIPTEN__
+
+#ifdef __EMSCRIPTEN__
+extern "C" {
+  EMSCRIPTEN_KEEPALIVE
+  void wasmStreamEncryptFileWithHeader(
+      const char* inFilename,
+      const char* outFilename,
+      const char* key,
+      const char* algorithm, // Use a string for the algorithm name
+      uint32_t hashBits,
+      uint64_t seed,
+      const uint8_t* salt,
+      uint32_t saltLen,
+      uint32_t outputExtension,
+      int verbose // Use int for compatibility
+  ) {
+    try {
+      // Convert the C-compatible parameters into C++ types
+      std::string inFile(inFilename);
+      std::string outFile(outFilename);
+      std::string password(key);
+      std::string algo(algorithm);
+      std::vector<uint8_t> saltVec(salt, salt + saltLen);
+
+      // Determine the hash algorithm based on the algorithm string
+      HashAlgorithm algot;
+      if (algo == "rainbow") {
+        algot = HashAlgorithm::Rainbow;
+      } else if (algo == "rainstorm") {
+        algot = HashAlgorithm::Rainstorm;
+      } else {
+        throw std::runtime_error("Unsupported algorithm: " + algo);
+      }
+
+      // Call the actual encryption function
+      streamEncryptFileWithHeader(
+          inFile,
+          outFile,
+          password,
+          algot,
+          hashBits,
+          seed,
+          saltVec,
+          outputExtension,
+          verbose
+      );
+    } catch (const std::exception& e) {
+      // Print error message to the console
+      fprintf(stderr, "Error in _streamEncryptFileWithHeader: %s\n", e.what());
+    }
+  }
+
+
+  EMSCRIPTEN_KEEPALIVE
+  void _streamDecryptFileWithHeader(
+    const char* inFilename,
+    const char* outFilename,
+    const char* password,
+    int verbose
+  ) {
+
+  }
+}
+#endif
+
+
