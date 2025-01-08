@@ -1,55 +1,53 @@
-// The revised encryption and decryption functions:
+#pragma once
 
-// =================================================================
-// Stream Encryption Function
-// =================================================================
- void streamEncryptFileWithHeader(
-    const std::string &inFilename,
-    const std::string &outFilename,
-    const std::string &key,
-    HashAlgorithm algot,
-    uint32_t hash_bits,
-    uint64_t seed, // Used as IV
-    const std::vector<uint8_t> &salt,
-    uint32_t outputExtension,
-    bool verbose
+#include "file-header.h"
+#include "common.h"
+#include "tool.h" // for compressData, decompressData, derivePRK, extendOutputKDF, etc.
+
+/**
+ * @brief Buffer-based stream encryption. Produces a buffer containing:
+ *        1) FileHeader (serialized)
+ *        2) XOR'd (compressed) plaintext
+ *
+ * @param plainData       The *already compressed* plaintext bytes to encrypt
+ * @param key             User password/IKM
+ * @param algot           HashAlgorithm for PRK derivation (rainbow or rainstorm)
+ * @param hash_bits       Hash size in bits
+ * @param seed            64-bit seed (used as IV in the header)
+ * @param salt            Additional salt
+ * @param outputExtension Extra bytes of keystream offset
+ * @param verbose         Whether to print debugging info
+ * @return std::vector<uint8_t>  The final output: [FileHeader bytes][XOR'd bytes]
+ */
+static std::vector<uint8_t> streamEncryptBuffer(
+  const std::vector<uint8_t> &plainData,
+  const std::string &key,
+  HashAlgorithm algot,
+  uint32_t hash_bits,
+  uint64_t seed,
+  const std::vector<uint8_t> &salt,
+  uint32_t outputExtension,
+  bool verbose
 ) {
-  // 1) Read and compress the plaintext
-  std::ifstream fin(inFilename, std::ios::binary);
-  if (!fin.is_open()) {
-    throw std::runtime_error("[StreamEnc] Cannot open input file: " + inFilename);
-  }
-  std::vector<uint8_t> plainData((std::istreambuf_iterator<char>(fin)),
-                                 (std::istreambuf_iterator<char>()));
-  fin.close();
-
-  auto compressed = compressData(plainData);
-
-  // 2) Open output file
-  std::ofstream fout(outFilename, std::ios::binary);
-  if (!fout.is_open()) {
-    throw std::runtime_error("[StreamEnc] Cannot open output file: " + outFilename);
-  }
-
-  // 3) Prepare FileHeader
+  // 1) Prepare the FileHeader in memory
   FileHeader hdr{};
-  hdr.magic = MagicNumber;
-  hdr.version = 0x02;  // Example version
-  hdr.cipherMode = 0x10;  // Stream Cipher Mode
-  hdr.blockSize = 0;  // Not used for stream cipher
-  hdr.nonceSize = 0;  // Not used for stream cipher
-  hdr.outputExtension = outputExtension;
-  hdr.hashSizeBits = hash_bits;
-  hdr.hashName = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
-  hdr.iv = seed; // Using seed as IV
-  hdr.saltLen = static_cast<uint8_t>(salt.size());
-  hdr.salt = salt;
-  hdr.originalSize = compressed.size();
+  hdr.magic          = MagicNumber;
+  hdr.version        = 0x02;        // Example version
+  hdr.cipherMode     = 0x10;        // Stream Cipher
+  hdr.blockSize      = 0;           // Not used in stream cipher
+  hdr.nonceSize      = 0;           // Not used in stream cipher
+  hdr.outputExtension= outputExtension;
+  hdr.hashSizeBits   = hash_bits;
+  hdr.hashName       = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
+  hdr.iv             = seed;        // seed as IV
+  hdr.saltLen        = static_cast<uint8_t>(salt.size());
+  hdr.salt           = salt;
+  hdr.originalSize   = plainData.size();
 
-  // 4) Write FileHeader
-  writeFileHeader(fout, hdr);
+  // 2) Serialize header to a buffer
+  std::vector<uint8_t> headerBytes = serializeFileHeader(hdr);
 
-  // 5) Derive PRK
+  // 3) Derive PRK
   std::vector<uint8_t> seed_vec(8);
   for (size_t i = 0; i < 8; ++i) {
     seed_vec[i] = static_cast<uint8_t>((seed >> (i * 8)) & 0xFF);
@@ -57,142 +55,99 @@
   std::vector<uint8_t> ikm(key.begin(), key.end());
   std::vector<uint8_t> prk = derivePRK(seed_vec, salt, ikm, algot, hash_bits, verbose);
 
-  // 6) Generate Keystream
-  size_t needed = compressed.size() + outputExtension;
-  auto keystream = extendOutputKDF(prk, needed, algot, hash_bits);
-
-  // Optional debug info
-  if (verbose) {
-    std::cerr << "\n[StreamEnc] --- ENCRYPT HEADER DATA ---\n";
-    std::cerr << "[StreamEnc] Magic: 0x" << std::hex << hdr.magic << std::dec << "\n";
-    std::cerr << "[StreamEnc] Version: " << static_cast<int>(hdr.version) << "\n";
-    std::cerr << "[StreamEnc] CipherMode: 0x" << std::hex << static_cast<int>(hdr.cipherMode) << std::dec << "\n";
-    std::cerr << "[StreamEnc] BlockSize: " << hdr.blockSize << "\n";
-    std::cerr << "[StreamEnc] NonceSize: " << hdr.nonceSize << "\n";
-    std::cerr << "[StreamEnc] outputExtension: " << hdr.outputExtension << "\n";
-    std::cerr << "[StreamEnc] hashSizeBits: " << hdr.hashSizeBits << "\n";
-    std::cerr << "[StreamEnc] hashName: " << hdr.hashName << "\n";
-    std::cerr << "[StreamEnc] iv (seed): 0x" << std::hex << hdr.iv << std::dec << "\n";
-    std::cerr << "[StreamEnc] saltLen: " << static_cast<int>(hdr.saltLen) << "\n";
-    std::cerr << "[StreamEnc] salt: ";
-    for (auto &s : hdr.salt) {
-      std::cerr << std::hex << static_cast<int>(s) << " ";
-    }
-    std::cerr << std::dec << "\n";
-    std::cerr << "[StreamEnc] originalSize: " << hdr.originalSize << "\n";
-
-    std::cerr << "\n[StreamEnc] seed_vec: ";
-    for (auto &b : seed_vec) {
-      std::cerr << std::hex << static_cast<int>(b) << " ";
-    }
-    std::cerr << std::dec << "\n";
-
-    std::cerr << "[StreamEnc] PRK (" << prk.size() << " bytes): ";
-    for (auto &p : prk) {
-      std::cerr << std::hex << static_cast<int>(p) << " ";
-    }
-    std::cerr << std::dec << "\n";
-
-    std::cerr << "[StreamEnc] Keystream size: " << keystream.size() << "\n";
-    std::cerr << "[StreamEnc] Keystream first 100 bytes:\n";
-    for (size_t i = 0; i < std::min<size_t>(100, keystream.size()); i++) {
-      std::cerr << std::hex << static_cast<int>(keystream[i]) << " ";
-    }
-    std::cerr << std::dec << "\n";
-
-    std::cerr << "[StreamEnc] Compressed data size: " << compressed.size() << "\n";
-  }
-
-  // 7) XOR compressed data with keystream, skipping first 'outputExtension' bytes
-  const size_t progress_step = 1000000; // 1,000,000 bytes
-  size_t next_progress = progress_step;
-  for (size_t i = 0; i < compressed.size(); ++i) {
-      compressed[i] ^= keystream[i + outputExtension];
-
-      // Progress update
-      if (i + 1 == next_progress || i + 1 == compressed.size()) {
-          std::cerr << "\r" << (i + 1) << "/" << compressed.size() << " bytes processed." << std::flush;
-          next_progress += progress_step;
-      }
-  }
-  std::cerr << std::endl; // Final newline after loop
-
-  // 8) Write ciphertext
-  fout.write(reinterpret_cast<const char*>(compressed.data()), compressed.size());
-  fout.close();
+  // 4) Generate Keystream
+  size_t needed   = plainData.size() + outputExtension;
+  auto keystream  = extendOutputKDF(prk, needed, algot, hash_bits);
 
   if (verbose) {
-    std::cerr << "[StreamEnc] Encrypted " << compressed.size()
-              << " bytes from " << inFilename
-              << " to " << outFilename
-              << " using IV=0x" << std::hex << seed << std::dec
-              << " and salt of length " << static_cast<int>(hdr.saltLen) << " bytes.\n";
+    std::cerr << "\n[BufferEnc] headerBytes.size(): " << headerBytes.size() << "\n";
+    std::cerr << "[BufferEnc] plaintext size: " << plainData.size() << "\n";
+    std::cerr << "[BufferEnc] needed (with extension): " << needed << "\n";
+    std::cerr << "[BufferEnc] keystream.size(): " << keystream.size() << "\n";
   }
+
+  // 5) Allocate final output buffer = [header][ciphertext]
+  std::vector<uint8_t> output;
+  output.reserve(headerBytes.size() + plainData.size());
+
+  // 6) Append header
+  output.insert(output.end(), headerBytes.begin(), headerBytes.end());
+
+  // 7) XOR plaintext with keystream (skipping first outputExtension bytes)
+  std::vector<uint8_t> cipherData(plainData);
+  for (size_t i = 0; i < cipherData.size(); ++i) {
+    cipherData[i] ^= keystream[i + outputExtension];
+  }
+
+  // 8) Append the XOR'd data
+  output.insert(output.end(), cipherData.begin(), cipherData.end());
+
+  return output;
 }
 
-// =================================================================
-// Stream Decryption Function
-// =================================================================
-static void streamDecryptFileWithHeader(
-    const std::string &inFilename,
-    const std::string &outFilename,
-    const std::string &key,
-    bool verbose
+/**
+ * @brief Buffer-based stream decryption. Assumes the input buffer has:
+ *        [FileHeader][XOR'd compressed plaintext]
+ *        We parse the header, XOR the data, decompress, and return plaintext.
+ *
+ * @param input    The input buffer containing the entire file data
+ * @param key      The user password
+ * @param verbose  Whether to print debug info
+ * @return std::vector<uint8_t>  Decompressed plaintext bytes
+ */
+static std::vector<uint8_t> streamDecryptBuffer(
+  const std::vector<uint8_t> &input,
+  const std::string &key,
+  bool verbose
 ) {
-  // 1) Open input file and read FileHeader
-  std::ifstream fin(inFilename, std::ios::binary);
-  if (!fin.is_open()) {
-    throw std::runtime_error("[StreamDec] Cannot open input file: " + inFilename);
+  // 1) Parse the FileHeader from the start of 'input'
+  //    We'll do something similar to readFileHeader, but from memory
+  if (input.size() < sizeof(FileHeader)) {
+    throw std::runtime_error("[BufferDec] Input too small to contain a FileHeader");
   }
-  FileHeader hdr = readFileHeader(fin);
+
+  // We can reuse the existing readFileHeader logic if we refactor it 
+  // or we parse it by hand. Here, let's parse by reusing:
+  //    a) slice out the header portion
+  //    b) use readFileHeader from a stream, or 
+  // We can do a memory-based approach for demonstration:
+
+  // We know the header is variable length due to hashName, so let's do the same approach as parseFileHeader in memory
+  // The simplest approach is to create a memory stream from 'input' and readFileHeader. 
+  std::stringstream memStream(std::string(reinterpret_cast<const char*>(input.data()), input.size()), std::ios::binary);
+  FileHeader hdr = readFileHeader(memStream);
+
   if (hdr.magic != MagicNumber) {
-    throw std::runtime_error("[StreamDec] Invalid magic number in header.");
+    throw std::runtime_error("[BufferDec] Invalid magic number in header");
   }
-  if (hdr.cipherMode != 0x10) { // Stream Cipher Mode
-    throw std::runtime_error("[StreamDec] File is not in Stream Cipher mode.");
+  if (hdr.cipherMode != 0x10) {
+    throw std::runtime_error("[BufferDec] Not a stream cipher file");
   }
 
   if (verbose) {
-    std::cerr << "\n[StreamDec] --- DECRYPT HEADER DATA ---\n";
-    std::cerr << "[StreamDec] Magic: 0x" << std::hex << hdr.magic << std::dec << "\n";
-    std::cerr << "[StreamDec] Version: " << static_cast<int>(hdr.version) << "\n";
-    std::cerr << "[StreamDec] CipherMode: 0x" << std::hex << static_cast<int>(hdr.cipherMode) << std::dec << "\n";
-    std::cerr << "[StreamDec] BlockSize: " << hdr.blockSize << "\n";
-    std::cerr << "[StreamDec] NonceSize: " << hdr.nonceSize << "\n";
-    std::cerr << "[StreamDec] outputExtension: " << hdr.outputExtension << "\n";
-    std::cerr << "[StreamDec] hashSizeBits: " << hdr.hashSizeBits << "\n";
-    std::cerr << "[StreamDec] hashName: " << hdr.hashName << "\n";
-    std::cerr << "[StreamDec] iv (seed): 0x" << std::hex << hdr.iv << std::dec << "\n";
-    std::cerr << "[StreamDec] saltLen: " << static_cast<int>(hdr.saltLen) << "\n";
-    std::cerr << "[StreamDec] salt: ";
-    for (auto &s : hdr.salt) {
-      std::cerr << std::hex << static_cast<int>(s) << " ";
-    }
-    std::cerr << std::dec << "\n";
-    std::cerr << "[StreamDec] originalSize: " << hdr.originalSize << "\n";
+    std::cerr << "\n[BufferDec] parse header done. cipherMode=0x" 
+              << std::hex << (int)hdr.cipherMode << std::dec << "\n";
+    std::cerr << "[BufferDec] originalSize: " << hdr.originalSize << "\n";
   }
 
-  HashAlgorithm algot = HashAlgorithm::Unknown;
-  if (hdr.hashName == "rainbow") {
-      algot = HashAlgorithm::Rainbow;
+  // 2) The remainder after the header is the ciphertext
+  size_t headerSize   = memStream.tellg(); // how many bytes we read
+  size_t cipherSize   = input.size() - headerSize;
+  if (cipherSize == 0) {
+    throw std::runtime_error("[BufferDec] No ciphertext data found");
   }
-  else if (hdr.hashName == "rainstorm") {
-      algot = HashAlgorithm::Rainstorm;
-  }
-  else {
-      throw std::runtime_error("Unsupported hash algorithm in header: " + hdr.hashName);
-  }
-
-  // 2) Read ciphertext
-  std::vector<uint8_t> cipherData((std::istreambuf_iterator<char>(fin)),
-                                  (std::istreambuf_iterator<char>()));
-  fin.close();
-
-  if (verbose) {
-    std::cerr << "[StreamDec] Cipher data size: " << cipherData.size() << "\n";
-  }
+  std::vector<uint8_t> cipherData(input.begin() + headerSize, input.end());
 
   // 3) Derive PRK
+  HashAlgorithm algot = HashAlgorithm::Unknown;
+  if (hdr.hashName == "rainbow") {
+    algot = HashAlgorithm::Rainbow;
+  } else if (hdr.hashName == "rainstorm") {
+    algot = HashAlgorithm::Rainstorm;
+  } else {
+    throw std::runtime_error("[BufferDec] Unsupported hashName: " + hdr.hashName);
+  }
+
   std::vector<uint8_t> seed_vec(8);
   for (size_t i = 0; i < 8; ++i) {
     seed_vec[i] = static_cast<uint8_t>((hdr.iv >> (i * 8)) & 0xFF);
@@ -205,57 +160,113 @@ static void streamDecryptFileWithHeader(
   auto keystream = extendOutputKDF(prk, needed, algot, hdr.hashSizeBits);
 
   if (verbose) {
-    std::cerr << "\n[StreamDec] seed_vec: ";
-    for (auto &b : seed_vec) {
-      std::cerr << std::hex << static_cast<int>(b) << " ";
-    }
-    std::cerr << std::dec << "\n";
-
-    std::cerr << "[StreamDec] PRK (" << prk.size() << " bytes): ";
-    for (auto &p : prk) {
-      std::cerr << std::hex << static_cast<int>(p) << " ";
-    }
-    std::cerr << std::dec << "\n";
-
-    std::cerr << "[StreamDec] Keystream size: " << keystream.size() << "\n";
-    std::cerr << "[StreamDec] Keystream first 100 bytes:\n";
-    for (size_t i = 0; i < std::min<size_t>(100, keystream.size()); i++) {
-      std::cerr << std::hex << static_cast<int>(keystream[i]) << " ";
-    }
-    std::cerr << std::dec << "\n";
+    std::cerr << "[BufferDec] cipherData.size(): " << cipherData.size() << "\n";
+    std::cerr << "[BufferDec] needed with extension: " << needed << "\n";
+    std::cerr << "[BufferDec] keystream.size(): " << keystream.size() << "\n";
   }
 
-  // 5) XOR ciphertext with keystream (skipping first 'outputExtension' bytes)
-  const size_t progress_step = 1000000; // 1,000,000 bytes
-  size_t next_progress = progress_step;
+  // 5) XOR cipherData with keystream (skip extension bytes)
   for (size_t i = 0; i < cipherData.size(); ++i) {
     cipherData[i] ^= keystream[i + hdr.outputExtension];
-    // Progress update
-    if (i + 1 == next_progress || i + 1 == cipherData.size()) {
-      std::cerr << "\r" << (i + 1) << "/" << cipherData.size() << " bytes processed." << std::flush;
-      next_progress += progress_step;
-    }
   }
-  std::cerr << std::endl; // Final newline after loop
 
-  // 6) Decompress to get plaintext
+  // 6) Decompress
   auto decompressed = decompressData(cipherData);
 
-  // 7) Write plaintext to output file
+  return decompressed;
+}
+
+/* ------------------------------------------------------------------
+ *  The original file-based encryption function
+ *  now uses the new buffer-based approach under the hood
+ * ------------------------------------------------------------------ */
+static void streamEncryptFileWithHeader(
+    const std::string &inFilename,
+    const std::string &outFilename,
+    const std::string &key,
+    HashAlgorithm algot,
+    uint32_t hash_bits,
+    uint64_t seed, // Used as IV
+    const std::vector<uint8_t> &salt,
+    uint32_t outputExtension,
+    bool verbose
+) {
+  // 1) Read input file
+  std::ifstream fin(inFilename, std::ios::binary);
+  if (!fin.is_open()) {
+    throw std::runtime_error("[StreamEnc] Cannot open input file: " + inFilename);
+  }
+  std::vector<uint8_t> plainData((std::istreambuf_iterator<char>(fin)),
+                                 (std::istreambuf_iterator<char>()));
+  fin.close();
+
+  // 2) Compress the plaintext
+  auto compressed = compressData(plainData);
+
+  // 3) Ask the new buffer-based function to create [header + XOR data]
+  std::vector<uint8_t> finalBuffer = streamEncryptBuffer(
+    compressed,
+    key,
+    algot,
+    hash_bits,
+    seed,
+    salt,
+    outputExtension,
+    verbose
+  );
+
+  // 4) Write result to output file
+  std::ofstream fout(outFilename, std::ios::binary);
+  if (!fout.is_open()) {
+    throw std::runtime_error("[StreamEnc] Cannot open output file: " + outFilename);
+  }
+  fout.write(reinterpret_cast<const char*>(finalBuffer.data()), finalBuffer.size());
+  fout.close();
+
+  if (verbose) {
+    std::cerr << "[StreamEnc] Encrypted " << compressed.size()
+              << " compressed bytes from " << inFilename
+              << " to " << outFilename
+              << " using IV=0x" << std::hex << seed << std::dec
+              << ", salt length=" << salt.size() << ", total output size=" << finalBuffer.size()
+              << "\n";
+  }
+}
+
+/* ------------------------------------------------------------------
+ *  The original file-based decryption function
+ *  also calls the new buffer-based approach
+ * ------------------------------------------------------------------ */
+static void streamDecryptFileWithHeader(
+    const std::string &inFilename,
+    const std::string &outFilename,
+    const std::string &key,
+    bool verbose
+) {
+  // 1) Read the entire input (including header) from file
+  std::ifstream fin(inFilename, std::ios::binary);
+  if (!fin.is_open()) {
+    throw std::runtime_error("[StreamDec] Cannot open input file: " + inFilename);
+  }
+  std::vector<uint8_t> fileData((std::istreambuf_iterator<char>(fin)),
+                                (std::istreambuf_iterator<char>()));
+  fin.close();
+
+  // 2) Decrypt the buffer-based approach
+  std::vector<uint8_t> plaintext = streamDecryptBuffer(fileData, key, verbose);
+
+  // 3) Write plaintext to output file
   std::ofstream fout(outFilename, std::ios::binary);
   if (!fout.is_open()) {
     throw std::runtime_error("[StreamDec] Cannot open output file: " + outFilename);
   }
-  fout.write(reinterpret_cast<const char*>(decompressed.data()), decompressed.size());
+  fout.write(reinterpret_cast<const char*>(plaintext.data()), plaintext.size());
   fout.close();
 
   if (verbose) {
-    std::cerr << "[StreamDec] Decompressed data size: " << decompressed.size() << "\n";
-    std::cerr << "[StreamDec] Decrypted " << decompressed.size()
+    std::cerr << "[StreamDec] Decrypted " << plaintext.size()
               << " bytes from " << inFilename
-              << " to " << outFilename
-              << " using IV=0x" << std::hex << hdr.iv << std::dec
-              << " and salt of length " << static_cast<int>(hdr.saltLen) << " bytes.\n\n";
+              << " to " << outFilename << "\n";
   }
 }
 
