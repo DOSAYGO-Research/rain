@@ -66,7 +66,7 @@ static void writeFileHeader(std::ofstream &out, const FileHeader &hdr) {
 // -------------------------------------------------------------------
 // Read the unified FileHeader from a file
 // -------------------------------------------------------------------
-static FileHeader readFileHeader(std::ifstream &in) {
+static FileHeader readFileHeader(std::istream &in) {
   FileHeader hdr{};
   in.read(reinterpret_cast<char*>(&hdr.magic), sizeof(hdr.magic));
   in.read(reinterpret_cast<char*>(&hdr.version), sizeof(hdr.version));

@@ -13,7 +13,7 @@ LDFLAGS = -fopenmp -L/opt/homebrew/opt/llvm/lib -lz -lc++
 # Emscripten Flags for WASM
 # Include your new bridging funcs in EXPORTED_FUNCTIONS:
 EMCCFLAGS = -O3 -s WASM=1 \
-  -s EXPORTED_FUNCTIONS="['_rainbowHash64','_rainbowHash128','_rainbowHash256','stringToUTF8','UTF8ToString', 'lengthBytesUTF8','_malloc','_free','_wasmGetFileHeaderInfo','_wasmFree', '_wasmStreamEncryptFileWithHeader']" \
+  -s EXPORTED_FUNCTIONS="['_rainbowHash64','_rainbowHash128','_rainbowHash256','_rainstormHash64', '_rainstormHash128', '_rainstormHash256', '_rainstormHash512', 'stringToUTF8','UTF8ToString', 'lengthBytesUTF8','_malloc','_free','_wasmGetFileHeaderInfo','_wasmFree', '_wasmStreamEncryptBuffer', '_wasmStreamDecryptBuffer', '_wasmFreeBuffer']" \
   -s EXPORTED_RUNTIME_METHODS="['wasmExports','ccall','cwrap']" \
   -s WASM_BIGINT=1 \
   -s ALLOW_MEMORY_GROWTH=1 \
