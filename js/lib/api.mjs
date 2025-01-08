@@ -204,7 +204,7 @@ export async function streamDecryptBuffer(
       await loadRain();
     }
 
-    const { wasmExports: { wasmStreamDecryptBuffer, wasmFreeBuffer, wasmFreeString, malloc: _malloc, free: _free }, HEAPU8, UTF8ToString } = rain;
+    const { wasmExports: { wasmStreamDecryptBuffer, wasmFreeBuffer, wasmFreeString, malloc: _malloc, free: _free }, HEAPU8, HEAPU32, UTF8ToString } = rain;
 
     // Allocate memory for encrypted buffer
     const encryptedPtr = _malloc(encryptedData.length);
@@ -315,7 +315,7 @@ export async function streamEncryptBuffer(
       await loadRain();
     }
 
-    const { wasmStreamEncryptBuffer, wasmFreeBuffer, malloc: _malloc, free: _free, HEAPU8 } = rain.wasmExports;
+    const { wasmExports: { wasmStreamEncryptBuffer, wasmFreeBuffer, malloc: _malloc, free: _free }, HEAPU8, HEAPU32 } = rain;
 
     // Allocate memory for input buffer (plainData)
     const plainDataPtr = _malloc(plainData.length);
@@ -344,14 +344,6 @@ export async function streamEncryptBuffer(
 
     // Debug logs
     if (verbose) {
-      console.log({
-        outBufferPtr,
-        outBufferSizePtr,
-        plainDataPtr,
-        passwordPtr,
-        algorithmPtr,
-        saltPtr
-      });
       console.log({
         plainDataPtr,
         length: plainData.length,
@@ -398,10 +390,6 @@ export async function streamEncryptBuffer(
 
     // Copy encrypted data from WASM memory to Node.js Buffer
     const encryptedData = Buffer.from(HEAPU8.buffer, encryptedPtr, encryptedSize);
-
-    if (verbose) {
-      console.log({ encryptedData, encryptedPtr, encryptedSize });
-    }
 
     // Free allocated memory in WASM
     wasmFreeBuffer(encryptedPtr);

@@ -29,6 +29,9 @@ static std::vector<uint8_t> streamEncryptBuffer(
   uint32_t outputExtension,
   bool verbose
 ) {
+  // 2) Compress the plaintext
+  auto compressed = compressData(plainData);
+
   // 1) Prepare the FileHeader in memory
   FileHeader hdr{};
   hdr.magic          = MagicNumber;
@@ -42,7 +45,7 @@ static std::vector<uint8_t> streamEncryptBuffer(
   hdr.iv             = seed;        // seed as IV
   hdr.saltLen        = static_cast<uint8_t>(salt.size());
   hdr.salt           = salt;
-  hdr.originalSize   = plainData.size();
+  hdr.originalSize   = compressed.size();
 
   // 2) Serialize header to a buffer
   std::vector<uint8_t> headerBytes = serializeFileHeader(hdr);
@@ -56,25 +59,25 @@ static std::vector<uint8_t> streamEncryptBuffer(
   std::vector<uint8_t> prk = derivePRK(seed_vec, salt, ikm, algot, hash_bits, verbose);
 
   // 4) Generate Keystream
-  size_t needed   = plainData.size() + outputExtension;
+  size_t needed   = compressed.size() + outputExtension;
   auto keystream  = extendOutputKDF(prk, needed, algot, hash_bits);
 
   if (verbose) {
     std::cerr << "\n[BufferEnc] headerBytes.size(): " << headerBytes.size() << "\n";
-    std::cerr << "[BufferEnc] plaintext size: " << plainData.size() << "\n";
+    std::cerr << "[BufferEnc] plaintext size: " << compressed.size() << "\n";
     std::cerr << "[BufferEnc] needed (with extension): " << needed << "\n";
     std::cerr << "[BufferEnc] keystream.size(): " << keystream.size() << "\n";
   }
 
   // 5) Allocate final output buffer = [header][ciphertext]
   std::vector<uint8_t> output;
-  output.reserve(headerBytes.size() + plainData.size());
+  output.reserve(headerBytes.size() + compressed.size());
 
   // 6) Append header
   output.insert(output.end(), headerBytes.begin(), headerBytes.end());
 
   // 7) XOR plaintext with keystream (skipping first outputExtension bytes)
-  std::vector<uint8_t> cipherData(plainData);
+  std::vector<uint8_t> cipherData(compressed);
   for (size_t i = 0; i < cipherData.size(); ++i) {
     cipherData[i] ^= keystream[i + outputExtension];
   }
@@ -195,12 +198,9 @@ static void streamEncryptFileWithHeader(
                                  (std::istreambuf_iterator<char>()));
   fin.close();
 
-  // 2) Compress the plaintext
-  auto compressed = compressData(plainData);
-
   // 3) Ask the new buffer-based function to create [header + XOR data]
   std::vector<uint8_t> finalBuffer = streamEncryptBuffer(
-    compressed,
+    plainData,
     key,
     algot,
     hash_bits,
@@ -217,15 +217,6 @@ static void streamEncryptFileWithHeader(
   }
   fout.write(reinterpret_cast<const char*>(finalBuffer.data()), finalBuffer.size());
   fout.close();
-
-  if (verbose) {
-    std::cerr << "[StreamEnc] Encrypted " << compressed.size()
-              << " compressed bytes from " << inFilename
-              << " to " << outFilename
-              << " using IV=0x" << std::hex << seed << std::dec
-              << ", salt length=" << salt.size() << ", total output size=" << finalBuffer.size()
-              << "\n";
-  }
 }
 
 /* ------------------------------------------------------------------

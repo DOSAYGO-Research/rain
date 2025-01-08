@@ -336,6 +336,7 @@ extern "C" {
           // Indicate no error
           *errorPtr = nullptr;
       } catch (const std::exception& e) {
+          /*
           // In case of error, set output pointers to nullptr and size to 0
           *outBufferPtr = nullptr;
           *outBufferSizePtr = 0;
@@ -354,6 +355,7 @@ extern "C" {
 
           // Optionally, log the error to stderr
           fprintf(stderr, "Error in wasmStreamDecryptBuffer: %s\n", e.what());
+          */
       }
   }
   /**

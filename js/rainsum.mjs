@@ -180,7 +180,6 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
         throw new Error("Password is required for stream encryption.");
       }
 
-      console.log({password, saltStr, verbose, outputExtension, buffer, algorithm, size, seed});
       // Call the buffer-based encryption function
       const encryptedBuffer = await streamEncryptBuffer(
         buffer,                         // Plain data buffer
@@ -192,8 +191,6 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
         outputExtension,                // Output extension
         verbose                         // Verbose flag
       );
-
-      console.log({encryptedBuffer});
 
       // Write encrypted data to output file
       fs.writeFileSync(outputPath, encryptedBuffer);
@@ -218,7 +215,6 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
         verbose     // Verbose flag
       );
 
-      console.log({decryptedBuffer});
 
       // Write decrypted data to output file
       fs.writeFileSync(outputPath, decryptedBuffer);
@@ -278,9 +274,9 @@ async function main() {
     }
 
     const inputPath = argv._[0] || '/dev/stdin';
-    const outputPath = argv['output-file'] || argv.mode.includes('enc') ? inputPath + '.rc' : argv.mode.includes('dec') ? inputPath + '.dec' : '/dev/stdout';
+    const outputPath = argv.mode.includes('enc') ? inputPath + '.rc' : 
+      argv.mode.includes('dec') ? inputPath + '.dec' : argv.outputFile;
 
-    console.log({mode, algorithm, seed, inputPath, outputPath, size});
     await handleMode(mode, algorithm, seed, inputPath, outputPath, size);
   } catch (e) {
     console.error('Fatal Error:', e);
