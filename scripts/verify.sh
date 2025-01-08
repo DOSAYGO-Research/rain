@@ -5,7 +5,7 @@
 
 valid=False
 # Compare the actual output to the expected output
-if diff verification/vectors.txt actual_output.txt >/dev/null ; then
+if diff -Z verification/vectors.txt actual_output.txt >/dev/null ; then
     echo "The outputs match."
     valid=True
 else

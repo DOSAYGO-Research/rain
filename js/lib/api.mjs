@@ -81,16 +81,16 @@ export async function rainstormHash(hashSize, seed, input) {
   let hashFunc;
   switch (hashSize) {
     case 64:
-      hashFunc = rain._rainstormHash64;
+      hashFunc = rain.rainstormHash64;
       break;
     case 128:
-      hashFunc = rain._rainstormHash128;
+      hashFunc = rain.rainstormHash128;
       break;
     case 256:
-      hashFunc = rain._rainstormHash256;
+      hashFunc = rain.rainstormHash256;
       break;
     case 512:
-      hashFunc = rain._rainstormHash512;
+      hashFunc = rain.rainstormHash512;
       break;
     default:
       throw new Error(`Unsupported hash size for rainstorm: ${hashSize}`);
@@ -423,15 +423,15 @@ async function loadRain() {
     const { cwrap } = rain;
 
     // Wrap rainstormHash functions
-    rain._rainstormHash64 = cwrap('rainstormHash64', null, ['number', 'number', 'bigint', 'number']);
-    rain._rainstormHash128 = cwrap('rainstormHash128', null, ['number', 'number', 'bigint', 'number']);
-    rain._rainstormHash256 = cwrap('rainstormHash256', null, ['number', 'number', 'bigint', 'number']);
-    rain._rainstormHash512 = cwrap('rainstormHash512', null, ['number', 'number', 'bigint', 'number']);
+    rain.rainstormHash64 = cwrap('rainstormHash64', null, ['number', 'number', 'bigint', 'number']);
+    rain.rainstormHash128 = cwrap('rainstormHash128', null, ['number', 'number', 'bigint', 'number']);
+    rain.rainstormHash256 = cwrap('rainstormHash256', null, ['number', 'number', 'bigint', 'number']);
+    rain.rainstormHash512 = cwrap('rainstormHash512', null, ['number', 'number', 'bigint', 'number']);
 
     // Wrap rainbowHash functions
-    rain._rainbowHash64 = cwrap('rainbowHash64', null, ['number', 'number', 'bigint', 'number']);
-    rain._rainbowHash128 = cwrap('rainbowHash128', null, ['number', 'number', 'bigint', 'number']);
-    rain._rainbowHash256 = cwrap('rainbowHash256', null, ['number', 'number', 'bigint', 'number']);
+    rain.rainbowHash64 = cwrap('rainbowHash64', null, ['number', 'number', 'bigint', 'number']);
+    rain.rainbowHash128 = cwrap('rainbowHash128', null, ['number', 'number', 'bigint', 'number']);
+    rain.rainbowHash256 = cwrap('rainbowHash256', null, ['number', 'number', 'bigint', 'number']);
 
     // Wrap WASM header info functions
     rain.wasmGetFileHeaderInfo = cwrap('wasmGetFileHeaderInfo', 'number', ['number', 'number']);
