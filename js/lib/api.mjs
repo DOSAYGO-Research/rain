@@ -166,7 +166,8 @@ export async function getFileHeaderInfo(buffer) {
   if (!rain.loaded) {
     await loadRain();
   }
-  const { wasmGetFileHeaderInfo, wasmFree, malloc: _malloc, free: _free, UTF8ToString } = rain.wasmExports;
+  const { UTF8ToString } = rain;
+  const { wasmGetFileHeaderInfo, wasmFree, malloc: _malloc, free: _free } = rain.wasmExports;
 
   // Allocate memory in WASM for the buffer
   const bufferPtr = _malloc(buffer.length);
@@ -207,74 +208,81 @@ export async function streamEncryptBuffer(
   outputExtension,
   verbose
 ) {
-  if (!rain.loaded) {
-    await loadRain();
+  try {
+    if (!rain.loaded) {
+      await loadRain();
+    }
+
+    const { wasmStreamEncryptBuffer, wasmFreeBuffer, malloc: _malloc, free: _free, HEAPU8 } = rain.wasmExports;
+
+    // Allocate memory for input buffer (plainData)
+    const plainDataPtr = _malloc(plainData.length);
+    rain.HEAPU8.set(plainData, plainDataPtr);
+
+    // Allocate memory for password string
+    const passwordLength = password.byteLength;
+    const passwordPtr = _malloc(passwordLength);
+    rain.HEAPU8.set(password, passwordPtr);
+
+    // Allocate memory for algorithm string
+    const algorithmLength = algorithm.byteLength;
+    const algorithmPtr = _malloc(algorithmLength);
+    rain.HEAPU8.set(algorithm, algorithmPtr);
+
+    // Allocate memory for salt
+    const saltLen = salt.length;
+    const saltPtr = _malloc(saltLen);
+    rain.HEAPU8.set(salt, saltPtr);
+
+    // Allocate memory for output pointers (uint8_t** outBufferPtr and size_t* outBufferSizePtr)
+    const outBufferPtr = _malloc(4); // Assuming 32-bit pointers; adjust if using 64-bit
+    const outBufferSizePtr = _malloc(4); // Assuming 32-bit size_t; adjust if using 64-bit
+
+    console.log({outBufferPtr, outBufferSizePtr});
+    // Call the WASM encryption function
+    wasmStreamEncryptBuffer(
+      plainDataPtr,
+      plainData.length,
+      passwordPtr,
+      passwordLength,
+      algorithmPtr,
+      algorithmLength,
+      hashBits,
+      seed,
+      saltPtr,
+      saltLen,
+      outputExtension,
+      verbose ? 1 : 0,
+      outBufferPtr,
+      outBufferSizePtr
+    );
+
+    console.log({outBufferPtr, outBufferSizePtr});
+    // Retrieve the encrypted buffer pointer and size from WASM memory
+    const encryptedPtr = rain.HEAP32[outBufferPtr >> 2];
+    const encryptedSize = rain.HEAP32[outBufferSizePtr >> 2];
+
+    if (!encryptedPtr || !encryptedSize) {
+      throw new Error("Encryption failed or returned empty buffer.");
+    }
+
+    // Copy encrypted data from WASM memory to Node.js Buffer
+    const encryptedData = Buffer.from(rain.HEAPU8.buffer, encryptedPtr, encryptedSize);
+    console.log({encryptedData, encryptedPtr, encryptedSize});
+
+    // Free allocated memory in WASM
+    //wasmFreeBuffer(encryptedPtr);
+    _free(plainDataPtr);
+    _free(passwordPtr);
+    _free(algorithmPtr);
+    _free(saltPtr);
+    //_free(outBufferPtr);
+    //_free(outBufferSizePtr);
+
+    return encryptedData;
+  } catch(err) {
+    console.warn("Wasm error", err);
   }
-
-  const { wasmStreamEncryptBuffer, wasmFreeBuffer, malloc: _malloc, free: _free, HEAPU8 } = rain.wasmExports;
-
-  // Allocate memory for input buffer (plainData)
-  const plainDataPtr = _malloc(plainData.length);
-  rain.HEAPU8.set(plainData, plainDataPtr);
-
-  // Allocate memory for password string
-  const passwordLength = Buffer.byteLength(password, 'utf-8');
-  const passwordPtr = _malloc(passwordLength);
-  rain.stringToUTF8(password, passwordPtr, passwordLength + 1);
-
-  // Allocate memory for algorithm string
-  const algorithmLength = Buffer.byteLength(algorithm, 'utf-8');
-  const algorithmPtr = _malloc(algorithmLength);
-  rain.stringToUTF8(algorithm, algorithmPtr, algorithmLength + 1);
-
-  // Allocate memory for salt
-  const saltLen = salt.length;
-  const saltPtr = _malloc(saltLen);
-  rain.HEAPU8.set(salt, saltPtr);
-
-  // Allocate memory for output pointers (uint8_t** outBufferPtr and size_t* outBufferSizePtr)
-  const outBufferPtr = _malloc(4); // Assuming 32-bit pointers; adjust if using 64-bit
-  const outBufferSizePtr = _malloc(4); // Assuming 32-bit size_t; adjust if using 64-bit
-
-  // Call the WASM encryption function
-  wasmStreamEncryptBuffer(
-    plainDataPtr,
-    plainData.length,
-    passwordPtr,
-    passwordLength,
-    algorithmPtr,
-    algorithmLength,
-    hashBits,
-    seed,
-    saltPtr,
-    saltLen,
-    outputExtension,
-    verbose ? 1 : 0,
-    outBufferPtr,
-    outBufferSizePtr
-  );
-
-  // Retrieve the encrypted buffer pointer and size from WASM memory
-  const encryptedPtr = rain.HEAP32[outBufferPtr >> 2];
-  const encryptedSize = rain.HEAP32[outBufferSizePtr >> 2];
-
-  if (!encryptedPtr || !encryptedSize) {
-    throw new Error("Encryption failed or returned empty buffer.");
-  }
-
-  // Copy encrypted data from WASM memory to Node.js Buffer
-  const encryptedData = Buffer.from(rain.HEAPU8.buffer, encryptedPtr, encryptedSize);
-
-  // Free allocated memory in WASM
-  wasmFreeBuffer(encryptedPtr);
-  _free(plainDataPtr);
-  _free(passwordPtr);
-  _free(algorithmPtr);
-  _free(saltPtr);
-  _free(outBufferPtr);
-  _free(outBufferSizePtr);
-
-  return encryptedData;
 }
 
 /**

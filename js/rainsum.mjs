@@ -32,10 +32,10 @@ const argv = yargs(hideBin(process.argv))
   })
   .option('algorithm', {
     alias: 'a',
-    description: 'Specify the hash algorithm to use (bow or storm)',
+    description: 'Specify the hash algorithm to use (rainbow or rainstorm)',
     type: 'string',
-    choices: ['bow', 'storm'],
-    default: 'storm',
+    choices: ['rainbow', 'rainstorm'],
+    default: 'rainstorm',
   })
   .option('size', {
     alias: 's',
@@ -92,6 +92,10 @@ const argv = yargs(hideBin(process.argv))
   .demandCommand(0, 1) // Accepts 0 or 1 positional arguments
   .argv;
 
+
+  if ( argv.algorithm.includes('storm') || argv.mode.match(/enc|dec/g) ) {
+    argv.size = 512;
+  }
 /**
  * Hashes a buffer and writes the result to the output stream.
  * @param {string} mode - The hashing mode ('digest' or 'stream').
@@ -178,14 +182,16 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
       // Call the buffer-based encryption function
       const encryptedBuffer = await streamEncryptBuffer(
         buffer,                         // Plain data buffer
-        password,                       // Encryption key
-        algorithm,                      // 'bow' or 'storm'
+        Buffer.from(password, 'utf-8'), // Encryption key
+        Buffer.from(algorithm, 'utf-8'), // 'bow' or 'storm'
         size,                           // Hash size in bits
         seed,                           // Seed as BigInt
         Buffer.from(saltStr, 'utf-8'),  // Salt as Buffer
         outputExtension,                // Output extension
         verbose                         // Verbose flag
       );
+
+      console.log({encryptedBuffer});
 
       // Write encrypted data to output file
       fs.writeFileSync(outputPath, encryptedBuffer);
@@ -222,7 +228,7 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
       await hashBuffer(mode, algorithm, seed, buffer, outputStream, size, inputName);
     }
   } catch (e) {
-    console.error('Error:', e.message);
+    console.error('Error:', e);
     console.error(e.stack);
     process.exit(1);
   }
@@ -266,11 +272,12 @@ async function main() {
     }
 
     const inputPath = argv._[0] || '/dev/stdin';
-    const outputPath = argv['output-file'] || '/dev/stdout';
+    const outputPath = argv['output-file'] || argv.mode.includes('enc') ? inputPath + '.rc' : argv.mode.includes('dec') ? inputPath + '.dec' : '/dev/stdout';
 
+    console.log({mode, algorithm, seed, inputPath, outputPath, size});
     await handleMode(mode, algorithm, seed, inputPath, outputPath, size);
   } catch (e) {
-    console.error('Fatal Error:', e.message);
+    console.error('Fatal Error:', e);
     console.error(e.stack);
     process.exit(1);
   }
