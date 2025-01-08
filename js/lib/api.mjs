@@ -57,9 +57,8 @@ export async function rainstormHash(hashSize, seed, input) {
   if (!rain.loaded) {
     await loadRain();
   }
-  // Convert the input to a bytes
   const { stringToUTF8, lengthBytesUTF8 } = rain;
-  const { wasmExports: { malloc: _malloc, free: _free } } = rain;
+  const { malloc: _malloc, free: _free } = rain.wasmExports;
 
   const hashLength = hashSize / 8;
   const hashPtr = _malloc(hashLength);
@@ -67,7 +66,7 @@ export async function rainstormHash(hashSize, seed, input) {
   let inputPtr;
   let inputLength;
 
-  if (typeof input == "string") {
+  if (typeof input === "string") {
     inputLength = lengthBytesUTF8(input);
     inputPtr = _malloc(inputLength);
     stringToUTF8(input, inputPtr, inputLength + 1);
@@ -77,11 +76,8 @@ export async function rainstormHash(hashSize, seed, input) {
     rain.HEAPU8.set(input, inputPtr);
   }
 
-  seed = BigInt(seed);
-
-  // Choose the correct hash function based on the hash size
+  // Select the appropriate hash function based on hashSize
   let hashFunc;
-
   switch (hashSize) {
     case 64:
       hashFunc = rain._rainstormHash64;
@@ -99,14 +95,14 @@ export async function rainstormHash(hashSize, seed, input) {
       throw new Error(`Unsupported hash size for rainstorm: ${hashSize}`);
   }
 
+  // Call the WASM hash function
   hashFunc(inputPtr, inputLength, seed, hashPtr);
 
-  let hash = rain.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
+  // Retrieve the hash from WASM memory
+  const hash = new Uint8Array(rain.HEAPU8.buffer, hashPtr, hashLength);
+  const hashHex = Array.from(hash).map(x => x.toString(16).padStart(2, '0')).join('');
 
-  // Return the hash as a hex string
-  const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
-
-  // Free the memory after use
+  // Free allocated memory
   _free(hashPtr);
   _free(inputPtr);
 
@@ -117,9 +113,8 @@ export async function rainbowHash(hashSize, seed, input) {
   if (!rain.loaded) {
     await loadRain();
   }
-  // Convert the input to a bytes
   const { stringToUTF8, lengthBytesUTF8 } = rain;
-  const { wasmExports: { malloc: _malloc, free: _free } } = rain;
+  const { malloc: _malloc, free: _free } = rain.wasmExports;
 
   const hashLength = hashSize / 8;
   const hashPtr = _malloc(hashLength);
@@ -127,7 +122,7 @@ export async function rainbowHash(hashSize, seed, input) {
   let inputPtr;
   let inputLength;
 
-  if (typeof input == "string") {
+  if (typeof input === "string") {
     inputLength = lengthBytesUTF8(input);
     inputPtr = _malloc(inputLength);
     stringToUTF8(input, inputPtr, inputLength + 1);
@@ -137,11 +132,8 @@ export async function rainbowHash(hashSize, seed, input) {
     rain.HEAPU8.set(input, inputPtr);
   }
 
-  seed = BigInt(seed);
-
-  // Choose the correct hash function based on the hash size
+  // Select the appropriate hash function based on hashSize
   let hashFunc;
-
   switch (hashSize) {
     case 64:
       hashFunc = rain._rainbowHash64;
@@ -156,14 +148,14 @@ export async function rainbowHash(hashSize, seed, input) {
       throw new Error(`Unsupported hash size for rainbow: ${hashSize}`);
   }
 
+  // Call the WASM hash function
   hashFunc(inputPtr, inputLength, seed, hashPtr);
 
-  let hash = rain.HEAPU8.subarray(hashPtr, hashPtr + hashLength);
+  // Retrieve the hash from WASM memory
+  const hash = new Uint8Array(rain.HEAPU8.buffer, hashPtr, hashLength);
+  const hashHex = Array.from(hash).map(x => x.toString(16).padStart(2, '0')).join('');
 
-  // Return the hash as a hex string
-  const hashHex = Array.from(new Uint8Array(hash)).map(x => x.toString(16).padStart(2, '0')).join('');
-
-  // Free the memory after use
+  // Free allocated memory
   _free(hashPtr);
   _free(inputPtr);
 
@@ -174,7 +166,7 @@ export async function getFileHeaderInfo(buffer) {
   if (!rain.loaded) {
     await loadRain();
   }
-  const { wasmExports: { wasmGetFileHeaderInfo, wasmFree, malloc: _malloc, free: _free }, UTF8ToString } = rain;
+  const { wasmGetFileHeaderInfo, wasmFree, malloc: _malloc, free: _free, UTF8ToString } = rain.wasmExports;
 
   // Allocate memory in WASM for the buffer
   const bufferPtr = _malloc(buffer.length);
@@ -193,6 +185,164 @@ export async function getFileHeaderInfo(buffer) {
   return info;
 }
 
+/**
+ * Encrypts a buffer using the WASM buffer-based encryption function.
+ * @param {Buffer} plainData - The plaintext data (already compressed).
+ * @param {string} password - User password/IKM.
+ * @param {string} algorithm - 'rainbow' or 'rainstorm'.
+ * @param {number} hashBits - Hash size in bits.
+ * @param {BigInt} seed - 64-bit seed (IV).
+ * @param {Buffer} salt - Additional salt.
+ * @param {number} outputExtension - Extra bytes of keystream offset.
+ * @param {boolean} verbose - Verbose flag.
+ * @returns {Buffer} - The encrypted data [FileHeader + XOR'd data].
+ */
+export async function streamEncryptBuffer(
+  plainData,
+  password,
+  algorithm,
+  hashBits,
+  seed,
+  salt,
+  outputExtension,
+  verbose
+) {
+  if (!rain.loaded) {
+    await loadRain();
+  }
+
+  const { wasmStreamEncryptBuffer, wasmFreeBuffer, malloc: _malloc, free: _free, HEAPU8 } = rain.wasmExports;
+
+  // Allocate memory for input buffer (plainData)
+  const plainDataPtr = _malloc(plainData.length);
+  rain.HEAPU8.set(plainData, plainDataPtr);
+
+  // Allocate memory for password string
+  const passwordLength = Buffer.byteLength(password, 'utf-8');
+  const passwordPtr = _malloc(passwordLength);
+  rain.stringToUTF8(password, passwordPtr, passwordLength + 1);
+
+  // Allocate memory for algorithm string
+  const algorithmLength = Buffer.byteLength(algorithm, 'utf-8');
+  const algorithmPtr = _malloc(algorithmLength);
+  rain.stringToUTF8(algorithm, algorithmPtr, algorithmLength + 1);
+
+  // Allocate memory for salt
+  const saltLen = salt.length;
+  const saltPtr = _malloc(saltLen);
+  rain.HEAPU8.set(salt, saltPtr);
+
+  // Allocate memory for output pointers (uint8_t** outBufferPtr and size_t* outBufferSizePtr)
+  const outBufferPtr = _malloc(4); // Assuming 32-bit pointers; adjust if using 64-bit
+  const outBufferSizePtr = _malloc(4); // Assuming 32-bit size_t; adjust if using 64-bit
+
+  // Call the WASM encryption function
+  wasmStreamEncryptBuffer(
+    plainDataPtr,
+    plainData.length,
+    passwordPtr,
+    passwordLength,
+    algorithmPtr,
+    algorithmLength,
+    hashBits,
+    seed,
+    saltPtr,
+    saltLen,
+    outputExtension,
+    verbose ? 1 : 0,
+    outBufferPtr,
+    outBufferSizePtr
+  );
+
+  // Retrieve the encrypted buffer pointer and size from WASM memory
+  const encryptedPtr = rain.HEAP32[outBufferPtr >> 2];
+  const encryptedSize = rain.HEAP32[outBufferSizePtr >> 2];
+
+  if (!encryptedPtr || !encryptedSize) {
+    throw new Error("Encryption failed or returned empty buffer.");
+  }
+
+  // Copy encrypted data from WASM memory to Node.js Buffer
+  const encryptedData = Buffer.from(rain.HEAPU8.buffer, encryptedPtr, encryptedSize);
+
+  // Free allocated memory in WASM
+  wasmFreeBuffer(encryptedPtr);
+  _free(plainDataPtr);
+  _free(passwordPtr);
+  _free(algorithmPtr);
+  _free(saltPtr);
+  _free(outBufferPtr);
+  _free(outBufferSizePtr);
+
+  return encryptedData;
+}
+
+/**
+ * Decrypts a buffer using the WASM buffer-based decryption function.
+ * @param {Buffer} encryptedData - The encrypted data [FileHeader + XOR'd data].
+ * @param {string} password - User password.
+ * @param {boolean} verbose - Verbose flag.
+ * @returns {Buffer} - The decrypted plaintext data.
+ */
+export async function streamDecryptBuffer(
+  encryptedData,
+  password,
+  verbose
+) {
+  if (!rain.loaded) {
+    await loadRain();
+  }
+
+  const { wasmStreamDecryptBuffer, wasmFreeBuffer, malloc: _malloc, free: _free, HEAPU8 } = rain.wasmExports;
+
+  // Allocate memory for encrypted buffer
+  const encryptedPtr = _malloc(encryptedData.length);
+  rain.HEAPU8.set(encryptedData, encryptedPtr);
+
+  // Allocate memory for password string
+  const passwordLength = Buffer.byteLength(password, 'utf-8');
+  const passwordPtr = _malloc(passwordLength);
+  rain.stringToUTF8(password, passwordPtr, passwordLength + 1);
+
+  // Allocate memory for output pointers (uint8_t** outBufferPtr and size_t* outBufferSizePtr)
+  const outBufferPtr = _malloc(4); // Assuming 32-bit pointers; adjust if using 64-bit
+  const outBufferSizePtr = _malloc(4); // Assuming 32-bit size_t; adjust if using 64-bit
+
+  // Call the WASM decryption function
+  wasmStreamDecryptBuffer(
+    encryptedPtr,
+    encryptedData.length,
+    passwordPtr,
+    passwordLength,
+    verbose ? 1 : 0,
+    outBufferPtr,
+    outBufferSizePtr
+  );
+
+  // Retrieve the decrypted buffer pointer and size from WASM memory
+  const decryptedPtr = rain.HEAP32[outBufferPtr >> 2];
+  const decryptedSize = rain.HEAP32[outBufferSizePtr >> 2];
+
+  if (!decryptedPtr || !decryptedSize) {
+    throw new Error("Decryption failed or returned empty buffer.");
+  }
+
+  // Copy decrypted data from WASM memory to Node.js Buffer
+  const decryptedData = Buffer.from(rain.HEAPU8.buffer, decryptedPtr, decryptedSize);
+
+  // Free allocated memory in WASM
+  wasmFreeBuffer(decryptedPtr);
+  _free(encryptedPtr);
+  _free(passwordPtr);
+  _free(outBufferPtr);
+  _free(outBufferSizePtr);
+
+  return decryptedData;
+}
+
+/**
+ * Loads the WASM module and wraps the necessary functions.
+ */
 async function loadRain() {
   let resolve;
   const pr = new Promise(res => resolve = res);
@@ -203,8 +353,7 @@ async function loadRain() {
     rain = x.default;
     rain.loaded = true;
 
-    // Wrap the WASM functions using cwrap
-    const { cwrap } = rain; // Assuming cwrap is available via rain object
+    const { cwrap } = rain;
 
     // Wrap rainstormHash functions
     rain._rainstormHash64 = cwrap('rainstormHash64', null, ['number', 'number', 'bigint', 'number']);
@@ -221,11 +370,32 @@ async function loadRain() {
     rain.wasmGetFileHeaderInfo = cwrap('wasmGetFileHeaderInfo', 'number', ['array', 'number']);
     rain.wasmFree = cwrap('wasmFree', null, ['number']);
 
+    // Wrap buffer-based encryption/decryption functions
+    rain.wasmStreamEncryptBuffer = cwrap('wasmStreamEncryptBuffer', null, [
+      'number', 'number', 'number', 'number', 'number', 'number',
+      'number', 'number', 'number', 'number',
+      'number', 'number'
+    ]);
+    rain.wasmStreamDecryptBuffer = cwrap('wasmStreamDecryptBuffer', null, [
+      'number', 'number', 'number', 'number',
+      'number', 'number', 'number'
+    ]);
+    rain.wasmFreeBuffer = cwrap('wasmFreeBuffer', null, ['number']);
+
     resolve();
+  }).catch(err => {
+    console.error('Failed to load WASM module:', err);
+    process.exit(1);
   });
   return pr;
 }
 
+/**
+ * Utility function to wait until a condition is true, polling periodically.
+ * @param {Function} pred - The predicate function to evaluate.
+ * @param {number} MAX - Maximum number of attempts.
+ * @param {number} MS_BETWEEN - Milliseconds between attempts.
+ */
 async function untilTrue(pred, MAX = 1000, MS_BETWEEN = 50) {
   let resolve, reject, abort = false;
   const oPred = pred;
@@ -259,6 +429,10 @@ async function untilTrue(pred, MAX = 1000, MS_BETWEEN = 50) {
   return pr;
 }
 
+/**
+ * Sleeps for a given number of milliseconds.
+ * @param {number} ms - Milliseconds to sleep.
+ */
 async function sleep(ms) {
   let resolve;
   const pr = new Promise(res => resolve = res);
