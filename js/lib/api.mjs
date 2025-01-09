@@ -556,7 +556,6 @@ async function loadRain() {
     const fromUint8Array = (buffer) => String.fromCharCode.apply(null, buffer);
 
     const encryptData = (plainText, key) => {
-        console.log("plainText length in JS: ", plainText.length);
         const dataPtr = rain._malloc(plainText.length);
         rain.HEAPU8.set(plainText, dataPtr);
 
