@@ -16,6 +16,7 @@
 // -------------------------------------------------------------------
 // FileHeader struct
 // -------------------------------------------------------------------
+#pragma pack(push, 1)
 struct FileHeader {
   uint32_t magic;             // MagicNumber
   uint8_t version;            // Version
@@ -32,6 +33,7 @@ struct FileHeader {
   uint64_t originalSize;      // Compressed plaintext size
   std::array<uint8_t, 32> hmac; // HMAC (256-bit)
 };
+#pragma pack(pop)
 
 // -------------------------------------------------------------------
 // Write the unified FileHeader to a file

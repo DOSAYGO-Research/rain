@@ -271,8 +271,11 @@ export async function streamDecryptBuffer(
       throw new Error(errorMessage || "Decryption failed or returned empty buffer.");
     }
 
-    // Copy decrypted data from WASM memory to Node.js Buffer
-    const decryptedData = Buffer.from(HEAPU8.buffer, decryptedPtr, decryptedSize);
+     // Safer approach: copy from subarray
+    const decryptedCopy = new Uint8Array(
+      rain.HEAPU8.subarray(decryptedPtr, decryptedPtr + decryptedSize)
+    );
+    const decryptedData = Buffer.from(decryptedCopy);
 
     // Free allocated memory in WASM
     wasmFreeBuffer(decryptedPtr);
@@ -407,6 +410,88 @@ export async function streamEncryptBuffer(
   }
 }
 
+// Just the snippet showing the new block-based API wrappers in api.mjs:
+
+/**
+ * Encrypts a buffer using the WASM block-based encryption function.
+ */
+export async function blockEncryptBuffer(
+  plainData,
+  password
+) {
+  if (!rain.loaded) {
+    await loadRain();
+  }
+  return rain.encryptData(plainData, password);
+}
+
+/**
+ * Decrypts a buffer using the WASM block-based decryption function.
+ */
+export async function blockDecryptBuffer(
+  cipherData,
+  password
+) {
+  if (!rain.loaded) {
+    await loadRain();
+  }
+
+  const {
+    wasmExports: { wasmBlockDecryptBuffer, wasmFreeBuffer, malloc: _malloc, free: _free },
+    HEAPU8,
+    HEAPU32
+  } = rain;
+
+  // Allocate memory for ciphertext
+  const cipherPtr = _malloc(cipherData.length);
+  HEAPU8.set(cipherData, cipherPtr);
+
+  // Allocate memory for password
+  const passwordLength = Buffer.byteLength(password, 'utf-8');
+  const passwordPtr = _malloc(passwordLength + 1);
+  HEAPU8.set(Buffer.from(password, 'utf-8'), passwordPtr);
+  HEAPU8[passwordPtr + passwordLength] = 0;
+
+  // Allocate output pointer
+  const outBufferPtr = _malloc(4);  // 32-bit
+  const outBufferSizePtr = _malloc(4);
+
+  try {
+    // Call the WASM function
+    wasmBlockDecryptBuffer(
+      cipherPtr,
+      cipherData.length,
+      passwordPtr,
+      passwordLength,
+      outBufferPtr,
+      outBufferSizePtr
+    );
+
+    // Grab the result
+    const decryptedPtr = HEAPU32[outBufferPtr >> 2];
+    const decryptedSize = HEAPU32[outBufferSizePtr >> 2];
+
+    if (!decryptedPtr || !decryptedSize) {
+      throw new Error("Block decryption returned empty buffer.");
+    }
+
+    // Copy out the result
+    const decryptedData = Buffer.from(HEAPU8.buffer, decryptedPtr, decryptedSize);
+
+    // Free the result buffer
+    wasmFreeBuffer(decryptedPtr);
+
+    return decryptedData;
+  } finally {
+    // Clean up
+    _free(cipherPtr);
+    _free(passwordPtr);
+    _free(outBufferPtr);
+    _free(outBufferSizePtr);
+  }
+}
+
+
 /**
  * Loads the WASM module and wraps the necessary functions.
  */
@@ -448,10 +533,45 @@ async function loadRain() {
       'number', 'number', 'number', 'number',
       'number', 'number', 'number', 'number'
     ]);
+
+    // Inside loadRain(), once the wasm is loaded:
+    rain.wasmBlockEncryptBuffer = cwrap('wasmBlockEncryptBuffer', 'number', [
+      'number', 'number', 'string', 'number' 
+    ]);
+    rain.wasmBlockDecryptBuffer = cwrap('wasmBlockDecryptBuffer', null, [
+      'number','number','number','number','number','number'
+    ]);
+ 
     rain.wasmFreeBuffer = cwrap('wasmFreeBuffer', null, ['number']);
 
     // Wrap the new wasmFreeString function
     rain.wasmFreeString = cwrap('wasmFreeString', null, ['number']);
+
+    const toUint8Array = (data) => {
+        const buffer = new Uint8Array(data.length);
+        for (let i = 0; i < data.length; i++) buffer[i] = data[i];
+        return buffer;
+    };
+
+    const fromUint8Array = (buffer) => String.fromCharCode.apply(null, buffer);
+
+    const encryptData = (plainText, key) => {
+        const dataPtr = rain._malloc(plainText.length);
+        rain.HEAPU8.set(plainText, dataPtr);
+
+        const outLenPtr = rain._malloc(4); // Allocate space for size_t (4 bytes)
+        const resultPtr = rain.wasmBlockEncryptBuffer(dataPtr, plainText.length, key, outLenPtr);
+
+        const resultLen = rain.HEAPU32[outLenPtr >> 2]; // Read size_t value
+        const encrypted = Buffer.from(rain.HEAPU8.buffer, resultPtr, resultLen)
+
+        rain._free(dataPtr);
+        rain._free(outLenPtr);
+
+        return encrypted;
+    };
+
+    rain.encryptData = encryptData;
 
     resolve();
   }).catch(err => {

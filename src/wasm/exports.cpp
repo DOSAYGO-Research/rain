@@ -377,3 +377,74 @@ extern "C" {
 } // extern "C"
 #endif // __EMSCRIPTEN__
 
+static std::vector<uint8_t> encryptInternal(const uint8_t* data, size_t data_len, const char* key) {
+    std::vector<uint8_t> plainData(data, data + data_len);
+    std::cout << "[wasmBlockEncryptBuffer] data_len = " << data_len << std::endl;
+    std::string keyStr(key);
+    std::vector<uint8_t> salt(32, 0); // 32 bytes initialized to zero
+
+    return puzzleEncryptBufferWithHeader(
+        plainData,
+        keyStr,
+        HashAlgorithm::Rainstorm,
+        512, // hash_size
+        0, // seed (example)
+        salt, // salt (example empty)
+        3, // blockSize
+        14, // nonceSize
+        "scatter", // searchMode
+        false, // verbose
+        true,  // deterministicNonce
+        128     // outputExtension
+    );
+}
+
+#ifdef __EMSCRIPTEN__
+extern "C" {
+
+EMSCRIPTEN_KEEPALIVE
+uint8_t* wasmBlockEncryptBuffer(
+  const uint8_t* data, size_t data_len,
+  const char* key, 
+  size_t* out_len
+) {
+    auto encrypted = encryptInternal(data, data_len, key);
+    *out_len = encrypted.size();
+
+    // Allocate memory for the result and copy data
+    uint8_t* result = static_cast<uint8_t*>(malloc(encrypted.size()));
+    memcpy(result, encrypted.data(), encrypted.size());
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void wasmBlockDecryptBuffer(
+  const uint8_t* inBufferPtr,
+  size_t inBufferSize,
+  const char* keyPtr,
+  size_t keyLength,
+  uint8_t** outBufferPtr,
+  size_t* outBufferSizePtr
+) {
+  try {
+    // Deserialize inputs
+    std::vector<uint8_t> cipherData(inBufferPtr, inBufferPtr + inBufferSize);
+    std::string key(keyPtr, keyLength);
+
+    // Call refactored function
+    std::vector<uint8_t> decryptedData = puzzleDecryptBufferWithHeader(cipherData, key);
+
+    // Serialize output
+    *outBufferSizePtr = decryptedData.size();
+    *outBufferPtr = (uint8_t*)malloc(*outBufferSizePtr);
+    std::memcpy(*outBufferPtr, decryptedData.data(), *outBufferSizePtr);
+  } catch (const std::exception &e) {
+    fprintf(stderr, "wasmBlockDecryptBuffer error: %s\n", e.what());
+    *outBufferPtr = nullptr;
+    *outBufferSizePtr = 0;
+  }
+}
+
+} // extern "C"
+
+#endif // __EMSCRIPTEN__
