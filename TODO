@@ -1,9 +1,8 @@
 cipher improvement
 
-- switch back to OG rainstorm as it seems more secure than the one with the compression step
 - port / add back the good code in block-cipher.h.good for modes other than scatter (which is already done today!) into block-cipher.h
 - ensure salt and iv is generated in JS version if not passed in
-- use 'more secure' randomness source
+- use 'more secure' randomness source in cpp
 - let key material come from a file not just a password or -P command line arg
 - write tests, including hmac testing tampering tests
 
