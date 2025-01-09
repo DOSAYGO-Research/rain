@@ -1,4 +1,4 @@
-#define __STORMVERSION__ "3.0.0"
+#define __STORMVERSION__ "3.1.1"
 // v2 is NIS2-v1 - non invertible state, v1 - passess all normal smhasher tests. BadSeeds not tested yet.
 // includes a compress step on each ingest to make it harder to invert the state even given knowledge of it
 
@@ -132,7 +132,7 @@ namespace rainstorm {
           weakfunc(this->h, temp, i & 1);
         }
 
-        compress1(this->h, this->start, seed);
+        //compress1(this->h, this->start, seed);
 
         chunk += 64;
         chunk_len -= 64;
@@ -147,7 +147,7 @@ namespace rainstorm {
         // temp[lenRemaining >> 3] |= (uint64_t)(lenRemaining << ((lenRemaining&7)*8)); 
         // was removed in Frank's code.
 
-        compress1(this->h, this->start, seed);
+        //compress1(this->h, this->start, seed);
 
         for (int i = 0; i < ROUNDS; i++) {
           weakfunc(this->h, temp, i & 1);
@@ -234,7 +234,7 @@ namespace rainstorm {
         weakfunc(h, temp, i & 1);
       }
 
-      compress1(h, start, seed);
+      //compress1(h, start, seed);
 
       data += 64;
       lenRemaining -= 64;
@@ -245,7 +245,7 @@ namespace rainstorm {
     // Frank's fix: remove the length encoding line that can cause issues
     // temp[lenRemaining >> 3] |= (uint64_t)(lenRemaining << ((lenRemaining&7)*8));
 
-    compress1(h, start, seed);
+    //compress1(h, start, seed);
 
     for (int i = 0; i < ROUNDS; i++) {
       weakfunc(h, temp, i & 1);
