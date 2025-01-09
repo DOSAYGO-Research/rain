@@ -16,13 +16,13 @@ import {
 
 const testVectors = {
   rainstorm: [
-    [ "0ec74bfcbbc1e74f7e3f6adc47dc267644a2071f2d8f4fc931adb96b864c0a5a", "" ],
-    [ "379bd2823607188d1a2f8c5621feda9002dc8ff1f0cc9902d55d6c99a6488240", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" ],
-    [ "600e741274ca196710064e3d8e892bebce5c9ec47944dbf0f56608a5cb21748a", "The quick brown fox jumps over the lazy dog" ],
-    [ "cfb961820b823c889e03ca79d130eb2d919a38f947e68745349a73e2f43f7392", "The quick brown fox jumps over the lazy cog" ],
-    [ "9161d399ef638b837b821631847aa6603edb66ad16e14e25f9f96d119bebca1b", "The quick brown fox jumps over the lazy dog." ],
-    [ "eaf60e7a4817e110d21b5d7888e0993f7ce4c4317ad168e47370cb67d053e41a", "After the rainstorm comes the rainbow." ],
-    [ "e2490c856a9f5086a896d2eba9b640e38c8ac8c234e769fb7b8ddd9f112a1727", "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" ]
+    [ "e3ea5f8885f7bb16468d08c578f0e7cc15febd31c27e323a79ef87c35756ce1e", ""],
+    [ "9e07ce365903116b62ac3ac0a033167853853074313f443d5b372f0225eede50", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"],
+    [ "f88600f4b65211a95c6817d0840e0fc2d422883ddf310f29fa8d4cbfda962626", "The quick brown fox jumps over the lazy dog"],
+    [ "ec05208dd1fbf47b9539a761af723612eaa810762ab7a77b715fcfb3bf44f04a", "The quick brown fox jumps over the lazy cog"],
+    [ "822578f80d46184a674a6069486b4594053490de8ddf343cc1706418e527bec8", "The quick brown fox jumps over the lazy dog."],
+    [ "410427b981efa6ef884cd1f3d812c880bc7a37abc7450dd62803a4098f28d0f1", "After the rainstorm comes the rainbow."],
+    [ "47b5d8cb1df8d81ed23689936d2edaa7bd5c48f5bc463600a4d7a56342ac80b9", "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"],
   ],
   rainbow: [
     [ "9af7f7b2faaf87e9da4fe493916a78567ec2284018028a5df78968e351cc6dda", "" ],
