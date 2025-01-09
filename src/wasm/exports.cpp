@@ -377,74 +377,44 @@ extern "C" {
 } // extern "C"
 #endif // __EMSCRIPTEN__
 
+static std::vector<uint8_t> encryptInternal(const uint8_t* data, size_t data_len, const char* key) {
+    std::vector<uint8_t> plainData(data, data + data_len);
+    std::cout << "[wasmBlockEncryptBuffer] data_len = " << data_len << std::endl;
+    std::string keyStr(key);
+    std::vector<uint8_t> salt(32, 0); // 32 bytes initialized to zero
+
+    return puzzleEncryptBufferWithHeader(
+        plainData,
+        keyStr,
+        HashAlgorithm::Rainstorm,
+        512, // hash_size
+        0, // seed (example)
+        salt, // salt (example empty)
+        3, // blockSize
+        14, // nonceSize
+        "scatter", // searchMode
+        false, // verbose
+        true,  // deterministicNonce
+        128     // outputExtension
+    );
+}
 
 #ifdef __EMSCRIPTEN__
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
-void wasmBlockEncryptBuffer(
-  const uint8_t* inBufferPtr,
-  size_t inBufferSize,
-  const char* keyPtr,
-  size_t keyLength,
-  const char* algorithmPtr,
-  size_t algorithmLength,
-  uint32_t hashBits,
-  uint64_t seed,
-  const uint8_t* saltPtr,
-  size_t saltLen,
-  uint32_t outputExtension,
-  size_t blockSize,
-  size_t nonceSize,
-  const char* searchModePtr,
-  size_t searchModeLength,
-  int verbose,
-  int deterministicNonce,
-  uint8_t** outBufferPtr,
-  size_t* outBufferSizePtr
+uint8_t* wasmBlockEncryptBuffer(
+  const uint8_t* data, size_t data_len,
+  const char* key, 
+  size_t* out_len
 ) {
-  try {
-    // Deserialize inputs
-    std::vector<uint8_t> plainData(inBufferPtr, inBufferPtr + inBufferSize);
-    std::string key(keyPtr, keyLength);
-    std::string searchMode(searchModePtr, searchModeLength);
-    std::string algorithm(algorithmPtr, algorithmLength);
-    std::vector<uint8_t> salt(saltPtr, saltPtr + saltLen);
+    auto encrypted = encryptInternal(data, data_len, key);
+    *out_len = encrypted.size();
 
-    HashAlgorithm algot;
-    if (algorithm == "rainbow") {
-      algot = HashAlgorithm::Rainbow;
-    } else if (algorithm == "rainstorm") {
-      algot = HashAlgorithm::Rainstorm;
-    } else {
-      throw std::runtime_error("Unsupported algorithm: " + algorithm);
-    }
-
-    // Call refactored function
-    std::vector<uint8_t> encryptedBuffer = puzzleEncryptBufferWithHeader(
-      plainData,
-      key,
-      algot,
-      hashBits,
-      seed,
-      salt,
-      blockSize,
-      nonceSize,
-      searchMode, // pass the search mode if you want, or however you track it
-      (verbose != 0),
-      (deterministicNonce != 0),
-      outputExtension
-    );
-
-    // Serialize output
-    *outBufferSizePtr = encryptedBuffer.size();
-    *outBufferPtr = (uint8_t*)malloc(*outBufferSizePtr);
-    std::memcpy(*outBufferPtr, encryptedBuffer.data(), *outBufferSizePtr);
-  } catch (const std::exception &e) {
-    fprintf(stderr, "wasmBlockEncryptBuffer error: %s\n", e.what());
-    *outBufferPtr = nullptr;
-    *outBufferSizePtr = 0;
-  }
+    // Allocate memory for the result and copy data
+    uint8_t* result = static_cast<uint8_t*>(malloc(encrypted.size()));
+    memcpy(result, encrypted.data(), encrypted.size());
+    return result;
 }
 
 EMSCRIPTEN_KEEPALIVE

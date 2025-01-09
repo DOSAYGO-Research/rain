@@ -20,7 +20,8 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
 #endif
 
   // 1) Compress plaintext
-  auto compressed = compressData(plainData);
+  //auto compressed = compressData(plainData);
+  auto compressed = plainData;
 
   // 2) Prepare output buffer
   std::vector<uint8_t> outBuffer;
@@ -521,7 +522,8 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
   }
 
   // Done reading, now decompress
-  std::vector<uint8_t> decompressedData = decompressData(plaintextAccumulated);
+  //std::vector<uint8_t> decompressedData = decompressData(plaintextAccumulated);
+  std::vector<uint8_t> decompressedData = plaintextAccumulated;
   if (plaintextAccumulated.size() != hdr.originalSize) {
     throw std::runtime_error("Compressed data size mismatch vs. original size header.");
   }

@@ -233,16 +233,6 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
       const encryptedBuffer = await blockEncryptBuffer(
         buffer,                      // Plain data
         password,                    // Password
-        algorithm,                   // "rainbow" or "rainstorm"
-        size,                        // Hash bits
-        seed,                        // 64-bit seed (as BigInt)
-        Buffer.from('mysalt'),       // Salt
-        outputExtension,
-        blockSize,
-        nonceSize,
-        searchMode,
-        deterministicNonce,
-        verbose
       );
 
       fs.writeFileSync(outputPath, encryptedBuffer);

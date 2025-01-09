@@ -3732,7 +3732,7 @@ var _wasmStreamEncryptBuffer = Module['_wasmStreamEncryptBuffer'] = (a0, a1, a2,
 var _wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7) => (_wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = wasmExports['wasmStreamDecryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7);
 var _wasmFreeString = Module['_wasmFreeString'] = (a0) => (_wasmFreeString = Module['_wasmFreeString'] = wasmExports['wasmFreeString'])(a0);
 var _wasmFreeBuffer = Module['_wasmFreeBuffer'] = (a0) => (_wasmFreeBuffer = Module['_wasmFreeBuffer'] = wasmExports['wasmFreeBuffer'])(a0);
-var _wasmBlockEncryptBuffer = Module['_wasmBlockEncryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18) => (_wasmBlockEncryptBuffer = Module['_wasmBlockEncryptBuffer'] = wasmExports['wasmBlockEncryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17, a18);
+var _wasmBlockEncryptBuffer = Module['_wasmBlockEncryptBuffer'] = (a0, a1, a2, a3) => (_wasmBlockEncryptBuffer = Module['_wasmBlockEncryptBuffer'] = wasmExports['wasmBlockEncryptBuffer'])(a0, a1, a2, a3);
 var _wasmBlockDecryptBuffer = Module['_wasmBlockDecryptBuffer'] = (a0, a1, a2, a3, a4, a5) => (_wasmBlockDecryptBuffer = Module['_wasmBlockDecryptBuffer'] = wasmExports['wasmBlockDecryptBuffer'])(a0, a1, a2, a3, a4, a5);
 var __emscripten_stack_restore = (a0) => (__emscripten_stack_restore = wasmExports['_emscripten_stack_restore'])(a0);
 var __emscripten_stack_alloc = (a0) => (__emscripten_stack_alloc = wasmExports['_emscripten_stack_alloc'])(a0);
