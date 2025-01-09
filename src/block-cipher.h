@@ -1,5 +1,50 @@
 #include "parallel-scatter.h"
 
+
+/**
+ * A helper to print out the puzzle encryption parameters for debugging.
+ * This will ensure the logs appear when run under wasm.
+ */
+static void debugPrintPuzzleParams(
+    const std::vector<uint8_t>& plainData,
+    const std::string& key,
+    HashAlgorithm algot,
+    uint32_t hash_size,
+    uint64_t seed,
+    const std::vector<uint8_t>& salt,
+    size_t blockSize,
+    size_t nonceSize,
+    const std::string& searchMode,
+    bool verbose,
+    bool deterministicNonce,
+    uint32_t outputExtension)
+{
+  std::cerr << "[puzzleEncryptBufferWithHeader - DEBUG]\n"
+            << "  plainData.size(): " << plainData.size() << "\n"
+            << "  key: \"" << key << "\" (length: " << key.size() << ")\n"
+            << "  algot: " << ((algot == HashAlgorithm::Rainbow) ? "Rainbow" :
+                                (algot == HashAlgorithm::Rainstorm ? "Rainstorm" : "Unknown")) << "\n"
+            << "  hash_size (bits): " << hash_size << "\n"
+            << "  seed (iv): " << seed << "\n"
+            << "  salt.size(): " << salt.size() << "\n"
+            << "  blockSize: " << blockSize << "\n"
+            << "  nonceSize: " << nonceSize << "\n"
+            << "  searchMode: \"" << searchMode << "\"\n"
+            << "  verbose: " << (verbose ? "true" : "false") << "\n"
+            << "  deterministicNonce: " << (deterministicNonce ? "true" : "false") << "\n"
+            << "  outputExtension: " << outputExtension << "\n";
+
+  // Optionally print the first few bytes of salt to confirm
+  if (!salt.empty()) {
+    std::cerr << "  Salt bytes (up to 16): ";
+    for (size_t i = 0; i < salt.size() && i < 16; i++) {
+      std::cerr << std::hex << (int)salt[i] << " ";
+    }
+    std::cerr << std::dec << "\n";
+  }
+}
+
+
 static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   const std::vector<uint8_t> &plainData,
   const std::string &key,
@@ -18,6 +63,13 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   int halfCores = std::max(1, 1 + static_cast<int>(std::thread::hardware_concurrency()) / 2);
   omp_set_num_threads(halfCores);
 #endif
+
+  // 0) Print debug info about all parameters
+  debugPrintPuzzleParams(
+      plainData, key, algot, hash_size, seed,
+      salt, blockSize, nonceSize, searchMode,
+      verbose, deterministicNonce, outputExtension
+  );
 
   // 1) Compress plaintext
   //auto compressed = compressData(plainData);
