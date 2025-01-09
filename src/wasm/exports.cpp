@@ -379,7 +379,6 @@ extern "C" {
 
 static std::vector<uint8_t> encryptInternal(const uint8_t* data, size_t data_len, const char* key) {
     std::vector<uint8_t> plainData(data, data + data_len);
-    std::cout << "[wasmBlockEncryptBuffer] data_len = " << data_len << std::endl;
     std::string keyStr(key);
     std::vector<uint8_t> salt(32, 0); // 32 bytes initialized to zero
 
