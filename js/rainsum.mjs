@@ -2,6 +2,7 @@
 import fs from 'fs';
 import process from 'process';
 import yargs from 'yargs';
+import crypto from 'crypto';
 import { hideBin } from 'yargs/helpers';
 import {
   rainbowHash,
@@ -64,9 +65,9 @@ const argv = yargs(hideBin(process.argv))
     default: '/dev/stdout',
   })
   .option('seed', {
+    alias: 'i',
     description: 'Seed value (64-bit number or string)',
     type: 'string',
-    default: '0',
   })
   .option('test-vectors', {
     alias: 't',
@@ -83,21 +84,47 @@ const argv = yargs(hideBin(process.argv))
     default: '',
   })
   .option('salt', {
+    alias: 'c',
     description: 'Salt value (string) for encryption with stream-enc mode',
     type: 'string',
-    demandOption: (argv) => argv.mode === 'stream-enc',
-    default: '',
   })
   .option('output-extension', {
     alias: 'x',
     description: 'Output extension in bytes for stream-enc mode',
     type: 'number',
-    demandOption: (argv) => argv.mode === 'stream-enc',
+    demandOption: (argv) => argv.mode.includes('enc'),
     default: 128,
+  })
+  .option('block-size', {
+    alias: 'b',
+    description: 'Size of block in bytes',
+    type: 'number',
+    demandOption: (argv) => argv.mode === 'block-enc',
+    default: 6,
+  })
+  .option('nonce-size', {
+    alias: 'n',
+    description: 'Output extension in bytes for stream-enc mode',
+    type: 'number',
+    demandOption: (argv) => argv.mode === 'block-enc',
+    default: 9,
+  })
+  .option('search-mode', {
+    alias: 'f',
+    description: 'Prefix, series, scatter',
+    type: 'string',
+    demandOption: (argv) => argv.mode === 'block-enc',
+    default: 'scatter',
   })
   .option('verbose', {
     alias: 'vv',
     description: 'Enable verbose logs for encryption/decryption',
+    type: 'boolean',
+    default: false,
+  })
+  .option('deterministic-nonce', {
+    alias: 'k',
+    description: 'Nonce is not random but an incremented counter',
     type: 'boolean',
     default: false,
   })
@@ -144,7 +171,7 @@ async function hashBuffer(mode, algorithm, seed, buffer, outputStream, hashSize,
  * @param {string} outputPath - The output file path.
  * @param {number} size - The size of the hash in bits.
  */
-async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
+async function handleMode(mode, algorithm, seed, inputPath, outputPath, size, argv) {
   try {
     let buffer;
     let inputName;
@@ -215,15 +242,7 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
     else if (mode === 'block-enc') {
       // (Or you can add more CLI flags for blockSize, nonceSize, searchMode, etc.)
       const password = argv.password || '';
-      const verbose = argv.verbose;
       
-      // For demonstration, let's just pick some sample defaults
-      const blockSize = 6;
-      const nonceSize = 8;
-      const outputExtension = 128;
-      const searchMode = 'scatter';    // or 'prefix', 'sequence', etc.
-      const deterministicNonce = false;
-
       // Validate password and salt
       if (!password) {
         throw new Error("Password is required for stream encryption.");
@@ -231,12 +250,22 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size) {
 
       // Call the new blockEncryptBuffer
       const encryptedBuffer = await blockEncryptBuffer(
-        buffer,                      // Plain data
-        password,                    // Password
+        buffer,                                           // Plain data
+        Buffer.from(password, 'utf8'),                    // Password
+        argv.algorithm,
+        argv.searchMode,
+        argv.size,
+        argv.blockSize,
+        argv.nonceSize,
+        argv.seed,
+        argv.salt,
+        argv.outputExtension,
+        argv.deterministicNonce,
+        argv.verbose
       );
 
       fs.writeFileSync(outputPath, encryptedBuffer);
-      if (verbose) {
+      if (argv.verbose) {
         console.log(`[block-enc] Block-based encryption written to: ${outputPath}`);
       }
     }
@@ -325,24 +354,38 @@ async function main() {
 
     const mode = argv.mode || 'digest';
     const size = argv.size || 256;
-    const seedInput = argv['seed'] || '0';
+    const seedInput = argv.seed;
     let seed;
 
-    // Determine if seed is a number or string
-    if (/^\d+$/.test(seedInput)) {
-      seed = BigInt(seedInput);
+    if ( seedInput === null || seedInput === undefined ) {
+      seed = crypto.randomBytes(8).readBigInt64BE(0);
     } else {
-      // If seed is a string, hash it using rainstormHash to derive a 64-bit seed
-      const seedBuffer = Buffer.from(seedInput, 'utf-8');
-      const seedHash = await rainstormHash(64, BigInt(0), seedBuffer);
-      seed = BigInt(`0x${seedHash.slice(0, 16)}`); // Take first 8 bytes (16 hex characters)
+      // Determine if seed is a number or string
+      if (/^\d+$/.test(seedInput)) {
+        seed = BigInt(seedInput);
+      } else {
+        // If seed is a string, hash it using rainstormHash to derive a 64-bit seed
+        const seedBuffer = Buffer.from(seedInput, 'utf-8');
+        const seedHash = await rainstormHash(64, BigInt(0), seedBuffer);
+        seed = BigInt(`0x${seedHash.slice(0, 16)}`); // Take first 8 bytes (16 hex characters)
+      }
+    }
+
+    argv.seed = seed;
+
+    if ( argv.salt === null || argv.salt === undefined ) {
+      argv.salt = crypto.randomBytes(32);
+    } else if ( argv.salt.startsWith('0x') ) {
+      argv.salt = Buffer.from(argv.salt, 'hex');
+    } else {
+      argv.salt = Buffer.from(argv.salt, 'utf8');
     }
 
     const inputPath = argv._[0] || '/dev/stdin';
     const outputPath = argv.mode.includes('enc') ? inputPath + '.rc' : 
       argv.mode.includes('dec') ? inputPath + '.dec' : argv.outputFile;
 
-    await handleMode(mode, algorithm, seed, inputPath, outputPath, size);
+    await handleMode(mode, algorithm, seed, inputPath, outputPath, size, argv);
   } catch (e) {
     console.error('Fatal Error:', e);
     console.error(e.stack);

@@ -21,7 +21,7 @@
  */
 static std::vector<uint8_t> streamEncryptBuffer(
   const std::vector<uint8_t> &plainData,
-  const std::string &key,
+  std::vector<uint8_t> &key,
   HashAlgorithm algot,
   uint32_t hash_bits,
   uint64_t seed,
@@ -90,7 +90,7 @@ static std::vector<uint8_t> streamEncryptBuffer(
 
 static std::vector<uint8_t> streamDecryptBuffer(
   const std::vector<uint8_t> &input,
-  const std::string &key,
+  std::vector<uint8_t> &key,
   bool verbose
 ) {
   // 1) Confirm we have enough data for at least the size of FileHeader in memory
@@ -181,7 +181,7 @@ static std::vector<uint8_t> streamDecryptBuffer(
 static void streamEncryptFileWithHeader(
     const std::string &inFilename,
     const std::string &outFilename,
-    const std::string &key,
+    std::vector<uint8_t> &key,
     HashAlgorithm algot,
     uint32_t hash_bits,
     uint64_t seed, // Used as IV
@@ -226,7 +226,7 @@ static void streamEncryptFileWithHeader(
 static void streamDecryptFileWithHeader(
     const std::string &inFilename,
     const std::string &outFilename,
-    const std::string &key,
+    std::vector<uint8_t> &key,
     bool verbose
 ) {
   // 1) Read the entire input (including header) from file
