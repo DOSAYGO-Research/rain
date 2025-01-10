@@ -351,6 +351,8 @@ int main(int argc, char** argv) {
                 key_input = promptForKey("Enter encryption key: ");
             }
 
+            std::vector<uint8_t> keyVec_dec(key_input.begin(), key_input.end());
+
             // Check if encFile exists and overwrite it with zeros if it does
             try {
                 overwriteFileWithZeros(encFile);
@@ -363,7 +365,7 @@ int main(int argc, char** argv) {
             }
 
             // ADDED: Call the existing puzzleEncryptFileWithHeader with updated header
-            puzzleEncryptFileWithHeader(inpath, encFile, key_input, algot, hash_size, seed, salt, blockSize, nonceSize, searchMode, verbose, deterministicNonce, output_extension);
+            puzzleEncryptFileWithHeader(inpath, encFile, keyVec_dec, algot, hash_size, seed, salt, blockSize, nonceSize, searchMode, verbose, deterministicNonce, output_extension);
             std::cerr << "[Enc] Wrote encrypted file to: " << encFile << "\n";
         }
         else if (mode == Mode::StreamEnc) {
@@ -376,6 +378,8 @@ int main(int argc, char** argv) {
             else {
                 key_input = promptForKey("Enter encryption key: ");
             }
+
+            std::vector<uint8_t> keyVec_dec(key_input.begin(), key_input.end());
 
             // Check if encFile exists and overwrite it with zeros if it does
             try {
@@ -392,7 +396,7 @@ int main(int argc, char** argv) {
             streamEncryptFileWithHeader(
                 inpath,
                 encFile,
-                key_input,
+                keyVec_dec,
                 algot,
                 hash_size,
                 seed,          // Using seed as IV
@@ -463,14 +467,14 @@ int main(int argc, char** argv) {
                 streamDecryptFileWithHeader(
                     inpath,
                     decFile,
-                    key_input,
+                    keyVec_dec,
                     verbose
                 );
                 std::cerr << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
             }
             else if (hdr_dec.cipherMode == 0x11) { // Block Cipher Mode
                 // ADDED: Block Decryption (integration with tool.h assumed)
-                puzzleDecryptFileWithHeader(inpath, decFile, key_input);
+                puzzleDecryptFileWithHeader(inpath, decFile, keyVec_dec);
                 std::cerr << "[Dec] Wrote decrypted plaintext to: " << decFile << "\n";
             }
             else {

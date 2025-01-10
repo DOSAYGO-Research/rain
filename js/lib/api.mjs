@@ -2,7 +2,6 @@
 
 export let rain = { loaded: false };
 
-
 const STORM_TV = [
   [ "e3ea5f8885f7bb16468d08c578f0e7cc15febd31c27e323a79ef87c35756ce1e", ""],
   [ "9e07ce365903116b62ac3ac0a033167853853074313f443d5b372f0225eede50", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"],
@@ -416,13 +415,23 @@ export async function streamEncryptBuffer(
  * Encrypts a buffer using the WASM block-based encryption function.
  */
 export async function blockEncryptBuffer(
-  plainData,
-  password
+  plainText,
+  key,
+  algorithm,
+  searchMode,
+  hashBits,
+  blockSize, 
+  nonceSize,
+  seed,
+  salt,
+  outputExtension,
+  deterministicNonce,
+  verbose
 ) {
   if (!rain.loaded) {
     await loadRain();
   }
-  return rain.encryptData(plainData, password);
+  return rain.encryptData({plainText, key, algorithm, searchMode, hashBits, blockSize, nonceSize, seed, salt, outputExtension, deterministicNonce, verbose});
 }
 
 /**
@@ -536,7 +545,9 @@ async function loadRain() {
 
     // Inside loadRain(), once the wasm is loaded:
     rain.wasmBlockEncryptBuffer = cwrap('wasmBlockEncryptBuffer', 'number', [
-      'number', 'number', 'string', 'number' 
+      'number', 'number', 'number', 'number', 'string', 'string', 
+      'number', 'number', 'number', 'number', 'number', 'number',
+      'number', 'number', 'number'
     ]);
     rain.wasmBlockDecryptBuffer = cwrap('wasmBlockDecryptBuffer', null, [
       'number','number','number','number','number','number'
@@ -555,17 +566,32 @@ async function loadRain() {
 
     const fromUint8Array = (buffer) => String.fromCharCode.apply(null, buffer);
 
-    const encryptData = (plainText, key) => {
+    // plaintext and key must be buffers (NOT strings otherwise lengths will not reflect bytes but codepoints)
+    const encryptData = ({plainText, key, algorithm, searchMode, hashBits, seed, salt, blockSize, nonceSize, outputExtension, deterministicNonce, verbose}) => {
         const dataPtr = rain._malloc(plainText.length);
         rain.HEAPU8.set(plainText, dataPtr);
 
-        const outLenPtr = rain._malloc(4); // Allocate space for size_t (4 bytes)
-        const resultPtr = rain.wasmBlockEncryptBuffer(dataPtr, plainText.length, key, outLenPtr);
+        const keyPtr = rain._malloc(key.length);
+        rain.HEAPU8.set(key, keyPtr);
+
+        const saltPtr = rain._malloc(salt.length);
+        rain.HEAPU8.set(salt, saltPtr);
+
+        let outLenPtr;
+        let resultPtr;
+        try { 
+          outLenPtr = rain._malloc(4); // Allocate space for size_t (4 bytes)
+          resultPtr = rain.wasmBlockEncryptBuffer(dataPtr, plainText.length, keyPtr, key.length, algorithm, searchMode, hashBits, seed, saltPtr, salt.length, blockSize, nonceSize, outputExtension, deterministicNonce ? 1 : 0, verbose ? 1 : 0, outLenPtr);
+        } catch(e) {
+          console.warn(`Wasm err`, e);
+        }
 
         const resultLen = rain.HEAPU32[outLenPtr >> 2]; // Read size_t value
         const encrypted = Buffer.from(rain.HEAPU8.buffer, resultPtr, resultLen)
 
         rain._free(dataPtr);
+        rain._free(keyPtr);
+        rain._free(saltPtr);
         rain._free(outLenPtr);
 
         return encrypted;

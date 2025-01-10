@@ -1,13 +1,12 @@
 #include "parallel-scatter.h"
 
-
 /**
  * A helper to print out the puzzle encryption parameters for debugging.
  * This will ensure the logs appear when run under wasm.
  */
 static void debugPrintPuzzleParams(
     const std::vector<uint8_t>& plainData,
-    const std::string& key,
+    std::vector<uint8_t> key,
     HashAlgorithm algot,
     uint32_t hash_size,
     uint64_t seed,
@@ -47,7 +46,7 @@ static void debugPrintPuzzleParams(
 
 static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   const std::vector<uint8_t> &plainData,
-  const std::string &key,
+  std::vector<uint8_t> key,
   HashAlgorithm algot,
   uint32_t hash_size,
   uint64_t seed,
@@ -64,8 +63,8 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   omp_set_num_threads(halfCores);
 #endif
 
-  // 0) Print debug info about all parameters
   /*
+  // 0) Print debug info about all parameters
   debugPrintPuzzleParams(
       plainData, key, algot, hash_size, seed,
       salt, blockSize, nonceSize, searchMode,
@@ -388,7 +387,7 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
 
 static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
   const std::vector<uint8_t> &cipherData,
-  const std::string &key
+  std::vector<uint8_t> key
 ) {
   // We'll parse the FileHeader from the front of cipherData
   // Then reconstruct the plaintext.
@@ -588,7 +587,7 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
 static void puzzleEncryptFileWithHeader(
   const std::string &inFilename,
   const std::string &outFilename,
-  const std::string &key,
+  std::vector<uint8_t> key,
   HashAlgorithm algot,
   uint32_t hash_size,
   uint64_t seed,
@@ -641,7 +640,7 @@ static void puzzleEncryptFileWithHeader(
 static void puzzleDecryptFileWithHeader(
   const std::string &inFilename,
   const std::string &outFilename,
-  const std::string &key
+  std::vector<uint8_t> key
 ) {
   // 1) Read the ciphertext file
   std::ifstream fin(inFilename, std::ios::binary);
