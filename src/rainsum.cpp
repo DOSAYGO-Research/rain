@@ -455,8 +455,7 @@ int main(int argc, char** argv) {
             // 8. Verify HMAC
             if (!verifyHMAC(headerData_dec, ciphertext_dec, keyVec_dec, storedHMAC_vec)) {
                 // Uncomment the following line if you want to enforce HMAC verification
-                // throw std::runtime_error("[Dec] HMAC verification failed! File may be corrupted or tampered with.");
-                std::cerr << "[Dec] HMAC verification failed! File may be corrupted or tampered with.\n";
+                throw std::runtime_error("[Dec] HMAC verification failed! File may be corrupted or tampered with.");
             }
             else {
                 std::cerr << "[Dec] HMAC verification succeeded.\n";
@@ -510,7 +509,7 @@ int main(int argc, char** argv) {
             std::vector<uint8_t> headerData_enc = serializeFileHeader(hdr_enc_for_hmac);
 
             // 5. Convert key_input to vector<uint8_t>
-            std::vector<uint8_t> keyVec_enc(key_input.begin(), key_input.end());
+            std::vector<uint8_t> keyVec_enc(key_input_enc.begin(), key_input_enc.end());
 
             // 6. Compute HMAC
             auto hmac_enc = createHMAC(headerData_enc, ciphertext_enc, keyVec_enc);

@@ -43,7 +43,6 @@ static void debugPrintPuzzleParams(
   }
 }
 
-
 static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   const std::vector<uint8_t> &plainData,
   std::vector<uint8_t> key,
@@ -63,8 +62,8 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   omp_set_num_threads(halfCores);
 #endif
 
+  // Uncomment for debugging
   /*
-  // 0) Print debug info about all parameters
   debugPrintPuzzleParams(
       plainData, key, algot, hash_size, seed,
       salt, blockSize, nonceSize, searchMode,
@@ -76,77 +75,46 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   auto compressed = compressData(plainData);
   //auto compressed = plainData;
 
-  // 2) Prepare output buffer
-  std::vector<uint8_t> outBuffer;
-  outBuffer.reserve(compressed.size() + 1024); // Just a guess to reduce re-allocs
-
-  // 3) Determine searchModeEnum
-  uint8_t searchModeEnum = 0xFF; // Default for Stream (not used), but we'll set properly
-  if (algot == HashAlgorithm::Rainbow || algot == HashAlgorithm::Rainstorm) {
-    if (searchMode == "prefix") {
-      searchModeEnum = 0x00;
-    } else if (searchMode == "sequence") {
-      searchModeEnum = 0x01;
-    } else if (searchMode == "series") {
-      searchModeEnum = 0x02;
-    } else if (searchMode == "scatter") {
-      searchModeEnum = 0x03;
-    } else if (searchMode == "mapscatter") {
-      searchModeEnum = 0x04;
-    } else if (searchMode == "parascatter") {
-      searchModeEnum = 0x05;
-    } else {
-      throw std::runtime_error("Invalid search mode: " + searchMode);
-    }
-  }
-
-  // 4) Build FileHeader
+  // 3) Prepare FileHeader
   FileHeader hdr{};
   hdr.magic = MagicNumber;
   hdr.version = 0x02;
   hdr.cipherMode = 0x11; // "Block Cipher + puzzle"
-  hdr.blockSize = static_cast<uint16_t>(blockSize);
-  hdr.nonceSize = static_cast<uint16_t>(nonceSize);
-  hdr.outputExtension = static_cast<uint16_t>(outputExtension);
+  hdr.blockSize = blockSize;
+  hdr.nonceSize = nonceSize;
+  hdr.outputExtension = outputExtension;
   hdr.hashSizeBits = hash_size;
   hdr.hashName = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
   hdr.iv = seed;
   hdr.saltLen = static_cast<uint8_t>(salt.size());
   hdr.salt = salt;
   hdr.originalSize = compressed.size();
-  hdr.searchModeEnum = searchModeEnum;
 
-  // 5) Write the header into outBuffer
-  {
-    // We'll mimic writeFileHeader but do it directly into outBuffer
-    // (You could factor out a writeHeaderToMemory if you prefer.)
-    auto writeVec = [&](const void* ptr, size_t len) {
-      const uint8_t* p = static_cast<const uint8_t*>(ptr);
-      outBuffer.insert(outBuffer.end(), p, p + len);
-    };
-
-    writeVec(&hdr.magic, sizeof(hdr.magic));
-    writeVec(&hdr.version, sizeof(hdr.version));
-    writeVec(&hdr.cipherMode, sizeof(hdr.cipherMode));
-    writeVec(&hdr.blockSize, sizeof(hdr.blockSize));
-    writeVec(&hdr.nonceSize, sizeof(hdr.nonceSize));
-    writeVec(&hdr.hashSizeBits, sizeof(hdr.hashSizeBits));
-    writeVec(&hdr.outputExtension, sizeof(hdr.outputExtension));
-    uint8_t hnLen = static_cast<uint8_t>(hdr.hashName.size());
-    writeVec(&hnLen, sizeof(hnLen));
-    if (hnLen > 0) {
-      writeVec(hdr.hashName.data(), hnLen);
+  // Determine searchModeEnum
+  if (algot == HashAlgorithm::Rainbow || algot == HashAlgorithm::Rainstorm) {
+    if (searchMode == "prefix") {
+      hdr.searchModeEnum = 0x00;
+    } else if (searchMode == "sequence") {
+      hdr.searchModeEnum = 0x01;
+    } else if (searchMode == "series") {
+      hdr.searchModeEnum = 0x02;
+    } else if (searchMode == "scatter") {
+      hdr.searchModeEnum = 0x03;
+    } else if (searchMode == "mapscatter") {
+      hdr.searchModeEnum = 0x04;
+    } else if (searchMode == "parascatter") {
+      hdr.searchModeEnum = 0x05;
+    } else {
+      throw std::runtime_error("Invalid search mode: " + searchMode);
     }
-    writeVec(&hdr.iv, sizeof(hdr.iv));
-    writeVec(&hdr.saltLen, sizeof(hdr.saltLen));
-    if (hdr.saltLen > 0) {
-      writeVec(hdr.salt.data(), hdr.saltLen);
-    }
-    writeVec(&hdr.searchModeEnum, sizeof(hdr.searchModeEnum));
-    writeVec(&hdr.originalSize, sizeof(hdr.originalSize));
-    // hmac left zero-initialized, if you use it
-    writeVec(hdr.hmac.data(), hdr.hmac.size());
+  } else {
+    hdr.searchModeEnum = 0xFF; // Default or undefined
   }
+
+  auto searchModeEnum = hdr.searchModeEnum;
+
+  // 4) Serialize FileHeader using file-header.h's serializeFileHeader
+  std::vector<uint8_t> headerData = serializeFileHeader(hdr);
 
   // 6) Derive PRK
   std::vector<uint8_t> keyBuf(key.begin(), key.end());
@@ -161,6 +129,11 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   size_t subkeySize = hdr.hashSizeBits / 8;
   size_t totalNeeded = totalBlocks * subkeySize;
   std::vector<uint8_t> allSubkeys = extendOutputKDF(prk, totalNeeded, algot, hdr.hashSizeBits);
+
+  // 5) Concatenate header and encrypted data
+  std::vector<uint8_t> outBuffer;
+  outBuffer.reserve(headerData.size() + totalBlocks* (nonceSize + subkeySize));
+  outBuffer.insert(outBuffer.end(), headerData.begin(), headerData.end());
 
   // 8) Setup for puzzle searching
   std::mt19937_64 rng(std::random_device{}());
@@ -406,78 +379,19 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
   const std::vector<uint8_t> &cipherData,
   std::vector<uint8_t> key
 ) {
-  // We'll parse the FileHeader from the front of cipherData
-  // Then reconstruct the plaintext.
+  // 1) Create an input stream from cipherData
+  std::istringstream inStream(std::string(cipherData.begin(), cipherData.end()), std::ios::binary);
 
-  if (cipherData.size() < sizeof(FileHeader) - 32) {
-    throw std::runtime_error("Cipher data too small to contain valid header.");
-  }
+  // 2) Read FileHeader using file-header.h's readFileHeader
+  FileHeader hdr = readFileHeader(inStream);
 
-  size_t offset = 0;
-  auto readAndAdvance = [&](void* dst, size_t len) {
-    if (offset + len > cipherData.size()) {
-      throw std::runtime_error("Buffer overrun reading cipher data.");
-    }
-    std::memcpy(dst, &cipherData[offset], len);
-    offset += len;
-  };
+  // 3) Read the ciphertext (rest of the stream)
+  std::vector<uint8_t> ciphertext_dec(
+    (std::istreambuf_iterator<char>(inStream)),
+    (std::istreambuf_iterator<char>())
+  );
 
-  FileHeader hdr{};
-  // Magic
-  readAndAdvance(&hdr.magic, sizeof(hdr.magic));
-  // Version
-  readAndAdvance(&hdr.version, sizeof(hdr.version));
-  // cipherMode
-  readAndAdvance(&hdr.cipherMode, sizeof(hdr.cipherMode));
-  // blockSize
-  readAndAdvance(&hdr.blockSize, sizeof(hdr.blockSize));
-  // nonceSize
-  readAndAdvance(&hdr.nonceSize, sizeof(hdr.nonceSize));
-  // hashSizeBits
-  readAndAdvance(&hdr.hashSizeBits, sizeof(hdr.hashSizeBits));
-  // outputExtension
-  readAndAdvance(&hdr.outputExtension, sizeof(hdr.outputExtension));
-  // hashName length
-  uint8_t hnLen = 0;
-  readAndAdvance(&hnLen, sizeof(hnLen));
-  hdr.hashName.resize(hnLen);
-  if (hnLen > 0) {
-    readAndAdvance(&hdr.hashName[0], hnLen);
-  }
-  // iv
-  readAndAdvance(&hdr.iv, sizeof(hdr.iv));
-  // saltLen
-  readAndAdvance(&hdr.saltLen, sizeof(hdr.saltLen));
-  hdr.salt.resize(hdr.saltLen);
-  if (hdr.saltLen > 0) {
-    readAndAdvance(hdr.salt.data(), hdr.saltLen);
-  }
-  // searchModeEnum
-  readAndAdvance(&hdr.searchModeEnum, sizeof(hdr.searchModeEnum));
-  // originalSize
-  readAndAdvance(&hdr.originalSize, sizeof(hdr.originalSize));
-  // hmac
-  readAndAdvance(hdr.hmac.data(), hdr.hmac.size());
-
-  if (hdr.magic != MagicNumber) {
-    throw std::runtime_error("Invalid magic number.");
-  }
-  if (hdr.cipherMode != 0x11) {
-    throw std::runtime_error("Not block cipher mode (expected 0x11).");
-  }
-
-  // Determine HashAlgorithm
-  HashAlgorithm algot = HashAlgorithm::Unknown;
-  if (hdr.hashName == "rainbow") {
-    algot = HashAlgorithm::Rainbow;
-  } else if (hdr.hashName == "rainstorm") {
-    algot = HashAlgorithm::Rainstorm;
-  } else {
-    throw std::runtime_error("Unsupported hash algorithm: " + hdr.hashName);
-  }
-
-  // Remainder is actual block data
-  // Derive PRK
+  // 4) Derive PRK
   std::vector<uint8_t> ikm(key.begin(), key.end());
   std::vector<uint8_t> seed_vec(8);
   for (size_t i = 0; i < 8; ++i) {
@@ -485,13 +399,13 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
   }
   std::vector<uint8_t> prk = derivePRK(seed_vec, hdr.salt, ikm, algot, hdr.hashSizeBits);
 
-  // Extend into subkeys
+  // 5) Extend into subkeys
   size_t totalBlocks = (hdr.originalSize + hdr.blockSize - 1) / hdr.blockSize;
   size_t subkeySize = hdr.hashSizeBits / 8;
   size_t totalNeeded = totalBlocks * subkeySize;
   std::vector<uint8_t> allSubkeys = extendOutputKDF(prk, totalNeeded, algot, hdr.hashSizeBits);
 
-  // Reconstruct
+  // 6) Reconstruct plaintext
   std::vector<uint8_t> plaintextAccumulated;
   plaintextAccumulated.reserve(hdr.originalSize);
 
@@ -499,14 +413,11 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
     size_t thisBlockSize = std::min<size_t>(hdr.blockSize, hdr.originalSize - plaintextAccumulated.size());
 
     // Read storedNonce
-    if (offset + hdr.nonceSize > cipherData.size()) {
+    std::vector<uint8_t> storedNonce(hdr.nonceSize);
+    inStream.read(reinterpret_cast<char*>(storedNonce.data()), hdr.nonceSize);
+    if (inStream.gcount() != hdr.nonceSize) {
       throw std::runtime_error("Cipher data ended while reading nonce.");
     }
-    std::vector<uint8_t> storedNonce(
-      cipherData.begin() + offset,
-      cipherData.begin() + offset + hdr.nonceSize
-    );
-    offset += hdr.nonceSize;
 
     // Read scatterIndices or startIndex
     std::vector<uint16_t> scatterIndices;
@@ -514,23 +425,17 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
     if (hdr.searchModeEnum == 0x02 || hdr.searchModeEnum == 0x03 ||
         hdr.searchModeEnum == 0x04 || hdr.searchModeEnum == 0x05) {
       size_t scatterDataSize = thisBlockSize * sizeof(uint16_t);
-      if (offset + scatterDataSize > cipherData.size()) {
+      scatterIndices.resize(thisBlockSize);
+      inStream.read(reinterpret_cast<char*>(scatterIndices.data()), scatterDataSize);
+      if (inStream.gcount() != scatterDataSize) {
         throw std::runtime_error("Cipher data ended while reading scatter indices.");
       }
-      scatterIndices.assign(
-        reinterpret_cast<const uint16_t*>(&cipherData[offset]),
-        reinterpret_cast<const uint16_t*>(&cipherData[offset + scatterDataSize])
-      );
-      offset += scatterDataSize;
     } else {
       // prefix or sequence
-      if (offset + sizeof(uint16_t) > cipherData.size()) {
+      inStream.read(reinterpret_cast<char*>(&startIndex), sizeof(startIndex));
+      if (inStream.gcount() != sizeof(startIndex)) {
         throw std::runtime_error("Cipher data ended while reading start index.");
       }
-      // We wrote a uint16_t, but for prefix/sequence we might have only written 1 byte,
-      // so adapt as needed if your real code only wrote 1 byte. We'll assume full 2 bytes.
-      std::memcpy(&startIndex, &cipherData[offset], sizeof(startIndex));
-      offset += sizeof(startIndex);
     }
 
     // Subkey
@@ -600,6 +505,7 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
 
   return decompressedData;
 }
+
 
 static void puzzleEncryptFileWithHeader(
   const std::string &inFilename,

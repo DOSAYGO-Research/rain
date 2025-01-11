@@ -15,13 +15,6 @@
 #include <cstring> // for memcpy
 
 // -------------------------------------------------------------------
-// Constants
-// -------------------------------------------------------------------
-
-// Magic number to identify your file format ('RCRY' in hex).
-inline constexpr uint32_t MagicNumber = 0x59524352;
-
-// -------------------------------------------------------------------
 // FileHeader struct (Public Interface)
 // -------------------------------------------------------------------
 struct FileHeader {

@@ -1,3 +1,4 @@
+#pragma once
 // Result structure:
 struct ParascatterResult {
   bool found;
