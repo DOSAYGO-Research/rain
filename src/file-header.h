@@ -21,10 +21,10 @@ struct FileHeader {
   uint32_t magic;             // MagicNumber
   uint8_t version;            // Version
   uint8_t cipherMode;         // Mode: 0x10 = Stream, 0x11 = Block
-  uint8_t blockSize;          // Block size in bytes (for block cipher)
-  uint8_t nonceSize;          // Nonce size in bytes
+  uint16_t blockSize;          // Block size in bytes (for block cipher)
+  uint16_t nonceSize;          // Nonce size in bytes
   uint16_t hashSizeBits;      // Hash size in bits
-  uint32_t outputExtension;   // How much to extend or handle
+  uint16_t outputExtension;   // How much to extend or handle
   std::string hashName;       // Hash algorithm name
   uint64_t iv;                // 64-bit IV (seed)
   uint8_t saltLen;            // Length of salt

@@ -1,8 +1,7 @@
 cipher improvement
 
-- port / add back the good code in block-cipher.h.good for modes other than scatter (which is already done today!) into block-cipher.h
-- use 'more secure' randomness source in cpp
 - let key material come from a file not just a password or -P command line arg
+- use 'more secure' randomness source in cpp
 - write tests, including hmac testing tampering tests
 
 Later maybe

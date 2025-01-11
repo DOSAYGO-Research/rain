@@ -11,12 +11,12 @@ static void debugPrintPuzzleParams(
     uint32_t hash_size,
     uint64_t seed,
     const std::vector<uint8_t>& salt,
-    size_t blockSize,
-    size_t nonceSize,
+    uint16_t blockSize,
+    uint16_t nonceSize,
     const std::string& searchMode,
     bool verbose,
     bool deterministicNonce,
-    uint32_t outputExtension)
+    uint16_t outputExtension)
 {
   std::cerr << "[puzzleEncryptBufferWithHeader - DEBUG]\n"
             << "  plainData.size(): " << plainData.size() << "\n"
@@ -51,12 +51,12 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   uint32_t hash_size,
   uint64_t seed,
   const std::vector<uint8_t> &salt,
-  size_t blockSize,
-  size_t nonceSize,
+  uint16_t blockSize,
+  uint16_t nonceSize,
   const std::string &searchMode,
   bool verbose,
   bool deterministicNonce,
-  uint32_t outputExtension
+  uint16_t outputExtension
 ) {
 #ifdef _OPENMP
   int halfCores = std::max(1, 1 + static_cast<int>(std::thread::hardware_concurrency()) / 2);
@@ -105,9 +105,9 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   hdr.magic = MagicNumber;
   hdr.version = 0x02;
   hdr.cipherMode = 0x11; // "Block Cipher + puzzle"
-  hdr.blockSize = static_cast<uint8_t>(blockSize);
-  hdr.nonceSize = static_cast<uint8_t>(nonceSize);
-  hdr.outputExtension = outputExtension;
+  hdr.blockSize = static_cast<uint16_t>(blockSize);
+  hdr.nonceSize = static_cast<uint16_t>(nonceSize);
+  hdr.outputExtension = static_cast<uint16_t>(outputExtension);
   hdr.hashSizeBits = hash_size;
   hdr.hashName = (algot == HashAlgorithm::Rainbow) ? "rainbow" : "rainstorm";
   hdr.iv = seed;
@@ -174,7 +174,7 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
 
   // We'll store encryption results in outBuffer after the header
   for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
-    size_t thisBlockSize = std::min(blockSize, remaining);
+    size_t thisBlockSize = std::min<size_t>(blockSize, remaining);
     remaining -= thisBlockSize;
 
     // Extract block
@@ -260,7 +260,7 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
             found = true;
           }
         } else if (searchModeEnum == 0x01) { // sequence
-          for (size_t i = 0; i + thisBlockSize <= finalHashOut.size(); i++) {
+          for (size_t i = 0; i <= finalHashOut.size() - thisBlockSize; i++) {
             if (std::equal(block.begin(), block.end(), finalHashOut.begin() + i)) {
               uint16_t startIdx = static_cast<uint16_t>(i);
               scatterIndices.assign(thisBlockSize, startIdx);
@@ -274,28 +274,37 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
           auto it = finalHashOut.begin();
 
           for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-            while (it != finalHashOut.end()) {
-              it = std::find(it, finalHashOut.end(), block[byteIdx]);
-              if (it != finalHashOut.end()) {
-                uint16_t idx = static_cast<uint16_t>(std::distance(finalHashOut.begin(), it));
-                if (!usedIndices.test(idx)) {
-                  scatterIndices[byteIdx] = idx;
-                  usedIndices.set(idx);
-                  break;
-                }
-                ++it;
-              } else {
-                allFound = false;
-                break;
+              while (it != finalHashOut.end()) {
+                  it = std::find(it, finalHashOut.end(), block[byteIdx]);
+                  if (it != finalHashOut.end()) {
+                      uint16_t idx = static_cast<uint16_t>(std::distance(finalHashOut.begin(), it));
+                      if (!usedIndices.test(idx)) {
+                          scatterIndices[byteIdx] = idx;
+                          usedIndices.set(idx);
+                          break;
+                      }
+                      ++it;
+                  }
+                  else {
+                      allFound = false;
+                      break;
+                  }
               }
-            }
-            if (it == finalHashOut.end()) {
-              allFound = false;
-              break;
-            }
+              if (it == finalHashOut.end()) {
+                  allFound = false;
+                  break;
+              }
           }
+
           if (allFound) {
-            found = true;
+              found = true;
+              if (verbose) {
+                  std::cout << "Series Indices: ";
+                  for (auto idx : scatterIndices) {
+                      std::cout << static_cast<uint16_t>(idx) << " ";
+                  }
+                  std::cout << std::endl;
+              }
           }
         } else if (searchModeEnum == 0x03) { // scatter
           bool allFound = true;
@@ -327,29 +336,37 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
             found = true;
           }
         } else if (searchModeEnum == 0x04) { // mapscatter
-          bool allFound = true;
+          // Reset offsets
+          std::fill(std::begin(reverseMapOffsets), std::end(reverseMapOffsets), 0);
 
-          memset(reverseMapOffsets, 0, sizeof(reverseMapOffsets));
-
-          // Build map
+          // Fill the map with all positions of each byte in finalHashOut
           for (uint16_t i = 0; i < finalHashOut.size(); i++) {
-            uint8_t b = finalHashOut[i];
-            reverseMap[b * 256 + reverseMapOffsets[b]] = i;
-            reverseMapOffsets[b]++;
+              uint8_t b = finalHashOut[i];
+              reverseMap[b * 256 + reverseMapOffsets[b]] = i;
+              reverseMapOffsets[b]++;
           }
 
+          bool allFound = true;
           for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
-            uint8_t targetByte = block[byteIdx];
-            if (reverseMapOffsets[targetByte] == 0) {
-              allFound = false;
-              break;
-            }
-            reverseMapOffsets[targetByte]--;
-            scatterIndices[byteIdx] =
-              reverseMap[targetByte * 256 + reverseMapOffsets[targetByte]];
+              uint8_t targetByte = block[byteIdx];
+              if (reverseMapOffsets[targetByte] == 0) {
+                  allFound = false;
+                  break;
+              }
+              reverseMapOffsets[targetByte]--;
+              scatterIndices[byteIdx] =
+                  reverseMap[targetByte * 256 + reverseMapOffsets[targetByte]];
           }
+
           if (allFound) {
-            found = true;
+              found = true;
+              if (verbose) {
+                  std::cout << "Scatter Indices: ";
+                  for (auto idx : scatterIndices) {
+                      std::cout << static_cast<uint16_t>(idx) << " ";
+                  }
+                  std::cout << std::endl;
+              }
           }
         }
 

@@ -24,9 +24,9 @@ int main(int argc, char** argv) {
             ("s,size", "Specify the size of the hash (e.g., 64, 128, 256, 512)",
                 cxxopts::value<uint32_t>()->default_value("256"))
             ("block-size", "Block size in bytes for puzzle-based encryption (1-255)",
-                cxxopts::value<uint8_t>()->default_value("3"))
+                cxxopts::value<uint16_t>()->default_value("3"))
             ("n,nonce-size", "Size of the nonce in bytes [1-255] (block-enc mode)",
-                cxxopts::value<size_t>()->default_value("14"))
+                cxxopts::value<uint16_t>()->default_value("14"))
             ("deterministic-nonce", "Use a deterministic counter for nonce generation",
                 cxxopts::value<bool>()->default_value("false"))
             ("search-mode", "Search mode for plaintext mining block cipher: prefix, sequence, series, scatter, mapscatter, parascatter",
@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
             ("l,output-length", "Output length in hash iterations (stream mode)",
                 cxxopts::value<uint64_t>()->default_value("1000000"))
             ("x,output-extension", "Output extension in bytes (block-enc mode). Extend digest by this many bytes to make mining larger P blocks faster",
-                cxxopts::value<uint32_t>()->default_value("128"))
+                cxxopts::value<uint16_t>()->default_value("128"))
             ("seed", "Seed value (0x prefixed hex string or numeric)",
                 cxxopts::value<std::string>()->default_value("0x0"))
             ("salt", "Salt value (0x prefixed hex string or string)",
@@ -125,15 +125,15 @@ int main(int argc, char** argv) {
         }
 
         // Block Size
-        uint8_t blockSize = result["block-size"].as<uint8_t>();
-        if (blockSize == 0 || blockSize > 255) {
-            throw std::runtime_error("Block size must be between 1 and 255 bytes.");
+        uint16_t blockSize = result["block-size"].as<uint16_t>();
+        if (blockSize == 0 || blockSize > 65535) {
+            throw std::runtime_error("Block size must be between 1 and 65535 bytes.");
         }
 
         // Nonce Size
-        size_t nonceSize = result["nonce-size"].as<size_t>();
-        if (nonceSize == 0 || nonceSize > 255) {
-            throw std::runtime_error("Nonce size must be between 1 and 255 bytes.");
+        uint16_t nonceSize = result["nonce-size"].as<uint16_t>();
+        if (nonceSize == 0 || nonceSize > 65535) {
+            throw std::runtime_error("Nonce size must be between 1 and 65535 bytes.");
         }
 
         // Nonce nature
@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
         }
 
         // Output extension
-        uint32_t output_extension = result["output-extension"].as<uint32_t>();
+        uint16_t output_extension = result["output-extension"].as<uint16_t>();
 
         // Convert Seed (either numeric or hex string)
         std::string seed_str = result["seed"].as<std::string>();

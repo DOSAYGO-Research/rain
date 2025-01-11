@@ -381,7 +381,7 @@ extern "C" {
 } // extern "C"
 #endif // __EMSCRIPTEN__
 
-  static std::vector<uint8_t> encryptInternal(const uint8_t* data, size_t data_len, const char* keyPtr, size_t keyLen, const char* algorithm, const char* searchMode, uint32_t hashBits, uint64_t seed, uint8_t* saltPtr, size_t saltLen, size_t blockSize, size_t nonceSize, uint32_t outputExtension, int deterministicNonce, int verbose) {
+  static std::vector<uint8_t> encryptInternal(const uint8_t* data, size_t data_len, const char* keyPtr, size_t keyLen, const char* algorithm, const char* searchMode, uint32_t hashBits, uint64_t seed, uint8_t* saltPtr, size_t saltLen, uint16_t blockSize, uint32_t nonceSize, uint32_t outputExtension, int deterministicNonce, int verbose) {
       std::vector<uint8_t> plainData(data, data + data_len);
       std::vector<uint8_t> key(keyPtr, keyPtr + keyLen);
       std::string algorithmStr(algorithm);
