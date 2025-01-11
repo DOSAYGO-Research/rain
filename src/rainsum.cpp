@@ -110,18 +110,22 @@ int main(int argc, char** argv) {
             if (hash_size != 64 && hash_size != 128 && hash_size != 256) {
                 throw std::runtime_error("Invalid size for Rainbow (must be 64, 128, or 256).");
             }
+            /*
             if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
               algot = HashAlgorithm::Rainstorm;
               hash_size = 512;
             }
+            */
         }
         else if (algot == HashAlgorithm::Rainstorm) {
             if (hash_size != 64 && hash_size != 128 && hash_size != 256 && hash_size != 512) {
                 throw std::runtime_error("Invalid size for Rainstorm (must be 64, 128, 256, or 512).");
             }
+            /*
             if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
               hash_size = 512;
             }
+            */
         }
 
         // Block Size

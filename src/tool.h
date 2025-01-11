@@ -22,6 +22,7 @@
 #include <iterator>
 #include <zlib.h>
 #include <stdexcept>
+
 // only define USE_FILESYSTEM if it is supported and needed
 #include <sys/stat.h>
 #ifdef USE_FILESYSTEM
@@ -903,6 +904,7 @@ inline constexpr uint32_t MagicNumber = 0x59524352;
   }
 
 
+  /*
   // ADDED: Extend Output with iterations and counter
   static std::vector<uint8_t> extendOutputKDF(
     const std::vector<uint8_t> &prk,
@@ -949,6 +951,58 @@ inline constexpr uint32_t MagicNumber = 0x59524352;
       out.resize(totalLen);
       return out;
   }
+  */
+
+  // SIMD-friendly memory copy
+  inline void fast_memcpy(void* dst, const void* src, size_t size) {
+    std::memcpy(dst, src, size); // Replace with SIMD intrinsics if beneficial
+  }
+
+  static std::vector<uint8_t> extendOutputKDF(
+      const std::vector<uint8_t>& prk,
+      size_t totalLen,
+      HashAlgorithm algot,
+      uint32_t hash_bits) {
+    
+    const size_t hash_size = hash_bits / 8;
+    std::vector<uint8_t> output(totalLen);
+    
+    uint64_t counter = 1;
+    std::vector<uint8_t> kn = prk; // Initial K_n = PRK
+    
+    size_t generated = 0;
+    while (generated < totalLen) {
+      // Combine PRK || info || counter
+      std::vector<uint8_t> combined;
+      combined.reserve(prk.size() + KDF_INFO_STRING.size() + 8);
+      combined.insert(combined.end(), prk.begin(), prk.end());
+      combined.insert(combined.end(), KDF_INFO_STRING.begin(), KDF_INFO_STRING.end());
+      
+      // Append counter in big-endian
+      for (int i = 7; i >= 0; --i) {
+        combined.push_back(static_cast<uint8_t>((counter >> (i * 8)) & 0xFF));
+      }
+
+      // Perform the hash function KDF_ITERATIONS times
+      std::vector<uint8_t> temp = combined;
+      std::vector<uint8_t> kn_next(hash_size, 0);
+      for (int i = 0; i < KDF_ITERATIONS; ++i) {
+        invokeHash<false>(algot, 0, temp, kn_next, hash_bits);
+        temp = kn_next;
+      }
+
+      kn = kn_next;
+
+      // Append to output
+      size_t to_copy = std::min(hash_size, totalLen - generated);
+      fast_memcpy(output.data() + generated, kn.data(), to_copy);
+      generated += to_copy;
+      counter++;
+    }
+    
+    return output;
+  }
+
 
 
 
