@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
         std::string seed_str = result["seed"].as<std::string>();
         uint64_t seed = 0;
         bool userProvidedSeed = false;
-        if (!seed_str.empty() && seed_str != "0x0") {
+        if (!seed_str.empty()) {
           userProvidedSeed = true;
           try {
             if (seed_str.find("0x") == 0 || seed_str.find("0X") == 0) {
@@ -178,6 +178,10 @@ int main(int argc, char** argv) {
             std::cerr << "[Info] No seed provided; generated random seed: 0x"
                       << std::hex << seed << std::dec << "\n";
           }
+        }
+
+        if ( verbose ) {
+          std::cout << "Seed: " << std::hex << seed << std::endl;
         }
 
         // SALT handling:
