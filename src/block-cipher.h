@@ -117,6 +117,10 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   std::uniform_int_distribution<uint8_t> dist(0, 255);
   uint64_t nonceCounter = 0;
   size_t remaining = hdr.originalSize;
+  int progressInterval = 1'000'000;
+  static uint16_t reverseMap[256 * 65536];
+  static uint16_t reverseMapOffsets[256];
+  std::bitset<65536> usedIndices;
 
   // Preallocate variables outside the loop
   std::vector<uint8_t> chosenNonce(nonceSize);
@@ -172,29 +176,147 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
 
         // Hash trial
         invokeHash<false>(algot, seed, trial, hashOut, hash_size);
-
-        // Output extension if needed
+        std::vector<uint8_t> finalHashOut = hashOut;
         if (outputExtension > 0) {
           std::vector<uint8_t> extendedOutput = extendOutputKDF(trial, outputExtension, algot, hash_size);
-          hashOut.insert(hashOut.end(), extendedOutput.begin(), extendedOutput.end());
+          finalHashOut.insert(finalHashOut.end(), extendedOutput.begin(), extendedOutput.end());
         }
 
-        // Search logic (unchanged but optimized slightly)
-        found = (searchModeEnum == 0x00 && hashOut.size() >= thisBlockSize &&
-                 std::equal(block.begin(), block.end(), hashOut.begin()));
-        if (found) {
-          scatterIndices.assign(thisBlockSize, 0);
-        }
+        // Check the search mode
+        if (searchModeEnum == 0x00) { // prefix
+          if (finalHashOut.size() >= thisBlockSize &&
+              std::equal(block.begin(), block.end(), finalHashOut.begin())) {
+            scatterIndices.assign(thisBlockSize, 0);
+            found = true;
+          }
+        } else if (searchModeEnum == 0x01) { // sequence
+          for (size_t i = 0; i <= finalHashOut.size() - thisBlockSize; i++) {
+            if (std::equal(block.begin(), block.end(), finalHashOut.begin() + i)) {
+              uint16_t startIdx = static_cast<uint16_t>(i);
+              scatterIndices.assign(thisBlockSize, startIdx);
+              found = true;
+              break;
+            }
+          }
+        } else if (searchModeEnum == 0x02) { // series
+          bool allFound = true;
+          usedIndices.reset();
+          auto it = finalHashOut.begin();
 
+          for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+              while (it != finalHashOut.end()) {
+                  it = std::find(it, finalHashOut.end(), block[byteIdx]);
+                  if (it != finalHashOut.end()) {
+                      uint16_t idx = static_cast<uint16_t>(std::distance(finalHashOut.begin(), it));
+                      if (!usedIndices.test(idx)) {
+                          scatterIndices[byteIdx] = idx;
+                          usedIndices.set(idx);
+                          break;
+                      }
+                      ++it;
+                  }
+                  else {
+                      allFound = false;
+                      break;
+                  }
+              }
+              if (it == finalHashOut.end()) {
+                  allFound = false;
+                  break;
+              }
+          }
+
+          if (allFound) {
+              found = true;
+              if (verbose) {
+                  std::cout << "Series Indices: ";
+                  for (auto idx : scatterIndices) {
+                      std::cout << static_cast<uint16_t>(idx) << " ";
+                  }
+                  std::cout << std::endl;
+              }
+          }
+        } else if (searchModeEnum == 0x03) { // scatter
+          bool allFound = true;
+          usedIndices.reset();
+
+          for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
+            auto it = finalHashOut.begin();
+            while (it != finalHashOut.end()) {
+              it = std::find(it, finalHashOut.end(), block[byteIdx]);
+              if (it != finalHashOut.end()) {
+                uint16_t idx = static_cast<uint16_t>(std::distance(finalHashOut.begin(), it));
+                if (!usedIndices.test(idx)) {
+                  scatterIndices[byteIdx] = idx;
+                  usedIndices.set(idx);
+                  break;
+                }
+                ++it;
+              } else {
+                allFound = false;
+                break;
+              }
+            }
+            if (it == finalHashOut.end()) {
+                allFound = false;
+                break;
+            }
+          }
+          if (allFound) {
+            found = true;
+          }
+        } else if (searchModeEnum == 0x04) { // mapscatter
+          // Reset offsets
+          std::fill(std::begin(reverseMapOffsets), std::end(reverseMapOffsets), 0);
+
+          // Fill the map with all positions of each byte in finalHashOut
+          for (uint16_t i = 0; i < finalHashOut.size(); i++) {
+              uint8_t b = finalHashOut[i];
+              reverseMap[b * 65536 + reverseMapOffsets[b]] = i;
+              reverseMapOffsets[b]++;
+          }
+
+          bool allFound = true;
+          for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
+              uint8_t targetByte = block[byteIdx];
+              if (reverseMapOffsets[targetByte] == 0) {
+                  allFound = false;
+                  break;
+              }
+              reverseMapOffsets[targetByte]--;
+              scatterIndices[byteIdx] =
+                  reverseMap[targetByte * 65536 + reverseMapOffsets[targetByte]];
+          }
+
+          if (allFound) {
+              found = true;
+              if (verbose) {
+                  std::cout << "Scatter Indices: ";
+                  for (auto idx : scatterIndices) {
+                      std::cout << static_cast<uint16_t>(idx) << " ";
+                  }
+                  std::cout << std::endl;
+              }
+          }
+        }
         if (tries % 100000 == 0 && verbose) {
           std::cerr << "\r[Enc] Block " << (blockIndex + 1) << "/" << totalBlocks
                     << ", " << tries << " tries..." << std::flush;
         }
       }
-
-      outBuffer.insert(outBuffer.end(), chosenNonce.begin(), chosenNonce.end());
-      const uint8_t* si = reinterpret_cast<const uint8_t*>(scatterIndices.data());
-      outBuffer.insert(outBuffer.end(), si, si + scatterIndices.size() * sizeof(uint16_t));
+      if (found) {
+        outBuffer.insert(outBuffer.end(), chosenNonce.begin(), chosenNonce.end());
+        // Write indices
+        if (searchModeEnum == 0x02 || searchModeEnum == 0x03 ||
+            searchModeEnum == 0x04) {
+          const uint8_t* si = reinterpret_cast<const uint8_t*>(scatterIndices.data());
+          outBuffer.insert(outBuffer.end(), si, si + scatterIndices.size() * sizeof(uint16_t));
+        } else if (searchModeEnum == 0x00 || searchModeEnum == 0x01) {
+          uint16_t startIdx = scatterIndices[0];
+          const uint8_t* idxPtr = reinterpret_cast<const uint8_t*>(&startIdx);
+          outBuffer.insert(outBuffer.end(), idxPtr, idxPtr + sizeof(startIdx));
+        }
+      }
     }
   }
 
