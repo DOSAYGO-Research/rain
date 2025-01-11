@@ -85,7 +85,9 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
     {"prefix", 0x00}, {"sequence", 0x01}, {"series", 0x02},
     {"scatter", 0x03}, {"mapscatter", 0x04}, {"parascatter", 0x05}
   };
-  hdr.searchModeEnum = searchModeMap.contains(searchMode) ? searchModeMap.at(searchMode) : 0xFF;
+  auto it = searchModeMap.find(searchMode);
+  hdr.searchModeEnum = (it != searchModeMap.end()) ? it->second : 0xFF;
+
 
   auto searchModeEnum = hdr.searchModeEnum;
 
