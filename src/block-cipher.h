@@ -376,22 +376,39 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
 }
 
 static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
-  const std::vector<uint8_t> &cipherData,
+  const std::vector<uint8_t> &cipherText,
   std::vector<uint8_t> key
 ) {
-  // 1) Create an input stream from cipherData
-  std::istringstream inStream(std::string(cipherData.begin(), cipherData.end()), std::ios::binary);
+  // Parse the FileHeader from the front of cipherData
+  // Then reconstruct the plaintext.
 
-  // 2) Read FileHeader using file-header.h's readFileHeader
+  if (cipherText.size() < sizeof(PackedHeader)) {
+    throw std::runtime_error("Cipher data too small to contain valid header.");
+  }
+
+  std::istringstream inStream(std::string(cipherText.begin(), cipherText.end()), std::ios::binary);
+
+  // Read the header
   FileHeader hdr = readFileHeader(inStream);
 
-  // 3) Read the ciphertext (rest of the stream)
-  std::vector<uint8_t> ciphertext_dec(
-    (std::istreambuf_iterator<char>(inStream)),
-    (std::istreambuf_iterator<char>())
-  );
+  if (hdr.magic != MagicNumber) {
+    throw std::runtime_error("Invalid magic number.");
+  }
+  if (hdr.cipherMode != 0x11) {
+    throw std::runtime_error("Not block cipher mode (expected 0x11).");
+  }
 
-  // 4) Derive PRK
+  // Determine HashAlgorithm
+  HashAlgorithm algot = HashAlgorithm::Unknown;
+  if (hdr.hashName == "rainbow") {
+    algot = HashAlgorithm::Rainbow;
+  } else if (hdr.hashName == "rainstorm") {
+    algot = HashAlgorithm::Rainstorm;
+  } else {
+    throw std::runtime_error("Unsupported hash algorithm: " + hdr.hashName);
+  }
+
+  // Derive PRK
   std::vector<uint8_t> ikm(key.begin(), key.end());
   std::vector<uint8_t> seed_vec(8);
   for (size_t i = 0; i < 8; ++i) {
@@ -399,20 +416,20 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
   }
   std::vector<uint8_t> prk = derivePRK(seed_vec, hdr.salt, ikm, algot, hdr.hashSizeBits);
 
-  // 5) Extend into subkeys
+  // Extend into subkeys
   size_t totalBlocks = (hdr.originalSize + hdr.blockSize - 1) / hdr.blockSize;
   size_t subkeySize = hdr.hashSizeBits / 8;
   size_t totalNeeded = totalBlocks * subkeySize;
   std::vector<uint8_t> allSubkeys = extendOutputKDF(prk, totalNeeded, algot, hdr.hashSizeBits);
 
-  // 6) Reconstruct plaintext
+  // Reconstruct plaintext
   std::vector<uint8_t> plaintextAccumulated;
   plaintextAccumulated.reserve(hdr.originalSize);
 
   for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
     size_t thisBlockSize = std::min<size_t>(hdr.blockSize, hdr.originalSize - plaintextAccumulated.size());
 
-    // Read storedNonce
+    // Read storedNonce directly from inStream
     std::vector<uint8_t> storedNonce(hdr.nonceSize);
     inStream.read(reinterpret_cast<char*>(storedNonce.data()), hdr.nonceSize);
     if (inStream.gcount() != hdr.nonceSize) {
@@ -498,14 +515,12 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
 
   // Done reading, now decompress
   std::vector<uint8_t> decompressedData = decompressData(plaintextAccumulated);
-  //std::vector<uint8_t> decompressedData = plaintextAccumulated;
   if (plaintextAccumulated.size() != hdr.originalSize) {
     throw std::runtime_error("Compressed data size mismatch vs. original size header.");
   }
 
   return decompressedData;
 }
-
 
 static void puzzleEncryptFileWithHeader(
   const std::string &inFilename,
