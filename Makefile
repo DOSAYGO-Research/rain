@@ -20,8 +20,8 @@ EMCCFLAGS = -O2 -s WASM=1 \
   -s WASM_BIGINT=1 \
   -s ALLOW_MEMORY_GROWTH=1 \
 	-s USE_ZLIB=1 \
-	-s NO_DISABLE_EXCEPTION_CATCHING \
-  -g
+	#-s NO_DISABLE_EXCEPTION_CATCHING \
+  #-g
 
 # Directories
 OBJDIR = rain/obj
