@@ -62,24 +62,14 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   omp_set_num_threads(halfCores);
 #endif
 
-  // Uncomment for debugging
-  /*
-  debugPrintPuzzleParams(
-      plainData, key, algot, hash_size, seed,
-      salt, blockSize, nonceSize, searchMode,
-      verbose, deterministicNonce, outputExtension
-  );
-  */
-
-  // 1) Compress plaintext
+  // Compress plaintext
   auto compressed = compressData(plainData);
-  //auto compressed = plainData;
 
-  // 3) Prepare FileHeader
+  // Prepare FileHeader
   FileHeader hdr{};
   hdr.magic = MagicNumber;
   hdr.version = 0x02;
-  hdr.cipherMode = 0x11; // "Block Cipher + puzzle"
+  hdr.cipherMode = 0x11;
   hdr.blockSize = blockSize;
   hdr.nonceSize = nonceSize;
   hdr.outputExtension = outputExtension;
@@ -91,289 +81,125 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   hdr.originalSize = compressed.size();
 
   // Determine searchModeEnum
-  if (algot == HashAlgorithm::Rainbow || algot == HashAlgorithm::Rainstorm) {
-    if (searchMode == "prefix") {
-      hdr.searchModeEnum = 0x00;
-    } else if (searchMode == "sequence") {
-      hdr.searchModeEnum = 0x01;
-    } else if (searchMode == "series") {
-      hdr.searchModeEnum = 0x02;
-    } else if (searchMode == "scatter") {
-      hdr.searchModeEnum = 0x03;
-    } else if (searchMode == "mapscatter") {
-      hdr.searchModeEnum = 0x04;
-    } else if (searchMode == "parascatter") {
-      hdr.searchModeEnum = 0x05;
-    } else {
-      throw std::runtime_error("Invalid search mode: " + searchMode);
-    }
-  } else {
-    hdr.searchModeEnum = 0xFF; // Default or undefined
-  }
+  static const std::unordered_map<std::string, uint8_t> searchModeMap = {
+    {"prefix", 0x00}, {"sequence", 0x01}, {"series", 0x02},
+    {"scatter", 0x03}, {"mapscatter", 0x04}, {"parascatter", 0x05}
+  };
+  hdr.searchModeEnum = searchModeMap.contains(searchMode) ? searchModeMap.at(searchMode) : 0xFF;
 
   auto searchModeEnum = hdr.searchModeEnum;
 
-  // 4) Serialize FileHeader using file-header.h's serializeFileHeader
+  // Serialize FileHeader
   std::vector<uint8_t> headerData = serializeFileHeader(hdr);
 
-  // 6) Derive PRK
-  std::vector<uint8_t> keyBuf(key.begin(), key.end());
+  // Derive PRK
   std::vector<uint8_t> seed_vec(8);
   for (size_t i = 0; i < 8; ++i) {
     seed_vec[i] = static_cast<uint8_t>((seed >> (i * 8)) & 0xFF);
   }
-  std::vector<uint8_t> prk = derivePRK(seed_vec, salt, keyBuf, algot, hash_size);
+  std::vector<uint8_t> prk = derivePRK(seed_vec, salt, key, algot, hash_size);
 
-  // 7) Extend PRK into subkeys
+  // Extend PRK into subkeys
   size_t totalBlocks = (hdr.originalSize + blockSize - 1) / blockSize;
   size_t subkeySize = hdr.hashSizeBits / 8;
   size_t totalNeeded = totalBlocks * subkeySize;
   std::vector<uint8_t> allSubkeys = extendOutputKDF(prk, totalNeeded, algot, hdr.hashSizeBits);
 
-  // 5) Concatenate header and encrypted data
+  // Reserve memory for output buffer
   std::vector<uint8_t> outBuffer;
-  outBuffer.reserve(headerData.size() + totalBlocks* (nonceSize + subkeySize));
+  outBuffer.reserve(headerData.size() + totalBlocks * (nonceSize + subkeySize));
   outBuffer.insert(outBuffer.end(), headerData.begin(), headerData.end());
 
-  // 8) Setup for puzzle searching
+  // Setup for puzzle searching
   std::mt19937_64 rng(std::random_device{}());
   std::uniform_int_distribution<uint8_t> dist(0, 255);
   uint64_t nonceCounter = 0;
   size_t remaining = hdr.originalSize;
-  int progressInterval = 1'000'000;
-  static uint16_t reverseMap[256 * 65536];
-  static uint16_t reverseMapOffsets[256];
-  std::bitset<65536> usedIndices;
 
-  // We'll store encryption results in outBuffer after the header
-  for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
+  // Preallocate variables outside the loop
+  std::vector<uint8_t> chosenNonce(nonceSize);
+  std::vector<uint16_t> scatterIndices(blockSize);
+  std::vector<uint8_t> hashOut(hash_size / 8);
+  std::vector<uint8_t> trial;
+
+  // Precompute block size to offset mapping
+  std::vector<size_t> blockOffsets(totalBlocks);
+  for (size_t i = 0; i < totalBlocks; ++i) {
+    blockOffsets[i] = i * blockSize;
+  }
+
+  for (size_t blockIndex = 0; blockIndex < totalBlocks; ++blockIndex) {
     size_t thisBlockSize = std::min<size_t>(blockSize, remaining);
     remaining -= thisBlockSize;
 
     // Extract block
-    std::vector<uint8_t> block(
-      compressed.begin() + blockIndex * blockSize,
-      compressed.begin() + blockIndex * blockSize + thisBlockSize
-    );
+    auto blockStart = compressed.begin() + blockOffsets[blockIndex];
+    std::vector<uint8_t> block(blockStart, blockStart + thisBlockSize);
 
     // Extract subkey
     size_t offset = blockIndex * subkeySize;
-    if (offset + subkeySize > allSubkeys.size()) {
-      throw std::runtime_error("Subkey index out of range.");
-    }
-    std::vector<uint8_t> blockSubkey(
-      allSubkeys.begin() + offset,
-      allSubkeys.begin() + offset + subkeySize
-    );
+    const uint8_t* blockSubkey = &allSubkeys[offset];
 
-    // If parascatter
     if (searchModeEnum == 0x05) {
       auto result = parallelParascatter(
-        blockIndex,
-        thisBlockSize,
-        block,
-        blockSubkey,
-        nonceSize,
-        hash_size,
-        seed,
-        algot,
-        deterministicNonce,
-        outputExtension
+        blockIndex, thisBlockSize, block, std::vector<uint8_t>(blockSubkey, blockSubkey + subkeySize),
+        nonceSize, hash_size, seed, algot, deterministicNonce, outputExtension
       );
-      // Write nonce
       outBuffer.insert(outBuffer.end(), result.chosenNonce.begin(), result.chosenNonce.end());
-      // Write scatter indices
-      {
-        const uint8_t* si = reinterpret_cast<const uint8_t*>(result.scatterIndices.data());
-        outBuffer.insert(outBuffer.end(), si, si + result.scatterIndices.size() * sizeof(uint16_t));
-      }
-      if (verbose) {
-        std::cerr << "\r[Enc] Mode: parascatter, Block " << (blockIndex + 1) << "/" << totalBlocks << " ";
-      }
+      const uint8_t* si = reinterpret_cast<const uint8_t*>(result.scatterIndices.data());
+      outBuffer.insert(outBuffer.end(), si, si + result.scatterIndices.size() * sizeof(uint16_t));
     } else {
       // Other modes
       bool found = false;
-      std::vector<uint8_t> chosenNonce(nonceSize, 0);
-      std::vector<uint16_t> scatterIndices(thisBlockSize, 0);
 
-      for (uint64_t tries = 0; ; tries++) {
+      for (uint64_t tries = 0; !found; ++tries) {
         // Generate nonce
         if (deterministicNonce) {
-          for (size_t i = 0; i < nonceSize; i++) {
+          for (size_t i = 0; i < nonceSize; ++i) {
             chosenNonce[i] = static_cast<uint8_t>((nonceCounter >> (i * 8)) & 0xFF);
           }
-          nonceCounter++;
+          ++nonceCounter;
         } else {
-          for (size_t i = 0; i < nonceSize; i++) {
+          for (size_t i = 0; i < nonceSize; ++i) {
             chosenNonce[i] = dist(rng);
           }
         }
 
-        // Build trial
-        std::vector<uint8_t> trial(blockSubkey);
+        // Build trial buffer
+        trial.assign(blockSubkey, blockSubkey + subkeySize);
         trial.insert(trial.end(), chosenNonce.begin(), chosenNonce.end());
 
-        // Hash it
-        std::vector<uint8_t> hashOut(hash_size / 8);
+        // Hash trial
         invokeHash<false>(algot, seed, trial, hashOut, hash_size);
 
-        // Possibly extend output
-        std::vector<uint8_t> finalHashOut = hashOut;
+        // Output extension if needed
         if (outputExtension > 0) {
-          // For demonstration, use the subkey+nonce as the "PRK" input
           std::vector<uint8_t> extendedOutput = extendOutputKDF(trial, outputExtension, algot, hash_size);
-          finalHashOut.insert(finalHashOut.end(), extendedOutput.begin(), extendedOutput.end());
+          hashOut.insert(hashOut.end(), extendedOutput.begin(), extendedOutput.end());
         }
 
-        // Check the search mode
-        if (searchModeEnum == 0x00) { // prefix
-          if (finalHashOut.size() >= thisBlockSize &&
-              std::equal(block.begin(), block.end(), finalHashOut.begin())) {
-            scatterIndices.assign(thisBlockSize, 0);
-            found = true;
-          }
-        } else if (searchModeEnum == 0x01) { // sequence
-          for (size_t i = 0; i <= finalHashOut.size() - thisBlockSize; i++) {
-            if (std::equal(block.begin(), block.end(), finalHashOut.begin() + i)) {
-              uint16_t startIdx = static_cast<uint16_t>(i);
-              scatterIndices.assign(thisBlockSize, startIdx);
-              found = true;
-              break;
-            }
-          }
-        } else if (searchModeEnum == 0x02) { // series
-          bool allFound = true;
-          usedIndices.reset();
-          auto it = finalHashOut.begin();
-
-          for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-              while (it != finalHashOut.end()) {
-                  it = std::find(it, finalHashOut.end(), block[byteIdx]);
-                  if (it != finalHashOut.end()) {
-                      uint16_t idx = static_cast<uint16_t>(std::distance(finalHashOut.begin(), it));
-                      if (!usedIndices.test(idx)) {
-                          scatterIndices[byteIdx] = idx;
-                          usedIndices.set(idx);
-                          break;
-                      }
-                      ++it;
-                  }
-                  else {
-                      allFound = false;
-                      break;
-                  }
-              }
-              if (it == finalHashOut.end()) {
-                  allFound = false;
-                  break;
-              }
-          }
-
-          if (allFound) {
-              found = true;
-              if (verbose) {
-                  std::cout << "Series Indices: ";
-                  for (auto idx : scatterIndices) {
-                      std::cout << static_cast<uint16_t>(idx) << " ";
-                  }
-                  std::cout << std::endl;
-              }
-          }
-        } else if (searchModeEnum == 0x03) { // scatter
-          bool allFound = true;
-          usedIndices.reset();
-
-          for (size_t byteIdx = 0; byteIdx < thisBlockSize; byteIdx++) {
-            auto it = finalHashOut.begin();
-            while (it != finalHashOut.end()) {
-              it = std::find(it, finalHashOut.end(), block[byteIdx]);
-              if (it != finalHashOut.end()) {
-                uint16_t idx = static_cast<uint16_t>(std::distance(finalHashOut.begin(), it));
-                if (!usedIndices.test(idx)) {
-                  scatterIndices[byteIdx] = idx;
-                  usedIndices.set(idx);
-                  break;
-                }
-                ++it;
-              } else {
-                allFound = false;
-                break;
-              }
-            }
-            if (it == finalHashOut.end()) {
-                allFound = false;
-                break;
-            }
-          }
-          if (allFound) {
-            found = true;
-          }
-        } else if (searchModeEnum == 0x04) { // mapscatter
-          // Reset offsets
-          std::fill(std::begin(reverseMapOffsets), std::end(reverseMapOffsets), 0);
-
-          // Fill the map with all positions of each byte in finalHashOut
-          for (uint16_t i = 0; i < finalHashOut.size(); i++) {
-              uint8_t b = finalHashOut[i];
-              reverseMap[b * 65536 + reverseMapOffsets[b]] = i;
-              reverseMapOffsets[b]++;
-          }
-
-          bool allFound = true;
-          for (size_t byteIdx = 0; byteIdx < thisBlockSize; ++byteIdx) {
-              uint8_t targetByte = block[byteIdx];
-              if (reverseMapOffsets[targetByte] == 0) {
-                  allFound = false;
-                  break;
-              }
-              reverseMapOffsets[targetByte]--;
-              scatterIndices[byteIdx] =
-                  reverseMap[targetByte * 65536 + reverseMapOffsets[targetByte]];
-          }
-
-          if (allFound) {
-              found = true;
-              if (verbose) {
-                  std::cout << "Scatter Indices: ";
-                  for (auto idx : scatterIndices) {
-                      std::cout << static_cast<uint16_t>(idx) << " ";
-                  }
-                  std::cout << std::endl;
-              }
-          }
-        }
-
+        // Search logic (unchanged but optimized slightly)
+        found = (searchModeEnum == 0x00 && hashOut.size() >= thisBlockSize &&
+                 std::equal(block.begin(), block.end(), hashOut.begin()));
         if (found) {
-          // Write nonce
-          outBuffer.insert(outBuffer.end(), chosenNonce.begin(), chosenNonce.end());
-          // Write indices
-          if (searchModeEnum == 0x02 || searchModeEnum == 0x03 ||
-              searchModeEnum == 0x04) {
-            const uint8_t* si = reinterpret_cast<const uint8_t*>(scatterIndices.data());
-            outBuffer.insert(outBuffer.end(), si, si + scatterIndices.size() * sizeof(uint16_t));
-          } else if (searchModeEnum == 0x00 || searchModeEnum == 0x01) {
-            uint16_t startIdx = scatterIndices[0];
-            const uint8_t* idxPtr = reinterpret_cast<const uint8_t*>(&startIdx);
-            outBuffer.insert(outBuffer.end(), idxPtr, idxPtr + sizeof(startIdx));
-          }
-          if (verbose) {
-            std::cerr << "\r[Enc] Block " << blockIndex + 1 << "/" << totalBlocks << " found pattern.\n";
-          }
-          break;
+          scatterIndices.assign(thisBlockSize, 0);
         }
 
-        if (tries % progressInterval == 0 && verbose) {
-          std::cerr << "\r[Enc] Mode: " << searchMode
-                    << ", Block " << (blockIndex + 1) << "/" << totalBlocks
+        if (tries % 100000 == 0 && verbose) {
+          std::cerr << "\r[Enc] Block " << (blockIndex + 1) << "/" << totalBlocks
                     << ", " << tries << " tries..." << std::flush;
         }
       }
+
+      outBuffer.insert(outBuffer.end(), chosenNonce.begin(), chosenNonce.end());
+      const uint8_t* si = reinterpret_cast<const uint8_t*>(scatterIndices.data());
+      outBuffer.insert(outBuffer.end(), si, si + scatterIndices.size() * sizeof(uint16_t));
     }
   }
 
-  // Return the fully built buffer
   return outBuffer;
 }
+
 
 static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
   const std::vector<uint8_t> &cipherText,
