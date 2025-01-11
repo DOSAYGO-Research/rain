@@ -1,8 +1,9 @@
 cipher improvement
 
+- use irradix l1 to encode and decode scatter indices
 - let key material come from a file not just a password or -P command line arg
 - use 'more secure' randomness source in cpp
-- write tests, including hmac testing tampering tests
+- write hmac testing tampering tests
 
 Later maybe
 
