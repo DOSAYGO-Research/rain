@@ -248,6 +248,10 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size, ar
         throw new Error("Password is required for stream encryption.");
       }
 
+      if ( argv.searchMode == 'parascatter' ) {
+        throw new TypeError(`parallel scatter mode is not supported in JS/WASM at this time! Use the C++ version for that feature.`);
+      }
+
       // Call the new blockEncryptBuffer
       const encryptedBuffer = await blockEncryptBuffer(
         buffer,                                           // Plain data

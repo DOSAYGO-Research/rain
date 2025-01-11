@@ -3,8 +3,9 @@ CXX = /opt/homebrew/opt/llvm/bin/clang++
 EMCC = emcc
 
 # Flags
-CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O3 -march=native
-#CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O0 -fsanitize=address,undefined -march=native
+#CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O3 -march=native
+CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O0 -fsanitize=address,undefined -march=native
+#CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O0 -g 
 CXXFLAGS += -isysroot $(shell xcrun --show-sdk-path)
 CXXFLAGS += -fopenmp -I/opt/homebrew/opt/llvm/include
 DEPFLAGS = -MMD -MF $(@:.o=.d)
@@ -19,8 +20,8 @@ EMCCFLAGS = -O2 -s WASM=1 \
   -s WASM_BIGINT=1 \
   -s ALLOW_MEMORY_GROWTH=1 \
 	-s USE_ZLIB=1 \
-	#-s NO_DISABLE_EXCEPTION_CATCHING \
-  #-g
+	-s NO_DISABLE_EXCEPTION_CATCHING \
+  -g
 
 # Directories
 OBJDIR = rain/obj
