@@ -25,9 +25,9 @@ int main(int argc, char** argv) {
             ("s,size", "Specify the size of the hash (e.g., 64, 128, 256, 512)",
                 cxxopts::value<uint32_t>()->default_value("256"))
             ("block-size", "Block size in bytes for puzzle-based encryption (1-255)",
-                cxxopts::value<uint16_t>()->default_value("3"))
+                cxxopts::value<uint16_t>()->default_value("7"))
             ("n,nonce-size", "Size of the nonce in bytes [1-255] (block-enc mode)",
-                cxxopts::value<uint16_t>()->default_value("14"))
+                cxxopts::value<uint16_t>()->default_value("5"))
             ("deterministic-nonce", "Use a deterministic counter for nonce generation",
                 cxxopts::value<bool>()->default_value("false"))
             ("search-mode", "Search mode for plaintext mining block cipher: prefix, sequence, series, scatter, mapscatter, parascatter",
@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
             ("x,output-extension", "Output extension in bytes (block-enc mode). Extend digest by this many bytes to make mining larger P blocks faster",
                 cxxopts::value<uint16_t>()->default_value("128"))
             ("seed", "Seed value (0x prefixed hex string or numeric)",
-                cxxopts::value<std::string>()->default_value("0x0"))
+                cxxopts::value<std::string>()->default_value(""))
             ("salt", "Salt value (0x prefixed hex string or string)",
                 cxxopts::value<std::string>()->default_value(""))
             // Mining options
@@ -110,22 +110,18 @@ int main(int argc, char** argv) {
             if (hash_size != 64 && hash_size != 128 && hash_size != 256) {
                 throw std::runtime_error("Invalid size for Rainbow (must be 64, 128, or 256).");
             }
-            /*
             if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
               algot = HashAlgorithm::Rainstorm;
               hash_size = 512;
             }
-            */
         }
         else if (algot == HashAlgorithm::Rainstorm) {
             if (hash_size != 64 && hash_size != 128 && hash_size != 256 && hash_size != 512) {
                 throw std::runtime_error("Invalid size for Rainstorm (must be 64, 128, 256, or 512).");
             }
-            /*
             if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
               hash_size = 512;
             }
-            */
         }
 
         // Block Size
@@ -185,7 +181,10 @@ int main(int argc, char** argv) {
         }
 
         if ( verbose ) {
-          std::cout << "Seed: " << std::hex << seed << std::endl;
+          std::cout << "Seed empty: " << seed_str.empty() << std::endl;
+          std::cout << "Seed size: " << seed_str.size() << std::endl;
+          std::cout << "Seed string: " << seed_str << std::endl;
+          std::cout << "Seed uint64_t: " << std::hex << seed << std::endl;
         }
 
         // SALT handling:
