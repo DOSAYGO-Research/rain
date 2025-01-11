@@ -253,7 +253,7 @@ inline void showFileFullInfo(const std::string &inFilename) {
 
 // -------------------------------------------------------------------
 // Function: serializeFileHeader
-// Description: Serializes the FileHeader into a raw byte buffer.
+// Description: Serializes the FileHeader into a contiguous byte buffer.
 // -------------------------------------------------------------------
 inline std::vector<uint8_t> serializeFileHeader(const FileHeader &hdr) {
     // Initialize PackedHeader

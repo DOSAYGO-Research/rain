@@ -36,7 +36,8 @@ static std::mutex cerr_mutex;
 #include "common.h"
 
 
-uint32_t MagicNumber = 0x59524352; // RCRY
+// Magic number to identify your file format ('RCRY' in hex).
+inline constexpr uint32_t MagicNumber = 0x59524352;
 
 // Standard test vectors
   std::vector<std::string> test_vectors = {
