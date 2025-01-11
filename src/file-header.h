@@ -192,6 +192,24 @@ inline FileHeader readFileHeader(std::istream &in) {
 }
 
 // -------------------------------------------------------------------
+// Function: writeHMACToStream
+// Description: Overwrites only the HMAC field in the output stream.
+// -------------------------------------------------------------------
+inline void writeHMACToStream(std::ostream &out, const std::array<uint8_t, 32> &hmac) {
+    size_t hmac_offset = 33; // Based on PackedHeader structure
+
+    out.seekp(hmac_offset, std::ios::beg);
+    if (!out.good()) {
+        throw std::runtime_error("Failed to seek to HMAC position in stream.");
+    }
+
+    out.write(reinterpret_cast<const char*>(hmac.data()), hmac.size());
+    if (!out.good()) {
+        throw std::runtime_error("Failed to write HMAC to stream.");
+    }
+}
+
+// -------------------------------------------------------------------
 // Function: showFileFullInfo
 // Description: Displays the FileHeader information in a human-readable format.
 // -------------------------------------------------------------------
