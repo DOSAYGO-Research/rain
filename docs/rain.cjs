@@ -3918,14 +3918,14 @@ var _rainstormHash512 = Module['_rainstormHash512'] = (a0, a1, a2, a3) => (_rain
 var _rainbowHash64 = Module['_rainbowHash64'] = (a0, a1, a2, a3) => (_rainbowHash64 = Module['_rainbowHash64'] = wasmExports['rainbowHash64'])(a0, a1, a2, a3);
 var _rainbowHash128 = Module['_rainbowHash128'] = (a0, a1, a2, a3) => (_rainbowHash128 = Module['_rainbowHash128'] = wasmExports['rainbowHash128'])(a0, a1, a2, a3);
 var _rainbowHash256 = Module['_rainbowHash256'] = (a0, a1, a2, a3) => (_rainbowHash256 = Module['_rainbowHash256'] = wasmExports['rainbowHash256'])(a0, a1, a2, a3);
-var _wasmGetFileHeaderInfo = Module['_wasmGetFileHeaderInfo'] = (a0, a1) => (_wasmGetFileHeaderInfo = Module['_wasmGetFileHeaderInfo'] = wasmExports['wasmGetFileHeaderInfo'])(a0, a1);
 var _malloc = Module['_malloc'] = (a0) => (_malloc = Module['_malloc'] = wasmExports['malloc'])(a0);
+var _wasmGetFileHeaderInfo = Module['_wasmGetFileHeaderInfo'] = (a0, a1) => (_wasmGetFileHeaderInfo = Module['_wasmGetFileHeaderInfo'] = wasmExports['wasmGetFileHeaderInfo'])(a0, a1);
 var _wasmFree = Module['_wasmFree'] = (a0) => (_wasmFree = Module['_wasmFree'] = wasmExports['wasmFree'])(a0);
 var _free = Module['_free'] = (a0) => (_free = Module['_free'] = wasmExports['free'])(a0);
-var _wasmStreamEncryptBuffer = Module['_wasmStreamEncryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13) => (_wasmStreamEncryptBuffer = Module['_wasmStreamEncryptBuffer'] = wasmExports['wasmStreamEncryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
-var _wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7) => (_wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = wasmExports['wasmStreamDecryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7);
 var _wasmFreeString = Module['_wasmFreeString'] = (a0) => (_wasmFreeString = Module['_wasmFreeString'] = wasmExports['wasmFreeString'])(a0);
 var _wasmFreeBuffer = Module['_wasmFreeBuffer'] = (a0) => (_wasmFreeBuffer = Module['_wasmFreeBuffer'] = wasmExports['wasmFreeBuffer'])(a0);
+var _wasmStreamEncryptBuffer = Module['_wasmStreamEncryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13) => (_wasmStreamEncryptBuffer = Module['_wasmStreamEncryptBuffer'] = wasmExports['wasmStreamEncryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13);
+var _wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7) => (_wasmStreamDecryptBuffer = Module['_wasmStreamDecryptBuffer'] = wasmExports['wasmStreamDecryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7);
 var _wasmBlockEncryptBuffer = Module['_wasmBlockEncryptBuffer'] = (a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15) => (_wasmBlockEncryptBuffer = Module['_wasmBlockEncryptBuffer'] = wasmExports['wasmBlockEncryptBuffer'])(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15);
 var _wasmBlockDecryptBuffer = Module['_wasmBlockDecryptBuffer'] = (a0, a1, a2, a3, a4, a5) => (_wasmBlockDecryptBuffer = Module['_wasmBlockDecryptBuffer'] = wasmExports['wasmBlockDecryptBuffer'])(a0, a1, a2, a3, a4, a5);
 var _setThrew = (a0, a1) => (_setThrew = wasmExports['setThrew'])(a0, a1);
