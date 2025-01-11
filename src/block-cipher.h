@@ -124,23 +124,22 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   std::vector<uint8_t> hashOut(hash_size / 8);
   std::vector<uint8_t> trial;
 
-  // Precompute block size to offset mapping
-  std::vector<size_t> blockOffsets(totalBlocks);
-  for (size_t i = 0; i < totalBlocks; ++i) {
-    blockOffsets[i] = i * blockSize;
-  }
+  // Precompute initial offsets
+  size_t blockOffset = 0;  // Cumulative offset for `compressed` data
+  size_t subkeyOffset = 0; // Cumulative offset for `allSubkeys`
 
   for (size_t blockIndex = 0; blockIndex < totalBlocks; ++blockIndex) {
     size_t thisBlockSize = std::min<size_t>(blockSize, remaining);
     remaining -= thisBlockSize;
 
     // Extract block
-    auto blockStart = compressed.begin() + blockOffsets[blockIndex];
+    auto blockStart = compressed.begin() + blockOffset;
     std::vector<uint8_t> block(blockStart, blockStart + thisBlockSize);
+    blockOffset += blockSize;  // Increment offset by blockSize
 
     // Extract subkey
-    size_t offset = blockIndex * subkeySize;
-    const uint8_t* blockSubkey = &allSubkeys[offset];
+    const uint8_t* blockSubkey = &allSubkeys[subkeyOffset];
+    subkeyOffset += subkeySize; // Increment offset by subkeySize
 
     if (searchModeEnum == 0x05) {
       auto result = parallelParascatter(
@@ -201,7 +200,6 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
 
   return outBuffer;
 }
-
 
 static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
   const std::vector<uint8_t> &cipherText,
