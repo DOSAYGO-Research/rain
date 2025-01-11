@@ -1,9 +1,8 @@
 cipher improvement
 
-- ensure we can pass in salt 0x0 or 0x1 or 0 and it is valid in both js and cpp
-- use irradix l1 to encode and decode scatter indices
-- let key material come from a file not just a password or -P command line arg
 - use 'more secure' randomness source in cpp
+- let key material come from a file not just a password or -P command line arg
+- use irradix l1 to encode and decode scatter indices
 - write hmac testing tampering tests
 
 Later maybe

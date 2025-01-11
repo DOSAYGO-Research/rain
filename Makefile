@@ -3,7 +3,7 @@ CXX = /opt/homebrew/opt/llvm/bin/clang++
 EMCC = emcc
 
 # Flags
-CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O3 -march=native
+CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O3 -march=native -mtune=native
 #CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O0 -fsanitize=address,undefined -march=native
 #CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -O0 -g 
 CXXFLAGS += -isysroot $(shell xcrun --show-sdk-path)

@@ -110,18 +110,22 @@ int main(int argc, char** argv) {
             if (hash_size != 64 && hash_size != 128 && hash_size != 256) {
                 throw std::runtime_error("Invalid size for Rainbow (must be 64, 128, or 256).");
             }
+            /*
             if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
               algot = HashAlgorithm::Rainstorm;
               hash_size = 512;
             }
+            */
         }
         else if (algot == HashAlgorithm::Rainstorm) {
             if (hash_size != 64 && hash_size != 128 && hash_size != 256 && hash_size != 512) {
                 throw std::runtime_error("Invalid size for Rainstorm (must be 64, 128, 256, or 512).");
             }
+            /*
             if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
               hash_size = 512;
             }
+            */
         }
 
         // Block Size
@@ -153,7 +157,7 @@ int main(int argc, char** argv) {
         std::string seed_str = result["seed"].as<std::string>();
         uint64_t seed = 0;
         bool userProvidedSeed = false;
-        if (!seed_str.empty() && seed_str != "0x0") {
+        if (!seed_str.empty()) {
           userProvidedSeed = true;
           try {
             if (seed_str.find("0x") == 0 || seed_str.find("0X") == 0) {
@@ -178,6 +182,10 @@ int main(int argc, char** argv) {
             std::cerr << "[Info] No seed provided; generated random seed: 0x"
                       << std::hex << seed << std::dec << "\n";
           }
+        }
+
+        if ( verbose ) {
+          std::cout << "Seed: " << std::hex << seed << std::endl;
         }
 
         // SALT handling:
