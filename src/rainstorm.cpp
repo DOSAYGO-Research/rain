@@ -1,4 +1,4 @@
-#define __STORMVERSION__ "3.1.1"
+#define __STORMVERSION__ "3.5.0"
 // v2 is NIS2-v1 - non invertible state, v1 - passess all normal smhasher tests. BadSeeds not tested yet.
 // includes a compress step on each ingest to make it harder to invert the state even given knowledge of it
 
