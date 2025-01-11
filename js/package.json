@@ -1,12 +1,12 @@
 {
   "name": "@dosyago/rainsum",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "module": true,
   "type": "module",
   "description": "The fastest 128-bit and 256-bit hash, passes all tests, and under 140 source lines of code. API library and CLI tool in C++ and NodeJS/Wasm",
   "main": "./lib/api.mjs",
   "bin": {
-    "jsrsum": "./rainsum.mjs"
+    "jsrsum": "rainsum.mjs"
   },
   "scripts": {
     "prepublishOnly": "cp ../README.md .",
