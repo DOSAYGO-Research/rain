@@ -168,9 +168,9 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   uint64_t nonceCounter = 0;
   size_t remaining = hdr.originalSize;
   int progressInterval = 1'000'000;
-  static uint8_t reverseMap[256 * 256];
-  static uint8_t reverseMapOffsets[256];
-  std::bitset<256 * 256> usedIndices;
+  static uint16_t reverseMap[256 * 65536];
+  static uint16_t reverseMapOffsets[256];
+  std::bitset<65536> usedIndices;
 
   // We'll store encryption results in outBuffer after the header
   for (size_t blockIndex = 0; blockIndex < totalBlocks; blockIndex++) {
@@ -342,7 +342,7 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
           // Fill the map with all positions of each byte in finalHashOut
           for (uint16_t i = 0; i < finalHashOut.size(); i++) {
               uint8_t b = finalHashOut[i];
-              reverseMap[b * 256 + reverseMapOffsets[b]] = i;
+              reverseMap[b * 65536 + reverseMapOffsets[b]] = i;
               reverseMapOffsets[b]++;
           }
 
@@ -355,7 +355,7 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
               }
               reverseMapOffsets[targetByte]--;
               scatterIndices[byteIdx] =
-                  reverseMap[targetByte * 256 + reverseMapOffsets[targetByte]];
+                  reverseMap[targetByte * 65536 + reverseMapOffsets[targetByte]];
           }
 
           if (allFound) {
