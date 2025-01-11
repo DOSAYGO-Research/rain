@@ -1,3 +1,4 @@
+#pragma once
 // Result structure:
 struct ParascatterResult {
   bool found;
@@ -8,10 +9,10 @@ struct ParascatterResult {
 // Parallel scatter function:
 ParascatterResult parallelParascatter(
     size_t blockIndex,
-    size_t thisBlockSize,
+    uint16_t thisBlockSize,
     const std::vector<uint8_t>& block,
     const std::vector<uint8_t>& blockSubkey,
-    size_t nonceSize,
+    uint16_t nonceSize,
     size_t hash_size,
     uint64_t seed,
     HashAlgorithm algot,

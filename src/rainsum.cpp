@@ -1,3 +1,5 @@
+// rainsum.cpp
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -5,7 +7,6 @@
 #include "file-header.h"
 #include "block-cipher.h"
 #include "stream-cipher.h"
-
 
 // =================================================================
 // ADDED: Main Function with Additions Only
@@ -24,9 +25,9 @@ int main(int argc, char** argv) {
             ("s,size", "Specify the size of the hash (e.g., 64, 128, 256, 512)",
                 cxxopts::value<uint32_t>()->default_value("256"))
             ("block-size", "Block size in bytes for puzzle-based encryption (1-255)",
-                cxxopts::value<uint8_t>()->default_value("3"))
+                cxxopts::value<uint16_t>()->default_value("3"))
             ("n,nonce-size", "Size of the nonce in bytes [1-255] (block-enc mode)",
-                cxxopts::value<size_t>()->default_value("14"))
+                cxxopts::value<uint16_t>()->default_value("14"))
             ("deterministic-nonce", "Use a deterministic counter for nonce generation",
                 cxxopts::value<bool>()->default_value("false"))
             ("search-mode", "Search mode for plaintext mining block cipher: prefix, sequence, series, scatter, mapscatter, parascatter",
@@ -42,7 +43,7 @@ int main(int argc, char** argv) {
             ("l,output-length", "Output length in hash iterations (stream mode)",
                 cxxopts::value<uint64_t>()->default_value("1000000"))
             ("x,output-extension", "Output extension in bytes (block-enc mode). Extend digest by this many bytes to make mining larger P blocks faster",
-                cxxopts::value<uint32_t>()->default_value("128"))
+                cxxopts::value<uint16_t>()->default_value("128"))
             ("seed", "Seed value (0x prefixed hex string or numeric)",
                 cxxopts::value<std::string>()->default_value("0x0"))
             ("salt", "Salt value (0x prefixed hex string or string)",
@@ -77,7 +78,6 @@ int main(int argc, char** argv) {
 
         // ADDED: verbose
         bool verbose = result["verbose"].as<bool>();
-
 
         // Access and validate options
 
@@ -125,15 +125,15 @@ int main(int argc, char** argv) {
         }
 
         // Block Size
-        uint8_t blockSize = result["block-size"].as<uint8_t>();
-        if (blockSize == 0 || blockSize > 255) {
-            throw std::runtime_error("Block size must be between 1 and 255 bytes.");
+        uint16_t blockSize = result["block-size"].as<uint16_t>();
+        if (blockSize == 0 || blockSize > 65535) {
+            throw std::runtime_error("Block size must be between 1 and 65535 bytes.");
         }
 
         // Nonce Size
-        size_t nonceSize = result["nonce-size"].as<size_t>();
-        if (nonceSize == 0 || nonceSize > 255) {
-            throw std::runtime_error("Nonce size must be between 1 and 255 bytes.");
+        uint16_t nonceSize = result["nonce-size"].as<uint16_t>();
+        if (nonceSize == 0 || nonceSize > 65535) {
+            throw std::runtime_error("Nonce size must be between 1 and 65535 bytes.");
         }
 
         // Nonce nature
@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
         }
 
         // Output extension
-        uint32_t output_extension = result["output-extension"].as<uint32_t>();
+        uint16_t output_extension = result["output-extension"].as<uint16_t>();
 
         // Convert Seed (either numeric or hex string)
         std::string seed_str = result["seed"].as<std::string>();
@@ -307,34 +307,34 @@ int main(int argc, char** argv) {
         }
 
         // Normal Hashing or Encryption/Decryption
-        std::string outpath = result["output-file"].as<std::string>();
-        std::string key_input;
+        std::string outpath_enc = result["output-file"].as<std::string>();
+        std::string key_input_enc;
         // We'll write ciphertext to inpath + ".rc"
         std::string encFile = inpath + ".rc";
 
 
         if (mode == Mode::Digest) {
             // Just a normal digest
-            if (outpath == "/dev/stdout") {
+            if (outpath_enc == "/dev/stdout") {
                 hashAnything(Mode::Digest, algot, inpath, std::cout, hash_size, use_test_vectors, seed, output_length);
             }
             else {
-                std::ofstream outfile(outpath, std::ios::binary);
+                std::ofstream outfile(outpath_enc, std::ios::binary);
                 if (!outfile.is_open()) {
-                    std::cerr << "Failed to open output file: " << outpath << std::endl;
+                    std::cerr << "Failed to open output file: " << outpath_enc << std::endl;
                     return 1;
                 }
                 hashAnything(Mode::Digest, algot, inpath, outfile, hash_size, use_test_vectors, seed, output_length);
             }
         }
         else if (mode == Mode::Stream) {
-            if (outpath == "/dev/stdout") {
+            if (outpath_enc == "/dev/stdout") {
                 hashAnything(Mode::Stream, algot, inpath, std::cout, hash_size, use_test_vectors, seed, output_length);
             }
             else {
-                std::ofstream outfile(outpath, std::ios::binary);
+                std::ofstream outfile(outpath_enc, std::ios::binary);
                 if (!outfile.is_open()) {
-                    std::cerr << "Failed to open output file: " << outpath << std::endl;
+                    std::cerr << "Failed to open output file: " << outpath_enc << std::endl;
                     return 1;
                 }
                 hashAnything(Mode::Stream, algot, inpath, outfile, hash_size, use_test_vectors, seed, output_length);
@@ -345,13 +345,13 @@ int main(int argc, char** argv) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
             if (!password.empty()) {
-                key_input = password;
+                key_input_enc = password;
             }
             else {
-                key_input = promptForKey("Enter encryption key: ");
+                key_input_enc = promptForKey("Enter encryption key: ");
             }
 
-            std::vector<uint8_t> keyVec_dec(key_input.begin(), key_input.end());
+            std::vector<uint8_t> keyVec_enc(key_input_enc.begin(), key_input_enc.end());
 
             // Check if encFile exists and overwrite it with zeros if it does
             try {
@@ -365,7 +365,7 @@ int main(int argc, char** argv) {
             }
 
             // ADDED: Call the existing puzzleEncryptFileWithHeader with updated header
-            puzzleEncryptFileWithHeader(inpath, encFile, keyVec_dec, algot, hash_size, seed, salt, blockSize, nonceSize, searchMode, verbose, deterministicNonce, output_extension);
+            puzzleEncryptFileWithHeader(inpath, encFile, keyVec_enc, algot, hash_size, seed, salt, blockSize, nonceSize, searchMode, verbose, deterministicNonce, output_extension);
             std::cerr << "[Enc] Wrote encrypted file to: " << encFile << "\n";
         }
         else if (mode == Mode::StreamEnc) {
@@ -373,13 +373,13 @@ int main(int argc, char** argv) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
             if (!password.empty()) {
-                key_input = password;
+                key_input_enc = password;
             }
             else {
-                key_input = promptForKey("Enter encryption key: ");
+                key_input_enc = promptForKey("Enter encryption key: ");
             }
 
-            std::vector<uint8_t> keyVec_dec(key_input.begin(), key_input.end());
+            std::vector<uint8_t> keyVec_enc(key_input_enc.begin(), key_input_enc.end());
 
             // Check if encFile exists and overwrite it with zeros if it does
             try {
@@ -396,7 +396,7 @@ int main(int argc, char** argv) {
             streamEncryptFileWithHeader(
                 inpath,
                 encFile,
-                keyVec_dec,
+                keyVec_enc,
                 algot,
                 hash_size,
                 seed,          // Using seed as IV
@@ -410,12 +410,12 @@ int main(int argc, char** argv) {
             if (inpath.empty()) {
                 throw std::runtime_error("No ciphertext file specified for decryption.");
             }
-            std::string key_input;
+            std::string key_input_dec;
             if (!password.empty()) {
-                key_input = password;
+                key_input_dec = password;
             }
             else {
-                key_input = promptForKey("Enter decryption key: ");
+                key_input_dec = promptForKey("Enter decryption key: ");
             }
 
             // We'll write plaintext to inpath + ".dec"
@@ -447,16 +447,20 @@ int main(int argc, char** argv) {
             std::vector<uint8_t> headerData_dec = serializeFileHeader(hdr_dec_for_hmac);
 
             // 6. Convert key_input to vector<uint8_t>
-            std::vector<uint8_t> keyVec_dec(key_input.begin(), key_input.end());
+            std::vector<uint8_t> keyVec_dec(key_input_dec.begin(), key_input_dec.end());
 
             // 7. Compute HMAC
             auto computedHMAC_dec = createHMAC(headerData_dec, ciphertext_dec, keyVec_dec);
 
             // 8. Verify HMAC
             if (!verifyHMAC(headerData_dec, ciphertext_dec, keyVec_dec, storedHMAC_vec)) {
+                // Uncomment the following line if you want to enforce HMAC verification
                 //throw std::runtime_error("[Dec] HMAC verification failed! File may be corrupted or tampered with.");
+                std::cerr << "[Dec] HMAC verification failed! File may be corrupted or tampered with.\n";
             }
-            std::cerr << "[Dec] HMAC verification succeeded.\n";
+            else {
+                std::cerr << "[Dec] HMAC verification succeeded.\n";
+            }
 
             if (hdr_dec.magic != MagicNumber) {
                 throw std::runtime_error("[Dec] Invalid magic number in header.");
@@ -506,7 +510,7 @@ int main(int argc, char** argv) {
             std::vector<uint8_t> headerData_enc = serializeFileHeader(hdr_enc_for_hmac);
 
             // 5. Convert key_input to vector<uint8_t>
-            std::vector<uint8_t> keyVec_enc(key_input.begin(), key_input.end());
+            std::vector<uint8_t> keyVec_enc(key_input_enc.begin(), key_input_enc.end());
 
             // 6. Compute HMAC
             auto hmac_enc = createHMAC(headerData_enc, ciphertext_enc, keyVec_enc);
@@ -515,15 +519,15 @@ int main(int argc, char** argv) {
             hdr_enc.hmac = std::array<uint8_t, 32>();
             std::copy(hmac_enc.begin(), hmac_enc.end(), hdr_enc.hmac.begin());
 
-            // 8. Rewrite the header with the HMAC
+            // 8. Overwrite only the HMAC field in the encrypted file
             std::ofstream fout_enc(encFile, std::ios::binary | std::ios::in | std::ios::out);
             if (!fout_enc.is_open()) {
                 throw std::runtime_error("Cannot reopen encrypted file for HMAC writing: " + encFile);
             }
-            fout_enc.seekp(0, std::ios::beg);
-            writeFileHeader(fout_enc, hdr_enc);
-            fout_enc.close();
 
+            // Use the new function to write HMAC
+            writeHMACToStream(fout_enc, hdr_enc.hmac);
+            fout_enc.close();
 
             // Test read back
             std::ifstream test_enc(encFile, std::ios::binary);
@@ -531,8 +535,12 @@ int main(int argc, char** argv) {
             test_enc.close();
 
             std::cerr << "[Enc] HMAC computed and stored successfully. HMAC first 4 bytes: "
-                      << (int)test_hdr.hmac[0] << " " << (int)test_hdr.hmac[1] << " "
-                      << (int)test_hdr.hmac[2] << " " << (int)test_hdr.hmac[3] << "\n";
+                      << std::hex
+                      << static_cast<int>(test_hdr.hmac[0]) << " "
+                      << static_cast<int>(test_hdr.hmac[1]) << " "
+                      << static_cast<int>(test_hdr.hmac[2]) << " "
+                      << static_cast<int>(test_hdr.hmac[3])
+                      << std::dec << "\n";
         }
 
         return 0;
