@@ -25,9 +25,9 @@ int main(int argc, char** argv) {
             ("s,size", "Specify the size of the hash (e.g., 64, 128, 256, 512)",
                 cxxopts::value<uint32_t>()->default_value("256"))
             ("block-size", "Block size in bytes for puzzle-based encryption (1-255)",
-                cxxopts::value<uint16_t>()->default_value("7"))
+                cxxopts::value<uint16_t>()->default_value("17"))
             ("n,nonce-size", "Size of the nonce in bytes [1-255] (block-enc mode)",
-                cxxopts::value<uint16_t>()->default_value("5"))
+                cxxopts::value<uint16_t>()->default_value("22"))
             ("deterministic-nonce", "Use a deterministic counter for nonce generation",
                 cxxopts::value<bool>()->default_value("false"))
             ("search-mode", "Search mode for plaintext mining block cipher: prefix, sequence, series, scatter, mapscatter, parascatter",
@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
             ("l,output-length", "Output length in hash iterations (stream mode)",
                 cxxopts::value<uint64_t>()->default_value("1000000"))
             ("x,output-extension", "Output extension in bytes (block-enc mode). Extend digest by this many bytes to make mining larger P blocks faster",
-                cxxopts::value<uint16_t>()->default_value("128"))
+                cxxopts::value<uint16_t>()->default_value("1024"))
             ("seed", "Seed value (0x prefixed hex string or numeric)",
                 cxxopts::value<std::string>()->default_value(""))
             ("salt", "Salt value (0x prefixed hex string or string)",
