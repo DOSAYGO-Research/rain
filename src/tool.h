@@ -31,6 +31,7 @@
 #include <mutex>
 static std::mutex cerr_mutex;
 
+#include "random.h"
 #include "rainbow.cpp"
 #include "rainstorm.cpp"
 #include "cxxopts.hpp"
