@@ -1,13 +1,13 @@
 #pragma once
 
 #include <cstdint>
-#include <cstdlib>
+#include <cstring>
 #include <stdexcept>
 #include <random>
-#include <cstring>
+#include <vector>
 #include <functional>
 #include <string>
-#include <vector>
+#include <array>
 
 // Platform-specific includes
 #ifdef _WIN32
@@ -44,99 +44,165 @@ EM_JS(int, fill_random_bytes, (void* buf, size_t size), {
   #include <fstream>
 #endif
 
+// Cross-platform secure randomness
 class CustomRandom {
 public:
-  // Random number from 64-bit unsigned integer range
-  static uint64_t randombytes_random() {
-    uint64_t value;
-    randombytes_buf(&value, sizeof(value));
-    return value;
-  }
-
-  // Uniform random number in range [0, upper_bound)
-  static uint64_t randombytes_uniform(const uint64_t upper_bound) {
-    if (upper_bound < 2) {
-      return 0; // Only one possible value
+    // Generate a random 64-bit unsigned integer
+    static uint64_t randombytes_random() {
+        uint64_t value;
+        randombytes_buf(&value, sizeof(value));
+        return value;
     }
 
-    uint64_t r, min;
-    min = -upper_bound % upper_bound; // Ensure uniformity
+    // Generate a random number uniformly in [0, upper_bound)
+    static uint64_t randombytes_uniform(uint64_t upper_bound) {
+        if (upper_bound < 2) {
+            return 0; // Only one possible value
+        }
 
-    do {
-      r = randombytes_random();
-    } while (r < min);
+        uint64_t r, min;
+        min = -upper_bound % upper_bound; // Ensure uniformity
 
-    return r % upper_bound;
-  }
+        do {
+            r = randombytes_random();
+        } while (r < min);
 
-  // Fill a buffer with random bytes
-  static void randombytes_buf(void *buf, size_t size) {
+        return r % upper_bound;
+    }
+
+    // Fill a buffer with secure random bytes
+    static void randombytes_buf(void* buf, size_t size) {
 #ifdef __EMSCRIPTEN__
-    if (fill_random_bytes(buf, size) != 0) {
-        throw std::runtime_error("fill_random_bytes failed");
-    }
+        if (fill_random_bytes(buf, size) != 0) {
+            throw std::runtime_error("fill_random_bytes failed");
+        }
 #elif defined(_WIN32)
-    if (BCryptGenRandom(nullptr, static_cast<PUCHAR>(buf), static_cast<ULONG>(size), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
-        throw std::runtime_error("BCryptGenRandom failed");
-    }
+        if (BCryptGenRandom(nullptr, static_cast<PUCHAR>(buf), static_cast<ULONG>(size), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
+            throw std::runtime_error("BCryptGenRandom failed");
+        }
 #elif defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
-    if (getrandom(buf, size, 0) == -1) {
-        throw std::runtime_error("getrandom() failed");
-    }
+        if (getrandom(buf, size, 0) == -1) {
+            throw std::runtime_error("getrandom() failed");
+        }
 #elif defined(__APPLE__)
-    if (getentropy(buf, size) == -1) {
-        throw std::runtime_error("getentropy() failed");
-    }
+        if (getentropy(buf, size) == -1) {
+            throw std::runtime_error("getentropy() failed");
+        }
 #else
-    int fd = open("/dev/urandom", O_RDONLY);
-    if (fd < 0) {
-        throw std::runtime_error("Failed to open /dev/urandom");
-    }
-    ssize_t read_bytes = read(fd, buf, size);
-    close(fd);
-    if (read_bytes < 0 || static_cast<size_t>(read_bytes) != size) {
-        throw std::runtime_error("Failed to read from /dev/urandom");
-    }
+        int fd = open("/dev/urandom", O_RDONLY);
+        if (fd < 0) {
+            throw std::runtime_error("Failed to open /dev/urandom");
+        }
+        ssize_t read_bytes = read(fd, buf, size);
+        close(fd);
+        if (read_bytes < 0 || static_cast<size_t>(read_bytes) != size) {
+            throw std::runtime_error("Failed to read from /dev/urandom");
+        }
 #endif
-  }
+    }
 };
 
-// Random function alias
-using RandomFunc = std::function<void(void*, size_t)>;
+// RandomGenerator class to support rng<T>() syntax
+class RandomGenerator {
+private:
+    std::function<std::vector<uint8_t>(size_t)> byteGenerator;
 
-// Default mode: std::mt19937_64 seeded with std::random_device
-void defaultRandom(void* buf, size_t size) {
-    static thread_local std::mt19937_64 rng(std::random_device{}());
-    std::uniform_int_distribution<uint8_t> dist(0, 255);
-    uint8_t* output = static_cast<uint8_t*>(buf);
-    for (size_t i = 0; i < size; ++i) {
-        output[i] = dist(rng);
+public:
+    // Constructor
+    explicit RandomGenerator(std::function<std::vector<uint8_t>(size_t)> generator)
+        : byteGenerator(std::move(generator)) {}
+
+    // Generate a single value of any type
+    template <typename T>
+    T operator()() {
+        std::vector<uint8_t> bytes = byteGenerator(sizeof(T));
+        T value;
+        std::memcpy(&value, bytes.data(), sizeof(T));
+        return value;
     }
-}
 
-// Seeded-MT mode: std::mt19937_64 seeded with CustomRandom
-void seededMtRandom(void* buf, size_t size) {
-    static thread_local std::mt19937_64 rng(CustomRandom::randombytes_random());
-    std::uniform_int_distribution<uint8_t> dist(0, 255);
-    uint8_t* output = static_cast<uint8_t*>(buf);
-    for (size_t i = 0; i < size; ++i) {
-        output[i] = dist(rng);
+    // Generate multiple values of the same type
+    template <typename T>
+    std::vector<T> operator()(size_t count) {
+        std::vector<T> results(count);
+        for (size_t i = 0; i < count; ++i) {
+            results[i] = this->operator()<T>();
+        }
+        return results;
     }
+
+    // Convenience wrappers
+    template <typename T>
+    T as() {
+        return this->operator()<T>();
+    }
+
+    template <typename T>
+    std::vector<T> as(size_t count) {
+        return this->operator()<T>(count);
+    }
+};
+
+// Factory functions for different modes of randomness
+
+// Default Mode: Mersenne Twister seeded with secure entropy
+RandomGenerator createDefaultGenerator() {
+    std::array<uint32_t, 20> seedData; // 80 bytes = 20 × 32-bit integers
+    CustomRandom::randombytes_buf(seedData.data(), seedData.size() * sizeof(uint32_t));
+    std::seed_seq seedSeq(seedData.begin(), seedData.end());
+    auto rng = std::mt19937_64(seedSeq);
+
+    auto byteGenerator = [rng = std::move(rng)](size_t size) mutable {
+        std::vector<uint8_t> result(size);
+        std::uniform_int_distribution<uint8_t> dist(0, 255);
+        for (size_t i = 0; i < size; ++i) {
+            result[i] = dist(rng);
+        }
+        return result;
+    };
+
+    return RandomGenerator(byteGenerator);
 }
 
-// Direct mode: Fully use CustomRandom
-void directRandom(void* buf, size_t size) {
-    CustomRandom::randombytes_buf(buf, size);
+// Full Mode: Direct use of CustomRandom
+RandomGenerator createFullGenerator() {
+    auto byteGenerator = [](size_t size) {
+        std::vector<uint8_t> result(size);
+        CustomRandom::randombytes_buf(result.data(), size);
+        return result;
+    };
+
+    return RandomGenerator(byteGenerator);
 }
 
-// Function to select random function based on entropy mode
+// Risky Mode: Plain std::mt19937_64 seeded with std::random_device
+RandomGenerator createRiskyGenerator() {
+    std::random_device rd;
+    auto rng = std::mt19937_64(rd());
+
+    auto byteGenerator = [rng = std::move(rng)](size_t size) mutable {
+        std::vector<uint8_t> result(size);
+        std::uniform_int_distribution<uint8_t> dist(0, 255);
+        for (size_t i = 0; i < size; ++i) {
+            result[i] = dist(rng);
+        }
+        return result;
+    };
+
+    return RandomGenerator(byteGenerator);
+}
+
+// RandomFunc returns a RandomGenerator
+using RandomFunc = std::function<RandomGenerator()>;
+
+// Select the appropriate random generator factory
 RandomFunc selectRandomFunc(const std::string& entropyMode) {
     if (entropyMode == "default") {
-        return defaultRandom;
-    } else if (entropyMode == "seeded-mt") {
-        return seededMtRandom;
-    } else if (entropyMode == "direct") {
-        return directRandom;
+        return createDefaultGenerator;
+    } else if (entropyMode == "full") {
+        return createFullGenerator;
+    } else if (entropyMode == "risky") {
+        return createRiskyGenerator;
     } else {
         throw std::invalid_argument("Invalid entropy mode: " + entropyMode);
     }

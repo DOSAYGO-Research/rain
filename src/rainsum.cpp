@@ -28,6 +28,8 @@ int main(int argc, char** argv) {
                 cxxopts::value<uint16_t>()->default_value("17"))
             ("n,nonce-size", "Size of the nonce in bytes [1-255] (block-enc mode)",
                 cxxopts::value<uint16_t>()->default_value("22"))
+            ("e,entropy-mode", "Style of random sourcing: default (MT seeded with secure randomness), full (all values drawn from secure randomness)",
+                cxxopts::value<std::string>()->default_value("default"))
             ("deterministic-nonce", "Use a deterministic counter for nonce generation",
                 cxxopts::value<bool>()->default_value("false"))
             ("search-mode", "Search mode for plaintext mining block cipher: prefix, sequence, series, scatter, mapscatter, parascatter",
