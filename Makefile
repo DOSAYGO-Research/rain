@@ -21,6 +21,7 @@ EMCCFLAGS = -O2 -s WASM=1 \
   -s ALLOW_MEMORY_GROWTH=1 \
 	-s USE_ZLIB=1 \
 	#-s NO_DISABLE_EXCEPTION_CATCHING \
+	-flto 
   #-g
 
 # Directories
