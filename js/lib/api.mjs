@@ -96,7 +96,7 @@ export async function rainstormHash(hashSize, seed, input) {
   }
 
   // Call the WASM hash function
-  hashFunc(inputPtr, inputLength, seed, hashPtr);
+  hashFunc(inputPtr, inputLength, BigInt(seed), hashPtr);
 
   // Retrieve the hash from WASM memory
   const hash = new Uint8Array(rain.HEAPU8.buffer, hashPtr, hashLength);
@@ -149,7 +149,7 @@ export async function rainbowHash(hashSize, seed, input) {
   }
 
   // Call the WASM hash function
-  hashFunc(inputPtr, inputLength, seed, hashPtr);
+  hashFunc(inputPtr, inputLength, BigInt(seed), hashPtr);
 
   // Retrieve the hash from WASM memory
   const hash = new Uint8Array(rain.HEAPU8.buffer, hashPtr, hashLength);

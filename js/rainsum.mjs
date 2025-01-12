@@ -377,12 +377,14 @@ async function main() {
 
     argv.seed = seed;
 
-    if ( argv.salt === null || argv.salt === undefined ) {
-      argv.salt = crypto.randomBytes(32);
-    } else if ( argv.salt.startsWith('0x') ) {
-      argv.salt = Buffer.from(argv.salt, 'hex');
-    } else {
-      argv.salt = Buffer.from(argv.salt, 'utf8');
+    if ( argv.mode.includes('enc') ) {
+      if ( argv.salt === null || argv.salt === undefined ) {
+        argv.salt = crypto.randomBytes(32);
+      } else if ( argv.salt.startsWith('0x') ) {
+        argv.salt = Buffer.from(argv.salt, 'hex');
+      } else {
+        argv.salt = Buffer.from(argv.salt, 'utf8');
+      }
     }
 
     const inputPath = argv._[0] || '/dev/stdin';
