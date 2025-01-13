@@ -60,6 +60,8 @@ int main(int argc, char** argv) {
                 cxxopts::value<std::string>()->default_value(""))
             ("key-material", "Path to a file whose contents will be hashed to derive the encryption/decryption key",
                 cxxopts::value<std::string>()->default_value(""))
+            ("noop", "Noop flag useful for testing as a placeholder",
+                cxxopts::value<bool>()->default_value("false"))
             // ADDED: verbose
             ("vv,verbose", "Enable verbose output for series/scatter indices",
                 cxxopts::value<bool>()->default_value("false"))
@@ -121,7 +123,7 @@ int main(int argc, char** argv) {
               keyFile.close();
 
               // Hash the file contents to derive a 512-bit key
-              key_input_enc.resize(512 / sizeof(uint8_t));
+              key_input_enc.resize(512 / 8);
               rainstorm::rainstorm<512, bswap>(fileData.data(), fileData.size(), 0, key_input_enc.data());
               if (verbose) {
                   std::cerr << "[Info] Derived 512-bit key from file: " << keyMaterialPath << "\n";
@@ -134,6 +136,8 @@ int main(int argc, char** argv) {
               key_input_enc.assign(password.begin(), password.end());
           }
         }
+
+        std::vector<uint8_t> keyVec_enc(key_input_enc.begin(), key_input_enc.end());
 
         // Determine Hash Algorithm
         std::string algorithm = result["algorithm"].as<std::string>();
@@ -387,8 +391,6 @@ int main(int argc, char** argv) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
 
-            std::vector<uint8_t> keyVec_enc(key_input_enc.begin(), key_input_enc.end());
-
             // Check if encFile exists and overwrite it with zeros if it does
             try {
                 overwriteFileWithZeros(encFile);
@@ -408,8 +410,6 @@ int main(int argc, char** argv) {
             if (inpath.empty()) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
-
-            std::vector<uint8_t> keyVec_enc(key_input_enc.begin(), key_input_enc.end());
 
             // Check if encFile exists and overwrite it with zeros if it does
             try {
@@ -529,9 +529,6 @@ int main(int argc, char** argv) {
             FileHeader hdr_enc_for_hmac = hdr_enc;
             std::fill(hdr_enc_for_hmac.hmac.begin(), hdr_enc_for_hmac.hmac.end(), 0x00);
             std::vector<uint8_t> headerData_enc = serializeFileHeader(hdr_enc_for_hmac);
-
-            // 5. Convert key_input to vector<uint8_t>
-            std::vector<uint8_t> keyVec_enc(key_input_enc.begin(), key_input_enc.end());
 
             // 6. Compute HMAC
             auto hmac_enc = createHMAC(headerData_enc, ciphertext_enc, keyVec_enc);

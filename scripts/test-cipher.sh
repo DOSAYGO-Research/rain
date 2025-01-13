@@ -65,7 +65,7 @@ function encrypt() {
   if $success; then
     return 0
   else
-    return 1
+    exit 1
   fi
 }
 
@@ -151,7 +151,7 @@ function test_harness() {
                       head -c 1024 /dev/urandom | base64 | head -c 1024 > $key_file
                       key=$key_file
                     fi
-                    deterministic_flag=$([[ $deterministic_nonce -eq 1 ]] && echo "--deterministic-nonce" || echo "")
+                    deterministic_flag=$([[ $deterministic_nonce -eq 1 ]] && echo "--deterministic-nonce" || echo "--noop")
                     echo "Testing: mode=$mode, key_mode=$keyType, key=$key, block_size=$block_size, output_extension=0, nonce_size=$nonce_size, search_mode=$search_mode, deterministic_nonce=$deterministic_flag, entropy_mode=$entropy_mode"
                     echo "Testing: mode=$mode, key_mode=$keyType, key=$key, block_size=$block_size, output_extension=0, nonce_size=$nonce_size, search_mode=$search_mode, deterministic_nonce=$deterministic_flag, entropy_mode=$entropy_mode" &>> test.log
                     encrypt $mode $key 0 $block_size $nonce_size $search_mode $entropy_mode $deterministic_flag $keyType
@@ -175,7 +175,7 @@ function test_harness() {
                       head -c 1024 /dev/urandom | base64 | head -c 1024 > $key_file
                       key=$key_file
                     fi
-                    deterministic_flag=$([[ $deterministic_nonce -eq 1 ]] && echo "--deterministic-nonce" || echo "")
+                    deterministic_flag=$([[ $deterministic_nonce -eq 1 ]] && echo "--deterministic-nonce" || echo "--noop")
                     echo "Testing: mode=$mode, key_mode=$keyType, key=$key, block_size=$block_size, output_extension=0, nonce_size=$nonce_size, search_mode=$search_mode, deterministic_nonce=$deterministic_flag, entropy_mode=$entropy_mode"
                     echo "Testing: mode=$mode, key_mode=$keyType, key=$key, block_size=$block_size, output_extension=0, nonce_size=$nonce_size, search_mode=$search_mode, deterministic_nonce=$deterministic_flag, entropy_mode=$entropy_mode" &>> test.log
                     encrypt $mode $key 0 $block_size $nonce_size $search_mode $entropy_mode $deterministic_flag $keyType
@@ -199,7 +199,7 @@ function test_harness() {
                       head -c 1024 /dev/urandom | base64 | head -c 1024 > $key_file
                       key=$key_file
                     fi
-                    deterministic_flag=$([[ $deterministic_nonce -eq 1 ]] && echo "--deterministic-nonce" || echo "")
+                    deterministic_flag=$([[ $deterministic_nonce -eq 1 ]] && echo "--deterministic-nonce" || echo "--noop")
                     echo "Testing: mode=$mode, key_mode=$keyType, key=$key, block_size=$block_size, output_extension=0, nonce_size=$nonce_size, search_mode=$search_mode, deterministic_nonce=$deterministic_flag, entropy_mode=$entropy_mode"
                     echo "Testing: mode=$mode, key_mode=$keyType, key=$key, block_size=$block_size, output_extension=0, nonce_size=$nonce_size, search_mode=$search_mode, deterministic_nonce=$deterministic_flag, entropy_mode=$entropy_mode" &>> test.log
                     encrypt $mode $key 0 $block_size $nonce_size $search_mode $entropy_mode $deterministic_flag $keyType
@@ -225,7 +225,7 @@ function test_harness() {
                         head -c 1024 /dev/urandom | base64 | head -c 1024 > $key_file
                         key=$key_file
                       fi
-                      deterministic_flag=$([[ $deterministic_nonce -eq 1 ]] && echo "--deterministic-nonce" || echo "")
+                      deterministic_flag=$([[ $deterministic_nonce -eq 1 ]] && echo "--deterministic-nonce" || echo "--noop")
                       echo "Testing: mode=$mode, key_mode=$keyType, key=$key, block_size=$block_size, nonce_size=$nonce_size, output_extension=$output_extension, search_mode=$search_mode, deterministic_nonce=$deterministic_flag, entropy_mode=$entropy_mode" 
                       echo "Testing: mode=$mode, key_mode=$keyType, key=$key, block_size=$block_size, nonce_size=$nonce_size, output_extension=$output_extension, search_mode=$search_mode, deterministic_nonce=$deterministic_flag, entropy_mode=$entropy_mode" &>> test.log
                       encrypt $mode $key $output_extension $block_size $nonce_size $search_mode $entropy_mode $deterministic_flag $keyType

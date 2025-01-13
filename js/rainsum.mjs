@@ -81,7 +81,6 @@ const argv = yargs(hideBin(process.argv))
     alias: 'P',
     description: 'Password for encryption or decryption',
     type: 'string',
-    demandOption: (argv) => argv.mode === 'stream-enc' || argv.mode === 'dec' || argv.mode === 'block-enc',
     default: '',
   })
   .option('salt', {
@@ -135,6 +134,11 @@ const argv = yargs(hideBin(process.argv))
     type: 'string',
     default: ''
   })
+  .option('noop', {
+    description: 'No op for testing, useful as a placeholder',
+    type: 'boolean',
+    default: false
+  })
   .help()
   .alias('help', 'h')
   .demandCommand(0, 1) // Accepts 0 or 1 positional arguments
@@ -143,6 +147,9 @@ const argv = yargs(hideBin(process.argv))
 if ( argv.mode.match(/enc|dec/g) ) {
   argv.algorithm = 'rainstorm';
   argv.size = 512;
+  if ( ! argv.password && ! argv.keyMaterial ) {
+    throw new TypeError(`Either password or key-material are required.`);
+  }
 }
 
 /**
@@ -423,7 +430,11 @@ async function main() {
     let seed;
 
     if ( seedInput === null || seedInput === undefined ) {
-      seed = crypto.randomBytes(8).readBigInt64BE(0);
+      if ( argv.mode.match(/enc|dec/g) ) {
+        seed = crypto.randomBytes(8).readBigInt64BE(0);
+      } else {
+        seed = 0n;
+      }
     } else {
       // Determine if seed is a number or string
       if (/^\d+$/.test(seedInput)) {

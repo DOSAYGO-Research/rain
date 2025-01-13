@@ -1,8 +1,6 @@
-- let key material come from a file not just a password or -P command line arg
-- use irradix l1 to encode and decode scatter indices
-
 Later maybe
 
+- use irradix l1 to encode and decode scatter indices
 - ensure key privacy in memory, by checking raw keys:
   - Are wiped from memory after use (consider std::fill or explicit_bzero for zeroing memory).
   - Avoid storing plaintext keys in memory longer than necessary.

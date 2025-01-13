@@ -1,5 +1,5 @@
 #pragma once
-#define VERSION "3.5.0"
+#define VERSION "3.5.1"
 #include <atomic> // for std::atomic
 #include <iostream>
 #include <array>
@@ -623,6 +623,7 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
           state = std::make_unique<rainbow::HashState>(
                     rainbow::HashState::initialize(seed, input_length, size));
         } else if (algot == HashAlgorithm::Rainstorm) {
+          
           state = std::make_unique<rainstorm::HashState>(
                     rainstorm::HashState::initialize(seed, input_length, size));
         } else {
