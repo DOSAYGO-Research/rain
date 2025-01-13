@@ -41,6 +41,11 @@ static std::mutex cerr_mutex;
 // Magic number to identify your file format ('RCRY' in hex).
 inline constexpr uint32_t MagicNumber = 0x59524352;
 
+struct RandomConfig {
+    static std::string entropyMode; // Default: "default"
+};
+std::string RandomConfig::entropyMode = "default"; // Default initialization
+
 // Standard test vectors
   std::vector<std::string> test_vectors = {
     "",
@@ -522,8 +527,8 @@ inline constexpr uint32_t MagicNumber = 0x59524352;
     std::vector<uint8_t> hash_output(hash_size / 8);
     uint64_t iterationCount = 0;
 
-    static std::mt19937_64 rng(std::random_device{}());
-    std::uniform_int_distribution<uint8_t> dist(0, 255);
+    RandomFunc randomFunc = selectRandomFunc(RandomConfig::entropyMode);
+    RandomGenerator rng = randomFunc();
 
     auto start_time = std::chrono::steady_clock::now();
 
@@ -532,10 +537,8 @@ inline constexpr uint32_t MagicNumber = 0x59524352;
 
       // Build input = baseInput + random bytes
       std::vector<uint8_t> buffer(baseInput.begin(), baseInput.end());
-      // e.g. 16 random bytes appended
-      for (int i = 0; i < 16; i++) {
-        buffer.push_back(dist(rng));
-      }
+      std::vector<uint8_t> random = rng.as<uint8_t>(16);
+      buffer.insert(buffer.end(), random.begin(), random.end());
 
       invokeHash<bswap>(algot, seed, buffer, hash_output, hash_size);
 

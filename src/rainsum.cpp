@@ -97,6 +97,9 @@ int main(int argc, char** argv) {
         else if (modeStr == "info") mode = Mode::Info;
         else throw std::runtime_error("Invalid mode: " + modeStr);
 
+        // Determine entropy mode
+        RandomConfig::entropyMode = result["entropy-mode"].as<std::string>();
+
         // Determine Hash Algorithm
         std::string algorithm = result["algorithm"].as<std::string>();
         HashAlgorithm algot = getHashAlgorithm(algorithm);
@@ -151,6 +154,9 @@ int main(int argc, char** argv) {
         // Output extension
         uint16_t output_extension = result["output-extension"].as<uint16_t>();
 
+        RandomFunc randomFunc = selectRandomFunc(RandomConfig::entropyMode);
+        RandomGenerator rng = randomFunc();
+
         // Convert Seed (either numeric or hex string)
         std::string seed_str = result["seed"].as<std::string>();
         uint64_t seed = 0;
@@ -173,9 +179,7 @@ int main(int argc, char** argv) {
         // If user did NOT provide seed, generate a random one
         if (!userProvidedSeed && mode != Mode::Digest) {
           // A simple example using std::random_device + Mersenne Twister
-          std::random_device rd;
-          std::mt19937_64 rng(rd());
-          seed = rng();  // 64-bit random
+          seed = rng.as<uint64_t>();  // 64-bit random
           if (verbose) {
             std::cerr << "[Info] No seed provided; generated random seed: 0x"
                       << std::hex << seed << std::dec << "\n";
@@ -216,12 +220,8 @@ int main(int argc, char** argv) {
         if (!userProvidedSalt && mode != Mode::Digest) {
           // For example, 32 random bytes:
           const size_t saltLen = 32;
-          std::random_device rd;
-          std::mt19937_64 rng(rd());
           salt.resize(saltLen);
-          for (size_t i = 0; i < saltLen; ++i) {
-            salt[i] = static_cast<uint8_t>(rng());
-          }
+          rng.fill(salt.data(), saltLen);
           if (verbose) {
             std::cerr << "[Info] No salt provided; generated random 32-byte salt:\n  ";
             for (auto &b : salt) {

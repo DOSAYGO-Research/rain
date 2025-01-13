@@ -113,8 +113,8 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   outBuffer.insert(outBuffer.end(), headerData.begin(), headerData.end());
 
   // Setup for puzzle searching
-  std::mt19937_64 rng(std::random_device{}());
-  std::uniform_int_distribution<uint8_t> dist(0, 255);
+  RandomFunc randomFunc = selectRandomFunc(RandomConfig::entropyMode);
+  RandomGenerator rng = randomFunc();
   uint64_t nonceCounter = 0;
   size_t remaining = hdr.originalSize;
   int progressInterval = 1'000'000;
@@ -165,9 +165,8 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
           }
           ++nonceCounter;
         } else {
-          for (size_t i = 0; i < nonceSize; ++i) {
-            chosenNonce[i] = dist(rng);
-          }
+          rng.as<uint8_t>(nonceSize).swap(chosenNonce);
+          //rng.fill(chosenNonce.data(), nonceSize);
         }
 
         // Build trial buffer

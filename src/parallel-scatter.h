@@ -40,8 +40,8 @@ ParascatterResult parallelParascatter(
     std::vector<uint16_t> localScatterIndices(thisBlockSize);
 
     // RNG
-    std::mt19937_64 rng(std::random_device{}());
-    std::uniform_int_distribution<uint8_t> dist(0, 255);
+    RandomFunc randomFunc = selectRandomFunc(RandomConfig::entropyMode);
+    RandomGenerator rng = randomFunc();
     uint64_t nonceCounter = 0;
 
     // Preallocate 'trial' and 'hashOut' buffers
@@ -70,9 +70,8 @@ ParascatterResult parallelParascatter(
         }
         ++nonceCounter;
       } else {
-        for (size_t i = 0; i < nonceSize; ++i) {
-          localNonce[i] = dist(rng);
-        }
+        rng.as<uint8_t>(nonceSize).swap(localNonce);
+        //rng.fill(localNonce.data(), nonceSize);
       }
 
       // Build trial buffer

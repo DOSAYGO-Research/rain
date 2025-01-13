@@ -1,5 +1,6 @@
 test_data
-TEST*
+test-file.src*
+test.log
 *.rc
 *.rc.dec
 rain/**/*

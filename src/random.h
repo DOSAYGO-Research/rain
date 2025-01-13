@@ -141,6 +141,13 @@ public:
     std::vector<T> as(size_t count) {
         return this->operator()<T>(count);
     }
+
+    // Fill
+    template <typename T>
+    void fill(T* dest, size_t size) {
+      auto randomBytes = this->as<T>(size);
+      std::memcpy(dest, randomBytes.data(), size * sizeof(T));
+    }
 };
 
 // Factory functions for different modes of randomness

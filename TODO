@@ -1,4 +1,3 @@
-- use 'more secure' randomness source in cpp
 - let key material come from a file not just a password or -P command line arg
 - use irradix l1 to encode and decode scatter indices
 - write hmac testing tampering tests
