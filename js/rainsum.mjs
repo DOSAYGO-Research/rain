@@ -16,10 +16,6 @@ import {
   verifyHMAC
 } from './lib/api.mjs';
 
-process.on('epipe', () => {
-  process.exit(1);
-});
-
 const testVectors = {
   rainstorm: [
     [ "e3ea5f8885f7bb16468d08c578f0e7cc15febd31c27e323a79ef87c35756ce1e", ""],
@@ -397,6 +393,7 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size, ar
     else {
       // Handle hashing modes (digest, stream)
       const outputStream = fs.createWriteStream(outputPath, { flags: 'a' });
+      outputStream.on('error', err => err.code == "EPIPE" && process.abort());
       await hashBuffer(mode, algorithm, seed, buffer, outputStream, size, inputName);
     }
   } catch (e) {
