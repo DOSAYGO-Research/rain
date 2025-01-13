@@ -2,7 +2,7 @@
 #include <iostream>
 
 int main() {
-    RandomFunc randomFunc = selectRandomFunc("default");
+    RandomFunc randomFunc = selectRandomFunc(RandomConfig::entropyMode);
     RandomGenerator rng = randomFunc();
 
     // Generate random values

@@ -41,6 +41,11 @@ static std::mutex cerr_mutex;
 // Magic number to identify your file format ('RCRY' in hex).
 inline constexpr uint32_t MagicNumber = 0x59524352;
 
+struct RandomConfig {
+    static std::string entropyMode; // Default: "default"
+};
+std::string RandomConfig::entropyMode = "default"; // Default initialization
+
 // Standard test vectors
   std::vector<std::string> test_vectors = {
     "",
@@ -522,7 +527,7 @@ inline constexpr uint32_t MagicNumber = 0x59524352;
     std::vector<uint8_t> hash_output(hash_size / 8);
     uint64_t iterationCount = 0;
 
-    RandomFunc randomFunc = selectRandomFunc("default");
+    RandomFunc randomFunc = selectRandomFunc(RandomConfig::entropyMode);
     RandomGenerator rng = randomFunc();
 
     auto start_time = std::chrono::steady_clock::now();

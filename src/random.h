@@ -105,18 +105,19 @@ public:
 // RandomGenerator class to support rng<T>() syntax
 class RandomGenerator {
 private:
-    std::function<void(void*, size_t)> byteGenerator;
+    std::function<std::vector<uint8_t>(size_t)> byteGenerator;
 
 public:
     // Constructor
-    explicit RandomGenerator(std::function<void(void*, size_t)> generator)
+    explicit RandomGenerator(std::function<std::vector<uint8_t>(size_t)> generator)
         : byteGenerator(std::move(generator)) {}
 
     // Generate a single value of any type
     template <typename T>
     T operator()() {
+        std::vector<uint8_t> bytes = byteGenerator(sizeof(T));
         T value;
-        fill(&value, 1);
+        std::memcpy(&value, bytes.data(), sizeof(T));
         return value;
     }
 
@@ -124,7 +125,9 @@ public:
     template <typename T>
     std::vector<T> operator()(size_t count) {
         std::vector<T> results(count);
-        fill(results.data(), count);
+        for (size_t i = 0; i < count; ++i) {
+            results[i] = this->operator()<T>();
+        }
         return results;
     }
 
@@ -139,10 +142,11 @@ public:
         return this->operator()<T>(count);
     }
 
-    // Fill pre-allocated memory with random values
+    // Fill
     template <typename T>
-    void fill(T* dest, size_t count) {
-        byteGenerator(static_cast<void*>(dest), count * sizeof(T));
+    void fill(T* dest, size_t size) {
+      auto randomBytes = this->as<T>(size);
+      std::memcpy(dest, randomBytes.data(), size * sizeof(T));
     }
 };
 
@@ -155,24 +159,13 @@ RandomGenerator createDefaultGenerator() {
     std::seed_seq seedSeq(seedData.begin(), seedData.end());
     auto rng = std::mt19937_64(seedSeq);
 
-    auto byteGenerator = [rng = std::move(rng)](auto... args) mutable {
-        if constexpr (sizeof...(args) == 1) {
-            size_t size = args[0];
-            std::vector<uint8_t> result(size);
-            std::uniform_int_distribution<uint8_t> dist(0, 255);
-            for (size_t i = 0; i < size; ++i) {
-                result[i] = dist(rng);
-            }
-            return result;
-        } else {
-            void* dest = args[0];
-            size_t size = args[1];
-            uint8_t* buffer = static_cast<uint8_t*>(dest);
-            std::uniform_int_distribution<uint8_t> dist(0, 255);
-            for (size_t i = 0; i < size; ++i) {
-                buffer[i] = dist(rng);
-            }
+    auto byteGenerator = [rng = std::move(rng)](size_t size) mutable {
+        std::vector<uint8_t> result(size);
+        std::uniform_int_distribution<uint8_t> dist(0, 255);
+        for (size_t i = 0; i < size; ++i) {
+            result[i] = dist(rng);
         }
+        return result;
     };
 
     return RandomGenerator(byteGenerator);
@@ -180,17 +173,10 @@ RandomGenerator createDefaultGenerator() {
 
 // Full Mode: Direct use of CustomRandom
 RandomGenerator createFullGenerator() {
-    auto byteGenerator = [](auto... args) {
-        if constexpr (sizeof...(args) == 1) {
-            size_t size = args[0];
-            std::vector<uint8_t> result(size);
-            CustomRandom::randombytes_buf(result.data(), size);
-            return result;
-        } else {
-            void* dest = args[0];
-            size_t size = args[1];
-            CustomRandom::randombytes_buf(dest, size);
-        }
+    auto byteGenerator = [](size_t size) {
+        std::vector<uint8_t> result(size);
+        CustomRandom::randombytes_buf(result.data(), size);
+        return result;
     };
 
     return RandomGenerator(byteGenerator);
@@ -201,24 +187,13 @@ RandomGenerator createRiskyGenerator() {
     std::random_device rd;
     auto rng = std::mt19937_64(rd());
 
-    auto byteGenerator = [rng = std::move(rng)](auto... args) mutable {
-        if constexpr (sizeof...(args) == 1) {
-            size_t size = args[0];
-            std::vector<uint8_t> result(size);
-            std::uniform_int_distribution<uint8_t> dist(0, 255);
-            for (size_t i = 0; i < size; ++i) {
-                result[i] = dist(rng);
-            }
-            return result;
-        } else {
-            void* dest = args[0];
-            size_t size = args[1];
-            uint8_t* buffer = static_cast<uint8_t*>(dest);
-            std::uniform_int_distribution<uint8_t> dist(0, 255);
-            for (size_t i = 0; i < size; ++i) {
-                buffer[i] = dist(rng);
-            }
+    auto byteGenerator = [rng = std::move(rng)](size_t size) mutable {
+        std::vector<uint8_t> result(size);
+        std::uniform_int_distribution<uint8_t> dist(0, 255);
+        for (size_t i = 0; i < size; ++i) {
+            result[i] = dist(rng);
         }
+        return result;
     };
 
     return RandomGenerator(byteGenerator);
