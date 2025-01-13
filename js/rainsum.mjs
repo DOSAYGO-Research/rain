@@ -16,6 +16,10 @@ import {
   verifyHMAC
 } from './lib/api.mjs';
 
+process.on('epipe', () => {
+  process.exit(1);
+});
+
 const testVectors = {
   rainstorm: [
     [ "e3ea5f8885f7bb16468d08c578f0e7cc15febd31c27e323a79ef87c35756ce1e", ""],
@@ -51,7 +55,7 @@ const argv = yargs(hideBin(process.argv))
     description: 'Specify the hash algorithm to use (rainbow or rainstorm)',
     type: 'string',
     choices: ['rainbow', 'rainstorm'],
-    default: 'rainstorm',
+    default: 'rainbow',
   })
   .option('size', {
     alias: 's',
