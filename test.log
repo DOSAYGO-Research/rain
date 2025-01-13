@@ -2828,3 +2828,62 @@ Testing: mode=block-enc, password=ifFfz2Vm+M, block_size=3, output_extension=0, 
 [Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.cpp.dec
 [Dec] Wrote decrypted plaintext to: test-file.src.rc.cpp.dec
 Testing: mode=block-enc, password=pWWdNtok, block_size=3, output_extension=0, nonce_size=6, search_mode=sequence, deterministic_nonce=, entropy_mode=full
+
+[Enc] Block-based puzzle encryption with subkeys complete: test-file.src.rc
+[Enc] Wrote encrypted file to: test-file.src.rc
+[Enc] HMAC computed and stored successfully. HMAC first 4 bytes: ee 9a 3 c2
+[Dec] HMAC verification failed! File may be corrupted or tampered with.
+[Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.js.dec
+[Dec] Wrote decrypted plaintext to: test-file.src.rc.js.dec
+[Dec] HMAC verification succeeded.
+[Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.cpp.dec
+[Dec] Wrote decrypted plaintext to: test-file.src.rc.cpp.dec
+Testing: mode=block-enc, password=4VpkeC3lvQ, block_size=3, output_extension=0, nonce_size=6, search_mode=sequence, deterministic_nonce=--deterministic-nonce, entropy_mode=default
+
+[Enc] Block-based puzzle encryption with subkeys complete: test-file.src.rc
+[Enc] Wrote encrypted file to: test-file.src.rc
+[Enc] HMAC computed and stored successfully. HMAC first 4 bytes: b1 d 87 ad
+[Dec] HMAC verification failed! File may be corrupted or tampered with.
+[Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.js.dec
+[Dec] Wrote decrypted plaintext to: test-file.src.rc.js.dec
+[Dec] HMAC verification succeeded.
+[Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.cpp.dec
+[Dec] Wrote decrypted plaintext to: test-file.src.rc.cpp.dec
+Testing: mode=block-enc, password=Ql17pSRQZB, block_size=3, output_extension=0, nonce_size=6, search_mode=sequence, deterministic_nonce=--deterministic-nonce, entropy_mode=full
+
+[Enc] Block-based puzzle encryption with subkeys complete: test-file.src.rc
+[Enc] Wrote encrypted file to: test-file.src.rc
+[Enc] HMAC computed and stored successfully. HMAC first 4 bytes: 6f 1f 93 d3
+[Dec] HMAC verification failed! File may be corrupted or tampered with.
+[Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.js.dec
+[Dec] Wrote decrypted plaintext to: test-file.src.rc.js.dec
+[Dec] HMAC verification succeeded.
+[Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.cpp.dec
+[Dec] Wrote decrypted plaintext to: test-file.src.rc.cpp.dec
+Testing: mode=block-enc, password=CQ2kqA==, block_size=3, output_extension=0, nonce_size=8, search_mode=sequence, deterministic_nonce=, entropy_mode=default
+
+[Enc] Block-based puzzle encryption with subkeys complete: test-file.src.rc
+[Enc] Wrote encrypted file to: test-file.src.rc
+[Enc] HMAC computed and stored successfully. HMAC first 4 bytes: 9a 85 2a 66
+[Dec] HMAC verification failed! File may be corrupted or tampered with.
+[Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.js.dec
+[Dec] Wrote decrypted plaintext to: test-file.src.rc.js.dec
+[Dec] HMAC verification succeeded.
+[Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.cpp.dec
+[Dec] Wrote decrypted plaintext to: test-file.src.rc.cpp.dec
+Testing: mode=block-enc, password=+K0f4Qgxi2, block_size=3, output_extension=0, nonce_size=8, search_mode=sequence, deterministic_nonce=, entropy_mode=full
+
+[Enc] Block-based puzzle encryption with subkeys complete: test-file.src.rc
+[Enc] Wrote encrypted file to: test-file.src.rc
+[Enc] HMAC computed and stored successfully. HMAC first 4 bytes: 6a 78 67 31
+[Dec] HMAC verification failed! File may be corrupted or tampered with.
+[Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.js.dec
+[Dec] Wrote decrypted plaintext to: test-file.src.rc.js.dec
+[Dec] HMAC verification succeeded.
+[Dec] Processing block 1/5...[Dec] Decompressed plaintext written to: test-file.src.rc.cpp.dec
+[Dec] Wrote decrypted plaintext to: test-file.src.rc.cpp.dec
+Testing: mode=block-enc, password=umoo0Q==, block_size=3, output_extension=0, nonce_size=8, search_mode=sequence, deterministic_nonce=--deterministic-nonce, entropy_mode=default
+
+[Enc] Block-based puzzle encryption with subkeys complete: test-file.src.rc
+[Enc] Wrote encrypted file to: test-file.src.rc
+[Enc] HMAC computed and stored successfully. HMAC first 4 bytes: 3d a5 79 36
