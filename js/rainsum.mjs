@@ -51,7 +51,7 @@ const argv = yargs(hideBin(process.argv))
     description: 'Specify the hash algorithm to use (rainbow or rainstorm)',
     type: 'string',
     choices: ['rainbow', 'rainstorm'],
-    default: 'rainstorm',
+    default: 'rainbow',
   })
   .option('size', {
     alias: 's',
@@ -393,6 +393,7 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size, ar
     else {
       // Handle hashing modes (digest, stream)
       const outputStream = fs.createWriteStream(outputPath, { flags: 'a' });
+      outputStream.on('error', err => err.code == "EPIPE" && process.abort());
       await hashBuffer(mode, algorithm, seed, buffer, outputStream, size, inputName);
     }
   } catch (e) {

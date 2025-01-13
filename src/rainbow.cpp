@@ -1,4 +1,4 @@
-#define __RAINBNOWVERSION__ "3.5.1"
+#define __RAINBNOWVERSION__ "3.5.2"
 // includes the complete flow via mixB in response to a lack of backwards flow identified by Reiner Pope
 #include <cstdint>
 #include <cstdlib>
@@ -114,7 +114,7 @@ namespace rainbow {
 
       // Process any remaining data
       // According to Frank's logic, if there's any remainder it's the final block
-      if (chunk_len > 0) {
+      if (chunk_len >= 0) {
         final_block = true;
         mixB(h, seed);
 

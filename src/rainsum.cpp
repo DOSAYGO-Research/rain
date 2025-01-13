@@ -20,8 +20,8 @@ int main(int argc, char** argv) {
         options.add_options()
             ("m,mode", "Mode: digest, stream, block-enc, stream-enc, dec, info",
                 cxxopts::value<std::string>()->default_value("digest"))
-            ("a,algorithm", "Specify the hash algorithm to use (rainbow, rainstorm, rainbow-rp, rainstorm-nis1)",
-                cxxopts::value<std::string>()->default_value("bow"))
+            ("a,algorithm", "Specify the hash algorithm to use (rainbow, rainstorm)",
+                cxxopts::value<std::string>()->default_value("rainbow"))
             ("s,size", "Specify the size of the hash (e.g., 64, 128, 256, 512)",
                 cxxopts::value<uint32_t>()->default_value("256"))
             ("block-size", "Block size in bytes for puzzle-based encryption (1-255)",
