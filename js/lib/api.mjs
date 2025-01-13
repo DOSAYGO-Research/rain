@@ -190,7 +190,7 @@ export async function updateHeaderHMAC(encryptedBuffer, key) {
   if (!rain.loaded) {
     await loadRain();
   }
-  const { malloc: _malloc, _free, HEAPU8, wasmExports: { wasmSerializeHeader, wasmWriteHMACToBuffer, wasmFreeBuffer } } = rain;
+  const { HEAPU8, wasmExports: { malloc: _malloc, free: _free, wasmSerializeHeader, wasmWriteHMACToBuffer, wasmFreeBuffer } } = rain;
   // Allocate space for entire encryptedBuffer in WASM memory.
   const bufPtr = _malloc(encryptedBuffer.length);
   rain.HEAPU8.set(encryptedBuffer, bufPtr);
@@ -236,7 +236,7 @@ export async function createHMAC(headerData, ciphertext, key) {
       await loadRain();
     }
 
-    const { malloc: _malloc, free: _free } = rain;
+    const { malloc: _malloc, free: _free } = rain.wasmExports;
     const headerDataPtr = _malloc(headerData.length);
     rain.HEAPU8.set(headerData, headerDataPtr);
 
@@ -265,7 +265,7 @@ export async function verifyHMAC(headerData, ciphertext, key, hmacToCheck) {
     if (!rain.loaded) {
       await loadRain();
     }
-    const { malloc: _malloc, free: _free } = rain;
+    const { malloc: _malloc, free: _free } = rain.wasmExports;
 
     const headerDataPtr = _malloc(headerData.length);
     rain.HEAPU8.set(headerData, headerDataPtr);
@@ -507,7 +507,10 @@ export async function streamEncryptBuffer(
     _free(outBufferPtr);
     _free(outBufferSizePtr);
 
-    return encryptedData;
+
+    // Update the header HMAC using the same key (password)
+    const updatedBuffer = await updateHeaderHMAC(encryptedData, Buffer.from(password, 'utf8'));
+    return updatedBuffer;
   } catch (err) {
     console.warn("Wasm error", err);
     throw err; // Re-throw to be handled by higher-level functions
@@ -536,7 +539,10 @@ export async function blockEncryptBuffer(
   if (!rain.loaded) {
     await loadRain();
   }
-  return rain.encryptData({plainText, key, algorithm, searchMode, hashBits, blockSize, nonceSize, seed, salt, outputExtension, deterministicNonce, verbose});
+  let result = await rain.encryptData({plainText, key, algorithm, searchMode, hashBits, blockSize, nonceSize, seed, salt, outputExtension, deterministicNonce, verbose});
+  result = await updateHeaderHMAC(result, key);
+  return result;
+
 }
 
 /**

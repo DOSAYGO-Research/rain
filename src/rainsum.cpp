@@ -463,9 +463,7 @@ int main(int argc, char** argv) {
 
             // 8. Verify HMAC
             if (!verifyHMAC(headerData_dec, ciphertext_dec, keyVec_dec, storedHMAC_vec)) {
-                // Uncomment the following line if you want to enforce HMAC verification
-                //throw std::runtime_error("[Dec] HMAC verification failed! File may be corrupted or tampered with.");
-                std::cerr << "[Dec] HMAC verification failed! File may be corrupted or tampered with.\n";
+                throw std::runtime_error("[Dec] HMAC verification failed! File may be corrupted or tampered with.");
             }
             else {
                 std::cerr << "[Dec] HMAC verification succeeded.\n";
