@@ -12,7 +12,8 @@ import {
   streamDecryptBuffer,
   blockEncryptBuffer,      // NEW
   blockDecryptBuffer,      // NEW
-  rain
+  rain,
+  verifyHMAC
 } from './lib/api.mjs';
 
 const testVectors = {
@@ -280,43 +281,70 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size, ar
         throw new Error("Password is required for decryption.");
       }
 
-      // 1) Check the file header
+      // --- HMAC Verification Step ---
+      // Get header info (as JSON) from the encrypted file.
       const headerInfoStr = await getFileHeaderInfo(buffer);
-      let isBlockMode = false;
+      let headerJson = {};
+      try {
+        headerJson = JSON.parse(headerInfoStr);
+      } catch (e) {
+        console.warn("Error parsing header info in decryption:", e);
+      }
+      // Extract the stored HMAC (hex string) from the header.
+      const storedHMACHex = headerJson.hmac;
+      if (!storedHMACHex) {
+        throw new Error("No HMAC found in the file header for verification.");
+      }
+      // Convert the hex string to a Uint8Array.
+      const storedHMAC = Uint8Array.from(
+        storedHMACHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+      );
 
+      // Use WASM to obtain a zeroed header.
+      const { malloc: _malloc, free: _free, HEAPU8, wasmSerializeHeader, wasmFreeBuffer, getValue } = rain.wasmExports;
+      const bufPtr = rain._malloc(buffer.length);
+      rain.HEAPU8.set(buffer, bufPtr);
+      const outHeaderSizePtr = rain._malloc(4);
+      const headerPtr = wasmSerializeHeader(bufPtr, buffer.length, outHeaderSizePtr);
+      const headerSize = rain.getValue(outHeaderSizePtr, 'i32');
+      // Create header view from WASM memory.
+      const headerBytes = new Uint8Array(rain.HEAPU8.buffer, headerPtr, headerSize);
+      // The ciphertext is the remainder of the file.
+      const ciphertextBuffer = buffer.slice(headerSize);
+      // Free temporary pointers.
+      _free(bufPtr);
+      _free(outHeaderSizePtr);
+      
+      // Verify the HMAC.
+      const isHMACValid = await verifyHMAC(headerBytes, ciphertextBuffer, Buffer.from(password, 'utf8'), storedHMAC);
+      if (!isHMACValid) {
+        console.error("[dec] HMAC verification failed! File may be corrupted or tampered with.");
+        throw new Error("[dec] HMAC verification failed!");
+      } else if (verbose) {
+        console.log("[dec] HMAC verification succeeded.");
+      }
+
+      // Continue with decryption.
+      let decryptedBuffer;
+      // Check the header info to decide whether to use block or stream decryption.
+      let isBlockMode = false;
       try {
         const headerJson = JSON.parse(headerInfoStr);
-        // If cipherMode is "0x11", it’s block-mode puzzle
         if (headerJson.cipherMode === '0x11') {
           isBlockMode = true;
         }
-      } catch(e) {
-        // If it fails, we’ll assume it’s stream-based
-      }
-
-      let decryptedBuffer;
+      } catch (e) { }
       if (isBlockMode) {
-        // 2) Decrypt block-based
-        decryptedBuffer = await blockDecryptBuffer(
-          buffer,
-          password
-        );
+        decryptedBuffer = await blockDecryptBuffer(buffer, password);
         if (verbose) {
           console.log(`[dec] Detected block cipher mode, using block decryption.`);
         }
       } else {
-        // 2) Decrypt stream-based
-        decryptedBuffer = await streamDecryptBuffer(
-          buffer,
-          password,
-          verbose
-        );
+        decryptedBuffer = await streamDecryptBuffer(buffer, password, verbose);
         if (verbose) {
           console.log(`[dec] No block cipher header found, using stream decryption.`);
         }
       }
-
-      // 3) Write decrypted result
       fs.writeFileSync(outputPath, decryptedBuffer);
       if (verbose) {
         console.log(`[dec] Decrypted data written to: ${outputPath}`);

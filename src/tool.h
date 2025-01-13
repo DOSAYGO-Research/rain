@@ -91,20 +91,6 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
   };
 
 // Prototypes
-  // HMAC computation and verification
-  std::vector<uint8_t> createHMAC(
-    const std::vector<uint8_t> &headerData,
-    const std::vector<uint8_t> &ciphertext,
-    const std::vector<uint8_t> &key
-  );
-
-  bool verifyHMAC(
-    const std::vector<uint8_t> &headerData,
-    const std::vector<uint8_t> &ciphertext,
-    const std::vector<uint8_t> &key,
-    const std::vector<uint8_t> &hmacToCheck
-  );
-
   // Add a forward declaration for our new function
   void usage();
 
@@ -259,6 +245,47 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
     }
   }
 
+// HMAC
+  static const size_t HMAC_SIZE = 32; // 256 bits for Rainstorm
+
+  std::vector<uint8_t> createHMAC(
+    const std::vector<uint8_t> &headerData,
+    const std::vector<uint8_t> &ciphertext,
+    const std::vector<uint8_t> &key
+  ) {
+    // 1) Create a buffer for the concatenation
+    std::vector<uint8_t> buffer;
+    buffer.reserve(headerData.size() + ciphertext.size() + key.size());
+
+    // 2) Concatenate header data, ciphertext, and key
+    buffer.insert(buffer.end(), headerData.begin(), headerData.end());
+    buffer.insert(buffer.end(), ciphertext.begin(), ciphertext.end());
+    buffer.insert(buffer.end(), key.begin(), key.end());
+
+    // 3) Hash the concatenated buffer
+    std::vector<uint8_t> hmac(HMAC_SIZE);
+    rainstorm::rainstorm<256, false>(buffer.data(), buffer.size(), 0, hmac.data());
+    return hmac;
+  }
+
+  bool verifyHMAC(
+    const std::vector<uint8_t> &headerData,
+    const std::vector<uint8_t> &ciphertext,
+    const std::vector<uint8_t> &key,
+    const std::vector<uint8_t> &hmacToCheck
+  ) {
+    // Recompute the HMAC
+    auto computedHMAC = createHMAC(headerData, ciphertext, key);
+
+    // Compare with the provided HMAC (constant-time comparison)
+    if (computedHMAC.size() != hmacToCheck.size()) return false;
+    bool equal = true;
+    for (size_t i = 0; i < computedHMAC.size(); i++) {
+      if (computedHMAC[i] != hmacToCheck[i]) equal = false;
+    }
+    return equal;
+  }
+
 // ------------------------------------------------------------------
 // Mining Mode Operator>>(std::istream&, MineMode&) Implementation
 //    (If you haven't placed this in tool.h, it can go here)
@@ -308,47 +335,6 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
       in.setstate(std::ios_base::failbit);
     }
     return in;
-  }
-
-// HMAC
-  static const size_t HMAC_SIZE = 32; // 256 bits for Rainstorm
-
-  std::vector<uint8_t> createHMAC(
-    const std::vector<uint8_t> &headerData,
-    const std::vector<uint8_t> &ciphertext,
-    const std::vector<uint8_t> &key
-  ) {
-    // 1) Create a buffer for the concatenation
-    std::vector<uint8_t> buffer;
-    buffer.reserve(headerData.size() + ciphertext.size() + key.size());
-
-    // 2) Concatenate header data, ciphertext, and key
-    buffer.insert(buffer.end(), headerData.begin(), headerData.end());
-    buffer.insert(buffer.end(), ciphertext.begin(), ciphertext.end());
-    buffer.insert(buffer.end(), key.begin(), key.end());
-
-    // 3) Hash the concatenated buffer
-    std::vector<uint8_t> hmac(HMAC_SIZE);
-    rainstorm::rainstorm<256, false>(buffer.data(), buffer.size(), 0, hmac.data());
-    return hmac;
-  }
-
-  bool verifyHMAC(
-    const std::vector<uint8_t> &headerData,
-    const std::vector<uint8_t> &ciphertext,
-    const std::vector<uint8_t> &key,
-    const std::vector<uint8_t> &hmacToCheck
-  ) {
-    // Recompute the HMAC
-    auto computedHMAC = createHMAC(headerData, ciphertext, key);
-
-    // Compare with the provided HMAC (constant-time comparison)
-    if (computedHMAC.size() != hmacToCheck.size()) return false;
-    bool equal = true;
-    for (size_t i = 0; i < computedHMAC.size(); i++) {
-      if (computedHMAC[i] != hmacToCheck[i]) equal = false;
-    }
-    return equal;
   }
 
 // Stream retrieval (stdin vs file)
@@ -805,40 +791,6 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
   static const int XOF_ITERATIONS = 4;
   static const int DE_ITERATIONS = 1;
 
-  // ADDED: Derive PRK with iterations
-  /*
-  static std::vector<uint8_t> derivePRK(
-    const std::vector<uint8_t> &seed,
-    const std::vector<uint8_t> &salt,
-    const std::vector<uint8_t> &ikm,
-    HashAlgorithm algot,
-    uint32_t hash_bits) {
-      // Combine salt || ikm || info
-      std::vector<uint8_t> combined;
-      combined.reserve(salt.size() + ikm.size() + KDF_INFO_STRING.size());
-      combined.insert(combined.end(), salt.begin(), salt.end());
-      combined.insert(combined.end(), ikm.begin(), ikm.end());
-      combined.insert(combined.end(), KDF_INFO_STRING.begin(), KDF_INFO_STRING.end());
-      
-      std::vector<uint8_t> prk(hash_bits / 8, 0);
-      std::vector<uint8_t> temp(combined);
-
-      // Convert first 8 bytes of seed vector to uint64_t (little-endian)
-      uint64_t seed_num = 0;
-      for (size_t j = 0; j < std::min(static_cast<size_t>(8), seed.size()); ++j) {
-          seed_num |= static_cast<uint64_t>(seed[j]) << (j * 8);
-      }
-      
-      // Iterate the hash function KDF_ITERATIONS times
-      for (int i = 0; i < KDF_ITERATIONS; ++i) {
-          invokeHash<false>(algot, seed_num, temp, prk, hash_bits);
-          temp = prk; // Next iteration takes the output of the previous
-      }
-      
-      return prk;
-  }
-  */
-
   static std::vector<uint8_t> derivePRK(
     const std::vector<uint8_t> &seed,
     const std::vector<uint8_t> &salt,
@@ -908,55 +860,6 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
   }
 
 
-  /*
-  // ADDED: Extend Output with iterations and counter
-  static std::vector<uint8_t> extendOutputKDF(
-    const std::vector<uint8_t> &prk,
-    size_t totalLen,
-    HashAlgorithm algot,
-    uint32_t hash_bits) {
-      std::vector<uint8_t> out;
-      out.reserve(totalLen);
-      
-      uint64_t counter = 1;
-      std::vector<uint8_t> kn = prk; // Initial K_n = PRK
-      
-      while (out.size() < totalLen) {
-          // Combine PRK || info || counter
-          std::vector<uint8_t> combined;
-          combined.reserve(kn.size() + KDF_INFO_STRING.size() + 8); // 8 bytes for counter
-          combined.insert(combined.end(), prk.begin(), prk.end());
-          combined.insert(combined.end(), KDF_INFO_STRING.begin(), KDF_INFO_STRING.end());
-          
-          // Append counter in big-endian
-          for (int i = 7; i >= 0; --i) {
-              combined.push_back(static_cast<uint8_t>((counter >> (i * 8)) & 0xFF));
-          }
-          
-          // Iterate the hash function KDF_ITERATIONS times
-          std::vector<uint8_t> temp(combined);
-          std::vector<uint8_t> kn_next(hash_bits / 8, 0);
-          for (int i = 0; i < KDF_ITERATIONS; ++i) {
-              invokeHash<false>(algot, 0, temp, kn_next, hash_bits);
-              temp = kn_next;
-          }
-          
-          // Update K_n
-          kn = kn_next;
-          
-          // Append to output
-          size_t remaining = totalLen - out.size();
-          size_t to_copy = std::min(static_cast<size_t>(kn.size()), remaining);
-          out.insert(out.end(), kn.begin(), kn.begin() + to_copy);
-          
-          counter++;
-      }
-      
-      out.resize(totalLen);
-      return out;
-  }
-  */
-
   // SIMD-friendly memory copy
   inline void fast_memcpy(void* dst, const void* src, size_t size) {
     std::memcpy(dst, src, size); // Replace with SIMD intrinsics if beneficial
@@ -1006,8 +909,5 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
     
     return output;
   }
-
-
-
 
 

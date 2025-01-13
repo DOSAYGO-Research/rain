@@ -186,6 +186,111 @@ export async function getFileHeaderInfo(buffer) {
   return info;
 }
 
+export async function updateHeaderHMAC(encryptedBuffer, key) {
+  if (!rain.loaded) {
+    await loadRain();
+  }
+  const { HEAPU8, wasmExports: { malloc: _malloc, free: _free, wasmSerializeHeader, wasmWriteHMACToBuffer, wasmFreeBuffer } } = rain;
+  // Allocate space for entire encryptedBuffer in WASM memory.
+  const bufPtr = _malloc(encryptedBuffer.length);
+  rain.HEAPU8.set(encryptedBuffer, bufPtr);
+
+  // Allocate pointer for the header size (4 bytes)
+  const outHeaderSizePtr = _malloc(4);
+  // Call wasmSerializeHeader on the encrypted data.
+  const headerPtr = wasmSerializeHeader(bufPtr, encryptedBuffer.length, outHeaderSizePtr);
+  const headerSize = rain.getValue(outHeaderSizePtr, 'i32');
+
+  // Create a JS Uint8Array view of the header.
+  const headerBytes = new Uint8Array(HEAPU8.buffer, headerPtr, headerSize);
+  // The ciphertext is the remainder.
+  const ciphertextBuffer = encryptedBuffer.slice(headerSize);
+  // Compute new HMAC using the header bytes, ciphertext, and key.
+  const newHMAC = await createHMAC(headerBytes, ciphertextBuffer, key);
+
+  // Allocate WASM memory for the new HMAC.
+  const hmacPtr = _malloc(newHMAC.length);
+  rain.HEAPU8.set(newHMAC, hmacPtr);
+
+  // Call wasmWriteHMACToBuffer to update the header's HMAC field.
+  const ret = wasmWriteHMACToBuffer(headerPtr, headerSize, hmacPtr);
+  if (ret !== 0) {
+    throw new Error("wasmWriteHMACToBuffer failed");
+  }
+  // Get the updated header from WASM memory.
+  const updatedHeader = new Uint8Array(HEAPU8.buffer, headerPtr, headerSize);
+  // Copy updated header back into the encryptedBuffer.
+  encryptedBuffer.set(updatedHeader, 0);
+
+  // Free allocated WASM memory.
+  _free(bufPtr);
+  _free(outHeaderSizePtr);
+  _free(hmacPtr);
+  wasmFreeBuffer(headerPtr);
+
+  return encryptedBuffer;
+}
+
+export async function createHMAC(headerData, ciphertext, key) {
+    if (!rain.loaded) {
+      await loadRain();
+    }
+
+    const { malloc: _malloc, free: _free } = rain.wasmExports;
+    const headerDataPtr = _malloc(headerData.length);
+    rain.HEAPU8.set(headerData, headerDataPtr);
+
+    const ciphertextPtr = _malloc(ciphertext.length);
+    rain.HEAPU8.set(ciphertext, ciphertextPtr);
+
+    const keyPtr = _malloc(key.length);
+    rain.HEAPU8.set(key, keyPtr);
+
+    const outHMACLenPtr = _malloc(4);
+    const hmacPtr = rain.wasmExports.wasmCreateHMAC(headerDataPtr, headerData.length, ciphertextPtr, ciphertext.length, keyPtr, key.length, outHMACLenPtr);
+
+    const outHMACLen = rain.getValue(outHMACLenPtr, 'i32');
+    const hmac = new Uint8Array(rain.HEAPU8.buffer, hmacPtr, outHMACLen);
+
+    // Cleanup
+    _free(headerDataPtr);
+    _free(ciphertextPtr);
+    _free(keyPtr);
+    _free(outHMACLenPtr);
+
+    return hmac.slice(); // Copy result to avoid memory issues
+}
+
+export async function verifyHMAC(headerData, ciphertext, key, hmacToCheck) {
+    if (!rain.loaded) {
+      await loadRain();
+    }
+    const { malloc: _malloc, free: _free } = rain.wasmExports;
+
+    const headerDataPtr = _malloc(headerData.length);
+    rain.HEAPU8.set(headerData, headerDataPtr);
+
+    const ciphertextPtr = _malloc(ciphertext.length);
+    rain.HEAPU8.set(ciphertext, ciphertextPtr);
+
+    const keyPtr = _malloc(key.length);
+    rain.HEAPU8.set(key, keyPtr);
+
+    const hmacToCheckPtr = _malloc(hmacToCheck.length);
+    rain.HEAPU8.set(hmacToCheck, hmacToCheckPtr);
+
+    const result = rain.wasmExports.wasmVerifyHMAC(headerDataPtr, headerData.length, ciphertextPtr, ciphertext.length, keyPtr, key.length, hmacToCheckPtr, hmacToCheck.length);
+
+    // Cleanup
+    _free(headerDataPtr);
+    _free(ciphertextPtr);
+    _free(keyPtr);
+    _free(hmacToCheckPtr);
+
+    return result;
+}
+
+
 /**
  * Decrypts a buffer using the WASM buffer-based decryption function.
  * @param {Buffer} encryptedData - The encrypted data [FileHeader + XOR'd data].
@@ -402,7 +507,10 @@ export async function streamEncryptBuffer(
     _free(outBufferPtr);
     _free(outBufferSizePtr);
 
-    return encryptedData;
+
+    // Update the header HMAC using the same key (password)
+    const updatedBuffer = await updateHeaderHMAC(encryptedData, Buffer.from(password, 'utf8'));
+    return updatedBuffer;
   } catch (err) {
     console.warn("Wasm error", err);
     throw err; // Re-throw to be handled by higher-level functions
@@ -431,7 +539,10 @@ export async function blockEncryptBuffer(
   if (!rain.loaded) {
     await loadRain();
   }
-  return rain.encryptData({plainText, key, algorithm, searchMode, hashBits, blockSize, nonceSize, seed, salt, outputExtension, deterministicNonce, verbose});
+  let result = await rain.encryptData({plainText, key, algorithm, searchMode, hashBits, blockSize, nonceSize, seed, salt, outputExtension, deterministicNonce, verbose});
+  result = await updateHeaderHMAC(result, key);
+  return result;
+
 }
 
 /**
@@ -567,7 +678,10 @@ async function loadRain() {
     const fromUint8Array = (buffer) => String.fromCharCode.apply(null, buffer);
 
     // plaintext and key must be buffers (NOT strings otherwise lengths will not reflect bytes but codepoints)
-    const encryptData = ({plainText, key, algorithm, searchMode, hashBits, seed, salt, blockSize, nonceSize, outputExtension, deterministicNonce, verbose}) => {
+    const encryptData = async ({plainText, key, algorithm, searchMode, hashBits, seed, salt, blockSize, nonceSize, outputExtension, deterministicNonce, verbose}) => {
+      if (!rain.loaded) {
+        await loadRain();
+      }
         const dataPtr = rain._malloc(plainText.length);
         rain.HEAPU8.set(plainText, dataPtr);
 
