@@ -141,6 +141,12 @@ public:
     std::vector<T> as(size_t count) {
         return this->operator()<T>(count);
     }
+
+    // Fill
+    template <typename T>
+    void fill(T* dest, size_t size) {
+      // ???
+    }
 };
 
 // Factory functions for different modes of randomness
