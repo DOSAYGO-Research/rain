@@ -1,5 +1,5 @@
 #pragma once
-#define VERSION "3.5.1"
+#define VERSION "3.5.2"
 #include <atomic> // for std::atomic
 #include <iostream>
 #include <array>
@@ -588,89 +588,41 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
     }
   }
 
-// ------------------------------------------------------------------
-// Original hashAnything
-// ------------------------------------------------------------------
-  void hashAnything(Mode mode, HashAlgorithm algot, const std::string& inpath,
-                    std::ostream& outstream, uint32_t size, bool use_test_vectors,
-                    uint64_t seed, uint64_t output_length) {
+void hashAnything(Mode mode, HashAlgorithm algot, const std::string& inpath,
+                  std::ostream& outstream, uint32_t size, bool use_test_vectors,
+                  uint64_t seed, uint64_t output_length) {
 
-    std::vector<uint8_t> buffer;
-    std::vector<uint8_t> chunk(CHUNK_SIZE);
-
-    if (use_test_vectors) {
-      for (const auto& test_vector : test_vectors) {
-        buffer.assign(test_vector.begin(), test_vector.end());
-        hashBuffer(mode, algot, buffer, seed, output_length, outstream, size);
-        outstream << ' ' << '"' << test_vector << '"' << '\n';
-      }
-    } else {
-      std::istream* in_stream = nullptr;
-      std::ifstream infile;
-
-      uint64_t input_length = 0;
-
-      if (!inpath.empty()) {
-        infile.open(inpath, std::ios::binary);
-        if (infile.fail()) {
-          throw std::runtime_error("Cannot open file for reading: " + inpath);
-        }
-        in_stream = &infile;
-        input_length = getFileSize(inpath);
-
-        std::unique_ptr<IHashState> state;
-        if (algot == HashAlgorithm::Rainbow) {
-          state = std::make_unique<rainbow::HashState>(
-                    rainbow::HashState::initialize(seed, input_length, size));
-        } else if (algot == HashAlgorithm::Rainstorm) {
-          
-          state = std::make_unique<rainstorm::HashState>(
-                    rainstorm::HashState::initialize(seed, input_length, size));
-        } else {
-          throw std::runtime_error("Invalid algorithm: " + hashAlgoToString(algot));
-        }
-
-        // Stream the file
-        while (*in_stream) {
-          in_stream->read(reinterpret_cast<char*>(chunk.data()), CHUNK_SIZE);
-          if (in_stream->fail() && !in_stream->eof()) {
-            throw std::runtime_error(
-              "Input file could not be read after " +
-              std::to_string(state->len) + " bytes processed.");
-          }
-          std::streamsize bytes_read = in_stream->gcount();
-          if (bytes_read > 0 || input_length == 0) {
-            state->update(chunk.data(), bytes_read);
-          }
-        }
-
-        if (infile.is_open()) {
-          infile.close();
-        }
-
-        // Finalize
-        std::vector<uint8_t> output(output_length);
-        state->finalize(output.data());
-
-        if (mode == Mode::Digest) {
-          for (const auto& byte : output) {
-            outstream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
-          }
-          outstream << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
-        } else {
-          outstream.write(reinterpret_cast<char*>(output.data()), output_length);
-        }
-      }
-      else {
-        // Read from stdin fully
-        in_stream = &getInputStream();
-        buffer = std::vector<uint8_t>(std::istreambuf_iterator<char>(*in_stream), {});
-        input_length = buffer.size();
-        hashBuffer(mode, algot, buffer, seed, output_length, outstream, size);
-        outstream << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
-      }
+  // If using test vectors, process each one and print the hash.
+  if (use_test_vectors) {
+    for (const auto& test_vector : test_vectors) {
+      std::vector<uint8_t> buffer(test_vector.begin(), test_vector.end());
+      hashBuffer(mode, algot, buffer, seed, output_length, outstream, size);
+      outstream << ' ' << '"' << test_vector << '"' << '\n';
     }
+  } else {
+    std::vector<uint8_t> buffer;
+    if (!inpath.empty()) {
+      // Open the file and read its entire contents into buffer.
+      std::ifstream infile(inpath, std::ios::binary);
+      if (!infile) {
+        throw std::runtime_error("Cannot open file for reading: " + inpath);
+      }
+      buffer = std::vector<uint8_t>((std::istreambuf_iterator<char>(infile)),
+                                    std::istreambuf_iterator<char>());
+      infile.close();
+    }
+    else {
+      // Read from stdin (using getInputStream() helper).
+      std::istream& in_stream = getInputStream();
+      buffer = std::vector<uint8_t>((std::istreambuf_iterator<char>(in_stream)),
+                                    std::istreambuf_iterator<char>());
+    }
+
+    // Process the complete input buffer.
+    hashBuffer(mode, algot, buffer, seed, output_length, outstream, size);
+    outstream << ' ' << (inpath.empty() ? "stdin" : inpath) << '\n';
   }
+}
 
 // ------------------------------------------------------------------
 // Helper for password (key) prompt - disabling echo on POSIX systems

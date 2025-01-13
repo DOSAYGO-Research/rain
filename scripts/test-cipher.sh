@@ -30,11 +30,15 @@ function encrypt() {
 
   rm test-file.src.rc* &>> test.log
 
+  set -x
   ./rainsum -m $mode $keyArg --output-extension $outputExtension --block-size $blockSize --nonce-size $nonceSize --search-mode $searchMode --entropy-mode $entropyMode $deterministicNonce test-file.src &>> test.log
+  set +x
   mv test-file.src.rc test-file.src.rc.cpp &>> test.log
 
   if [[ "$searchMode" != "parascatter" ]]; then
+    set -x 
     ./js/rainsum.mjs -m $mode $keyArg --output-extension $outputExtension --block-size $blockSize --nonce-size $nonceSize --search-mode $searchMode --entropy-mode $entropyMode $deterministicNonce test-file.src &>> test.log
+    set +x
     mv test-file.src.rc test-file.src.rc.js &>> test.log
 
     ./rainsum -m dec $keyArg test-file.src.rc.js &>> test.log
