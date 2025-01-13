@@ -148,7 +148,8 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
     if (searchModeEnum == 0x05) {
       auto result = parallelParascatter(
         blockIndex, thisBlockSize, block, std::vector<uint8_t>(blockSubkey, blockSubkey + subkeySize),
-        nonceSize, hash_size, seed, algot, deterministicNonce, outputExtension
+        nonceSize, hash_size, seed, algot, deterministicNonce, outputExtension, totalBlocks,
+        verbose
       );
       outBuffer.insert(outBuffer.end(), result.chosenNonce.begin(), result.chosenNonce.end());
       const uint8_t* si = reinterpret_cast<const uint8_t*>(result.scatterIndices.data());
@@ -174,7 +175,7 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
         trial.insert(trial.end(), chosenNonce.begin(), chosenNonce.end());
 
         // Hash trial
-        invokeHash<false>(algot, seed, trial, hashOut, hash_size);
+        invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
         std::vector<uint8_t> finalHashOut = hashOut;
         if (outputExtension > 0) {
           std::vector<uint8_t> extendedOutput = extendOutputKDF(trial, outputExtension, algot, hash_size);
@@ -417,7 +418,7 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
     trial.insert(trial.end(), storedNonce.begin(), storedNonce.end());
 
     std::vector<uint8_t> hashOut(hdr.hashSizeBits / 8);
-    invokeHash<false>(algot, hdr.iv, trial, hashOut, hdr.hashSizeBits);
+    invokeHash<bswap>(algot, hdr.iv, trial, hashOut, hdr.hashSizeBits);
 
     std::vector<uint8_t> finalHashOut = hashOut;
     if (hdr.outputExtension > 0) {

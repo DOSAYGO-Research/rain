@@ -1,5 +1,5 @@
 #pragma once
-#define VERSION "3.5.0"
+#define VERSION "3.5.1"
 #include <atomic> // for std::atomic
 #include <iostream>
 #include <array>
@@ -623,6 +623,7 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
           state = std::make_unique<rainbow::HashState>(
                     rainbow::HashState::initialize(seed, input_length, size));
         } else if (algot == HashAlgorithm::Rainstorm) {
+          
           state = std::make_unique<rainstorm::HashState>(
                     rainstorm::HashState::initialize(seed, input_length, size));
         } else {
@@ -830,7 +831,7 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
     // Iterate the hash function KDF_ITERATIONS times
     for (int i = 0; i < KDF_ITERATIONS; ++i) {
       // Call your hashing function
-      invokeHash<false>(algot, seed_num, temp, prk, hash_bits);
+      invokeHash<bswap>(algot, seed_num, temp, prk, hash_bits);
 
       // prk is now the result of invokeHash
       temp = prk; // Next iteration takes the output of the previous
@@ -894,7 +895,7 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
       std::vector<uint8_t> temp = combined;
       std::vector<uint8_t> kn_next(hash_size, 0);
       for (int i = 0; i < KDF_ITERATIONS; ++i) {
-        invokeHash<false>(algot, 0, temp, kn_next, hash_bits);
+        invokeHash<bswap>(algot, 0, temp, kn_next, hash_bits);
         temp = kn_next;
       }
 

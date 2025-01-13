@@ -1,4 +1,4 @@
-#define __STORMVERSION__ "3.5.0"
+#define __STORMVERSION__ "3.5.1"
 // v2 is NIS2-v1 - non invertible state, v1 - passess all normal smhasher tests. BadSeeds not tested yet.
 // includes a compress step on each ingest to make it harder to invert the state even given knowledge of it
 
@@ -139,7 +139,7 @@ namespace rainstorm {
         this->len += 64;
       }
 
-      if (chunk_len > 0 || this->olen == 0) {
+      if (chunk_len >= 0 || this->olen == 0) {
         // Pad the remaining data
         memset(temp, (0x80 + chunk_len) & 255, sizeof(temp));
         memcpy(temp, chunk, chunk_len);
