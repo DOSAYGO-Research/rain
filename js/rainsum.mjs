@@ -81,7 +81,7 @@ const argv = yargs(hideBin(process.argv))
     alias: 'P',
     description: 'Password for encryption or decryption',
     type: 'string',
-    demandOption: (argv) => argv.mode === 'stream-enc' || argv.mode === 'dec',
+    demandOption: (argv) => argv.mode === 'stream-enc' || argv.mode === 'dec' || argv.mode === 'block-enc',
     default: '',
   })
   .option('salt', {
@@ -105,14 +105,14 @@ const argv = yargs(hideBin(process.argv))
   })
   .option('nonce-size', {
     alias: 'n',
-    description: 'Output extension in bytes for stream-enc mode',
+    description: 'Nonce size in bytes for block-enc mode',
     type: 'number',
     demandOption: (argv) => argv.mode === 'block-enc',
     default: 9,
   })
   .option('search-mode', {
     alias: 'f',
-    description: 'Prefix, series, scatter',
+    description: 'Search mode: prefix, series, scatter',
     type: 'string',
     demandOption: (argv) => argv.mode === 'block-enc',
     default: 'scatter',
@@ -125,20 +125,26 @@ const argv = yargs(hideBin(process.argv))
   })
   .option('deterministic-nonce', {
     alias: 'k',
-    description: 'Nonce is not random but an incremented counter',
+    description: 'Use a deterministic counter for nonce generation',
     type: 'boolean',
     default: false,
+  })
+  // NEW: key-material option (exclusive to --password)
+  .option('key-material', {
+    description: 'Path to a file whose contents will be hashed to derive the encryption/decryption key',
+    type: 'string',
+    default: ''
   })
   .help()
   .alias('help', 'h')
   .demandCommand(0, 1) // Accepts 0 or 1 positional arguments
   .argv;
 
+if ( argv.mode.match(/enc|dec/g) ) {
+  argv.algorithm = 'rainstorm';
+  argv.size = 512;
+}
 
-  if ( argv.mode.match(/enc|dec/g) ) {
-    argv.algorithm = 'rainstorm';
-    argv.size = 512;
-  }
 /**
  * Hashes a buffer and writes the result to the output stream.
  * @param {string} mode - The hashing mode ('digest' or 'stream').
@@ -165,7 +171,7 @@ async function hashBuffer(mode, algorithm, seed, buffer, outputStream, hashSize,
 
 /**
  * Handles hashing, info retrieval, encryption, or decryption based on the mode.
- * @param {string} mode - The mode ('digest', 'stream', 'info', 'stream-enc', or 'dec').
+ * @param {string} mode - The mode ('digest', 'stream', 'info', 'stream-enc', 'block-enc', or 'dec').
  * @param {string} algorithm - The hashing algorithm ('bow' or 'storm').
  * @param {BigInt} seed - The seed value.
  * @param {string} inputPath - The input file path.
@@ -212,51 +218,67 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size, ar
     }
     else if (mode === 'stream-enc') {
       // Handle stream encryption
-      const password = argv.password || '';
       const saltStr = argv.salt || '';
       const verbose = argv.verbose;
       const outputExtension = argv['output-extension'] || 128;
+      let key;
 
-      // Validate password and salt
-      if (!password) {
-        throw new Error("Password is required for stream encryption.");
+      // --- Key Material Handling ---
+      if (argv['key-material'] && argv['key-material'].length > 0) {
+        const keyFileBuffer = fs.readFileSync(argv['key-material']);
+        let derivedHex = await rainstormHash(512, BigInt(0), keyFileBuffer);
+        key = Buffer.from(derivedHex, 'hex');
+        if (verbose) {
+          console.log(`[Info] Derived 512-bit key from file: ${argv['key-material']}`);
+        }
+      } else {
+        const password = argv.password || '';
+        if (!password) {
+          throw new Error("Password is required for stream encryption.");
+        }
+        key = Buffer.from(password, 'utf8');
       }
 
-      // Call the buffer-based encryption function
       const encryptedBuffer = await streamEncryptBuffer(
-        buffer,                         // Plain data buffer
-        Buffer.from(password, 'utf-8'), // Encryption key
-        Buffer.from(algorithm, 'utf-8'), // 'bow' or 'storm'
-        size,                           // Hash size in bits
-        seed,                           // Seed as BigInt
-        Buffer.from(saltStr, 'utf-8'),  // Salt as Buffer
-        outputExtension,                // Output extension
-        verbose                         // Verbose flag
+        buffer,          // Plain data buffer
+        key,             // Encryption key (either derived from key-material or from password)
+        Buffer.from(algorithm, 'utf8'), // 'bow' or 'storm'
+        size,            // Hash size in bits
+        seed,            // Seed as BigInt
+        Buffer.from(saltStr, 'utf8'),   // Salt as Buffer
+        outputExtension, // Output extension
+        verbose          // Verbose flag
       );
 
-      // Write encrypted data to output file
       fs.writeFileSync(outputPath, encryptedBuffer);
       if (verbose) {
         console.log(`[stream-enc] Encrypted data written to: ${outputPath}`);
       }
     }
     else if (mode === 'block-enc') {
-      // (Or you can add more CLI flags for blockSize, nonceSize, searchMode, etc.)
-      const password = argv.password || '';
-      
-      // Validate password and salt
-      if (!password) {
-        throw new Error("Password is required for stream encryption.");
-      }
-
-      if ( argv.searchMode == 'parascatter' ) {
+      // Handle block encryption
+      if (argv.searchMode === 'parascatter') {
         throw new TypeError(`parallel scatter mode is not supported in JS/WASM at this time! Use the C++ version for that feature.`);
       }
+      let key;
+      if (argv['key-material'] && argv['key-material'].length > 0) {
+        const keyFileBuffer = fs.readFileSync(argv['key-material']);
+        let derivedHex = await rainstormHash(512, BigInt(0), keyFileBuffer);
+        key = Buffer.from(derivedHex, 'hex');
+        if (argv.verbose) {
+          console.log(`[Info] Derived 512-bit key from file: ${argv['key-material']}`);
+        }
+      } else {
+        const password = argv.password || '';
+        if (!password) {
+          throw new Error("Password is required for block encryption.");
+        }
+        key = Buffer.from(password, 'utf8');
+      }
 
-      // Call the new blockEncryptBuffer
       const encryptedBuffer = await blockEncryptBuffer(
-        buffer,                                           // Plain data
-        Buffer.from(password, 'utf8'),                    // Password
+        buffer,              // Plain data
+        key,                 // Encryption key (derived or from password)
         argv.algorithm,
         argv.searchMode,
         argv.size,
@@ -275,10 +297,21 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size, ar
       }
     }
     else if (mode === 'dec') {
-      const password = argv.password || '';
+      let key;
       const verbose = argv.verbose;
-      if (!password) {
-        throw new Error("Password is required for decryption.");
+      if (argv['key-material'] && argv['key-material'].length > 0) {
+        const keyFileBuffer = fs.readFileSync(argv['key-material']);
+        let derivedHex = await rainstormHash(512, BigInt(0), keyFileBuffer);
+        key = Buffer.from(derivedHex, 'hex');
+        if (verbose) {
+          console.log(`[Info] Derived 512-bit key from file: ${argv['key-material']}`);
+        }
+      } else {
+        const password = argv.password || '';
+        if (!password) {
+          throw new Error("Password is required for decryption.");
+        }
+        key = Buffer.from(password, 'utf8');
       }
 
       // --- HMAC Verification Step ---
@@ -301,7 +334,7 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size, ar
       );
 
       // Use WASM to obtain a zeroed header.
-      const { malloc: _malloc, free: _free, HEAPU8, wasmSerializeHeader, wasmFreeBuffer, getValue } = rain.wasmExports;
+      const { malloc: _malloc, free: _free, HEAPU8, wasmSerializeHeader, getValue } = rain.wasmExports;
       const bufPtr = rain._malloc(buffer.length);
       rain.HEAPU8.set(buffer, bufPtr);
       const outHeaderSizePtr = rain._malloc(4);
@@ -314,9 +347,9 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size, ar
       // Free temporary pointers.
       _free(bufPtr);
       _free(outHeaderSizePtr);
-      
+
       // Verify the HMAC.
-      const isHMACValid = await verifyHMAC(headerBytes, ciphertextBuffer, Buffer.from(password, 'utf8'), storedHMAC);
+      const isHMACValid = await verifyHMAC(headerBytes, ciphertextBuffer, key, storedHMAC);
       if (!isHMACValid) {
         console.error("[dec] HMAC verification failed! File may be corrupted or tampered with.");
         throw new Error("[dec] HMAC verification failed!");
@@ -335,12 +368,12 @@ async function handleMode(mode, algorithm, seed, inputPath, outputPath, size, ar
         }
       } catch (e) { }
       if (isBlockMode) {
-        decryptedBuffer = await blockDecryptBuffer(buffer, password);
+        decryptedBuffer = await blockDecryptBuffer(buffer, key);
         if (verbose) {
           console.log(`[dec] Detected block cipher mode, using block decryption.`);
         }
       } else {
-        decryptedBuffer = await streamDecryptBuffer(buffer, password, verbose);
+        decryptedBuffer = await streamDecryptBuffer(buffer, key, verbose);
         if (verbose) {
           console.log(`[dec] No block cipher header found, using stream decryption.`);
         }
@@ -408,9 +441,9 @@ async function main() {
     if ( argv.mode.includes('enc') ) {
       if ( argv.salt === null || argv.salt === undefined ) {
         argv.salt = crypto.randomBytes(32);
-      } else if ( argv.salt.startsWith('0x') ) {
-        argv.salt = Buffer.from(argv.salt, 'hex');
-      } else {
+      } else if ( typeof argv.salt === 'string' && argv.salt.startsWith('0x') ) {
+        argv.salt = Buffer.from(argv.salt.slice(2), 'hex');
+      } else if (typeof argv.salt === 'string') {
         argv.salt = Buffer.from(argv.salt, 'utf8');
       }
     }
