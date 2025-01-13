@@ -412,5 +412,158 @@ void wasmBlockDecryptBuffer(
 
 } // extern "C"
 
+extern "C" {
+
+  /**
+     * wasmSerializeHeader
+     *
+     * Reads a FileHeader from a buffer (using readFileHeader), zeros the HMAC field,
+     * then serializes the header (using serializeFileHeader) and returns a pointer to the
+     * new header buffer along with its size (via outHeaderSize).
+     *
+     * The header returned will have a zeroed HMAC. The JS side can then use this header along
+     * with the rest of the encrypted data (ciphertext) and the key to compute the new HMAC.
+     *
+     * Parameters:
+     *   data         - Pointer to the beginning of the encrypted file data.
+     *   size         - Total size of the encrypted file data.
+     *   outHeaderSize - Pointer to a size_t where the size of the serialized header will be stored.
+     *
+     * Returns:
+     *   A pointer to the allocated header buffer (which must be freed later via wasmFreeBuffer or similar)
+     *   or nullptr on error.
+   */
+  EMSCRIPTEN_KEEPALIVE
+  uint8_t* wasmSerializeHeader(const uint8_t* data, size_t size, size_t* outHeaderSize) {
+      try {
+          // Create a string from the incoming buffer (this is a simple way to wrap it in an istream)
+          std::string inStr(reinterpret_cast<const char*>(data), size);
+          std::istringstream inStream(inStr, std::ios::binary);
+
+          // Use readFileHeader to parse the FileHeader from the input stream.
+          FileHeader hdr = readFileHeader(inStream);
+
+          // Zero out the HMAC field in the header.
+          std::fill(hdr.hmac.begin(), hdr.hmac.end(), 0x00);
+
+          // Serialize the header to a contiguous byte vector.
+          std::vector<uint8_t> ser = serializeFileHeader(hdr);
+
+          // Allocate space to return the serialized header.
+          *outHeaderSize = ser.size();
+          uint8_t* buffer = (uint8_t*)malloc(ser.size());
+          if (!buffer) {
+              throw std::runtime_error("Memory allocation failed in wasmSerializeHeader.");
+          }
+          std::memcpy(buffer, ser.data(), ser.size());
+          return buffer;
+      } catch (const std::exception& e) {
+          fprintf(stderr, "wasmSerializeHeader error: %s\n", e.what());
+          *outHeaderSize = 0;
+          return nullptr;
+      }
+  }
+
+  /**
+     * wasmWriteHMACToBuffer
+     *
+     * Overwrites the HMAC field in a serialized header held in memory.
+     *
+     * It assumes that the header has the PackedHeader structure at the very beginning,
+     * where the HMAC field is located at a fixed offset (33 bytes into the header).
+     *
+     * Parameters:
+     *   buffer    - Pointer to the serialized header in memory.
+     *   bufferSize- Size of the header buffer (must be at least 33 + 32 bytes).
+     *   newHMAC   - Pointer to a 32-byte buffer containing the new HMAC value.
+     *
+     * Returns:
+     *   0 on success; nonzero if an error occurs.
+   */
+  EMSCRIPTEN_KEEPALIVE
+  int wasmWriteHMACToBuffer(uint8_t* buffer, size_t bufferSize, const uint8_t* newHMAC) {
+      try {
+          // According to PackedHeader layout:
+          // magic(4) + version(1) + cipherMode(1) + blockSize(2) +
+          // nonceSize(2) + hashSizeBits(2) + outputExtension(2) +
+          // hashNameLen(1) + iv(8) + saltLen(1) + searchModeEnum(1) + originalSize(8)
+          // = 33 bytes before the HMAC field.
+          const size_t hmac_offset = 33;
+          const size_t HMAC_SIZE = 32;
+          if (bufferSize < hmac_offset + HMAC_SIZE) {
+              throw std::runtime_error("Buffer size too small in wasmWriteHMACToBuffer.");
+          }
+          std::memcpy(buffer + hmac_offset, newHMAC, HMAC_SIZE);
+          return 0; // success
+      } catch (const std::exception& e) {
+          fprintf(stderr, "wasmWriteHMACToBuffer error: %s\n", e.what());
+          return -1;
+      }
+  }
+
+
+  EMSCRIPTEN_KEEPALIVE
+  uint8_t* wasmCreateHMAC(
+      const uint8_t* headerDataPtr,
+      size_t headerDataLen,
+      const uint8_t* ciphertextPtr,
+      size_t ciphertextLen,
+      const uint8_t* keyPtr,
+      size_t keyLen,
+      size_t* outHMACLen
+  ) {
+      try {
+          // Deserialize input buffers
+          std::vector<uint8_t> headerData(headerDataPtr, headerDataPtr + headerDataLen);
+          std::vector<uint8_t> ciphertext(ciphertextPtr, ciphertextPtr + ciphertextLen);
+          std::vector<uint8_t> key(keyPtr, keyPtr + keyLen);
+
+          // Compute HMAC
+          auto hmac = createHMAC(headerData, ciphertext, key);
+
+          // Serialize output
+          *outHMACLen = hmac.size();
+          uint8_t* hmacPtr = (uint8_t*)malloc(hmac.size());
+          if (!hmacPtr) {
+              throw std::runtime_error("Memory allocation failed for HMAC output.");
+          }
+          std::memcpy(hmacPtr, hmac.data(), hmac.size());
+          return hmacPtr;
+      } catch (const std::exception& e) {
+          fprintf(stderr, "Error in wasmCreateHMAC: %s\n", e.what());
+          *outHMACLen = 0;
+          return nullptr;
+      }
+  }
+
+  EMSCRIPTEN_KEEPALIVE
+  bool wasmVerifyHMAC(
+      const uint8_t* headerDataPtr,
+      size_t headerDataLen,
+      const uint8_t* ciphertextPtr,
+      size_t ciphertextLen,
+      const uint8_t* keyPtr,
+      size_t keyLen,
+      const uint8_t* hmacToCheckPtr,
+      size_t hmacToCheckLen
+  ) {
+      try {
+          // Deserialize input buffers
+          std::vector<uint8_t> headerData(headerDataPtr, headerDataPtr + headerDataLen);
+          std::vector<uint8_t> ciphertext(ciphertextPtr, ciphertextPtr + ciphertextLen);
+          std::vector<uint8_t> key(keyPtr, keyPtr + keyLen);
+          std::vector<uint8_t> hmacToCheck(hmacToCheckPtr, hmacToCheckPtr + hmacToCheckLen);
+
+          // Verify HMAC
+          return verifyHMAC(headerData, ciphertext, key, hmacToCheck);
+      } catch (const std::exception& e) {
+          fprintf(stderr, "Error in wasmVerifyHMAC: %s\n", e.what());
+          return false;
+      }
+  }
+
+}
+
+
 #endif // __EMSCRIPTEN__
 
