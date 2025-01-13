@@ -58,6 +58,8 @@ int main(int argc, char** argv) {
             // Encrypt / Decrypt options
             ("P,password", "Encryption/Decryption password (raw, insecure)",
                 cxxopts::value<std::string>()->default_value(""))
+            ("key-material", "Path to a file whose contents will be hashed to derive the encryption/decryption key",
+                cxxopts::value<std::string>()->default_value(""))
             // ADDED: verbose
             ("vv,verbose", "Enable verbose output for series/scatter indices",
                 cxxopts::value<bool>()->default_value("false"))
@@ -99,6 +101,39 @@ int main(int argc, char** argv) {
 
         // Determine entropy mode
         RandomConfig::entropyMode = result["entropy-mode"].as<std::string>();
+
+
+        // Key material or password
+        // Key material handling
+        std::string keyMaterialPath = result["key-material"].as<std::string>();
+        std::string password = result["password"].as<std::string>();
+        std::vector<uint8_t> key_input_enc;
+
+        if ( mode == Mode::BlockEnc || mode == Mode::StreamEnc || mode == Mode::Dec ) {
+          if (!keyMaterialPath.empty()) {
+              // Read the file contents
+              std::ifstream keyFile(keyMaterialPath, std::ios::binary);
+              if (!keyFile.is_open()) {
+                  throw std::runtime_error("Unable to open key material file: " + keyMaterialPath);
+              }
+              std::vector<uint8_t> fileData((std::istreambuf_iterator<char>(keyFile)),
+                                            (std::istreambuf_iterator<char>()));
+              keyFile.close();
+
+              // Hash the file contents to derive a 512-bit key
+              key_input_enc.resize(512 / sizeof(uint8_t));
+              rainstorm::rainstorm<512, bswap>(fileData.data(), fileData.size(), 0, key_input_enc.data());
+              if (verbose) {
+                  std::cerr << "[Info] Derived 512-bit key from file: " << keyMaterialPath << "\n";
+              }
+          } else {
+              // Fallback to password-based key derivation
+              if (password.empty()) {
+                  password = promptForKey("Enter encryption key: ");
+              }
+              key_input_enc.assign(password.begin(), password.end());
+          }
+        }
 
         // Determine Hash Algorithm
         std::string algorithm = result["algorithm"].as<std::string>();
@@ -186,12 +221,14 @@ int main(int argc, char** argv) {
           }
         }
 
-        if ( verbose ) {
-          std::cout << "Seed empty: " << seed_str.empty() << std::endl;
-          std::cout << "Seed size: " << seed_str.size() << std::endl;
-          std::cout << "Seed string: " << seed_str << std::endl;
-          std::cout << "Seed uint64_t: " << std::hex << seed << std::endl;
+        if (verbose) {
+            std::cerr << "[Verbose] Seed Details:" << "\n"
+                      << "  - Seed empty: " << (seed_str.empty() ? "true" : "false") << "\n"
+                      << "  - Seed size: " << seed_str.size() << "\n"
+                      << "  - Seed string: \"" << seed_str << "\"\n"
+                      << "  - Seed uint64_t (hex): 0x" << std::hex << seed << std::dec << "\n";
         }
+
 
         // SALT handling:
         std::string salt_str = result["salt"].as<std::string>();
@@ -263,8 +300,6 @@ int main(int argc, char** argv) {
             inpath = result.unmatched().front();
         }
 
-        std::string password = result["password"].as<std::string>();
-
         // Handle Mining Modes
         if (mine_mode != MineMode::None) {
             if (prefixHex.empty()) {
@@ -317,10 +352,8 @@ int main(int argc, char** argv) {
 
         // Normal Hashing or Encryption/Decryption
         std::string outpath_enc = result["output-file"].as<std::string>();
-        std::string key_input_enc;
         // We'll write ciphertext to inpath + ".rc"
         std::string encFile = inpath + ".rc";
-
 
         if (mode == Mode::Digest) {
             // Just a normal digest
@@ -353,12 +386,6 @@ int main(int argc, char** argv) {
             if (inpath.empty()) {
                 throw std::runtime_error("No input file specified for encryption.");
             }
-            if (!password.empty()) {
-                key_input_enc = password;
-            }
-            else {
-                key_input_enc = promptForKey("Enter encryption key: ");
-            }
 
             std::vector<uint8_t> keyVec_enc(key_input_enc.begin(), key_input_enc.end());
 
@@ -380,12 +407,6 @@ int main(int argc, char** argv) {
         else if (mode == Mode::StreamEnc) {
             if (inpath.empty()) {
                 throw std::runtime_error("No input file specified for encryption.");
-            }
-            if (!password.empty()) {
-                key_input_enc = password;
-            }
-            else {
-                key_input_enc = promptForKey("Enter encryption key: ");
             }
 
             std::vector<uint8_t> keyVec_enc(key_input_enc.begin(), key_input_enc.end());
@@ -419,13 +440,6 @@ int main(int argc, char** argv) {
             if (inpath.empty()) {
                 throw std::runtime_error("No ciphertext file specified for decryption.");
             }
-            std::string key_input_dec;
-            if (!password.empty()) {
-                key_input_dec = password;
-            }
-            else {
-                key_input_dec = promptForKey("Enter decryption key: ");
-            }
 
             // We'll write plaintext to inpath + ".dec"
             std::string decFile = inpath + ".dec";
@@ -456,7 +470,7 @@ int main(int argc, char** argv) {
             std::vector<uint8_t> headerData_dec = serializeFileHeader(hdr_dec_for_hmac);
 
             // 6. Convert key_input to vector<uint8_t>
-            std::vector<uint8_t> keyVec_dec(key_input_dec.begin(), key_input_dec.end());
+            std::vector<uint8_t> keyVec_dec(key_input_enc.begin(), key_input_enc.end());
 
             // 7. Compute HMAC
             auto computedHMAC_dec = createHMAC(headerData_dec, ciphertext_dec, keyVec_dec);

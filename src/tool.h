@@ -830,7 +830,7 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
     // Iterate the hash function KDF_ITERATIONS times
     for (int i = 0; i < KDF_ITERATIONS; ++i) {
       // Call your hashing function
-      invokeHash<false>(algot, seed_num, temp, prk, hash_bits);
+      invokeHash<bswap>(algot, seed_num, temp, prk, hash_bits);
 
       // prk is now the result of invokeHash
       temp = prk; // Next iteration takes the output of the previous
@@ -894,7 +894,7 @@ std::string RandomConfig::entropyMode = "default"; // Default initialization
       std::vector<uint8_t> temp = combined;
       std::vector<uint8_t> kn_next(hash_size, 0);
       for (int i = 0; i < KDF_ITERATIONS; ++i) {
-        invokeHash<false>(algot, 0, temp, kn_next, hash_bits);
+        invokeHash<bswap>(algot, 0, temp, kn_next, hash_bits);
         temp = kn_next;
       }
 

@@ -17,7 +17,9 @@ ParascatterResult parallelParascatter(
     uint64_t seed,
     HashAlgorithm algot,
     bool deterministicNonce,
-    uint32_t outputExtension
+    uint32_t outputExtension,
+    size_t totalBlocks,
+    bool verbose
 ) {
   // 1) Prepare the result
   ParascatterResult result;
@@ -32,8 +34,8 @@ ParascatterResult parallelParascatter(
 
   // 3) Launch parallel region
   #pragma omp parallel default(none) \
-    shared(block, blockSubkey, found, chosenNonceShared, scatterIndicesShared) \
-    firstprivate(nonceSize, hash_size, seed, algot, deterministicNonce, blockIndex, thisBlockSize, outputExtension)
+    shared(block, blockSubkey, found, chosenNonceShared, scatterIndicesShared, std::cerr) \
+    firstprivate(nonceSize, hash_size, seed, algot, deterministicNonce, blockIndex, thisBlockSize, outputExtension, totalBlocks, verbose)
   {
     // Each thread's preallocated buffers
     std::vector<uint8_t> localNonce(nonceSize);
@@ -53,6 +55,8 @@ ParascatterResult parallelParascatter(
     std::vector<uint8_t> extendedOutput(outputExtension);
     std::array<uint8_t, 65536> usedIndices = {};
     std::vector<uint8_t> finalHashOut;
+
+    uint64_t localTries = 0; // Track number of tries for each thread
 
     // 4) Main loop
     while (!found.load(std::memory_order_acquire)) {
@@ -79,7 +83,7 @@ ParascatterResult parallelParascatter(
                 trial.begin() + blockSubkey.size());
 
       // Hash it
-      invokeHash<false>(algot, seed, trial, hashOut, hash_size);
+      invokeHash<bswap>(algot, seed, trial, hashOut, hash_size);
       finalHashOut = hashOut;
 
       // Extend hashOut if outputExtension > 0
@@ -126,6 +130,17 @@ ParascatterResult parallelParascatter(
       }
 
       // If success, mark found & copy results
+       if (verbose && localTries % 100'000 == 0) {
+          #pragma omp critical
+          {
+              std::cerr << "\r[Parascatter] Block " << blockIndex << "/" << totalBlocks
+#ifdef _OPENMP
+                        << ": Thread " << omp_get_thread_num()
+#endif
+                        << " reached " << localTries << " tries..." << std::flush;
+          }
+      }
+      ++localTries;
       if (allFound) {
         bool expected = false;
         if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
