@@ -1,5 +1,5 @@
 test_data
-test-file.src
+test-file.src*
 test.log
 *.rc
 *.rc.dec
