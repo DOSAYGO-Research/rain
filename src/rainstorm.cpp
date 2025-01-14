@@ -1,4 +1,4 @@
-#define __STORMVERSION__ "3.5.2"
+#define __STORMVERSION__ "3.7.0"
 // v2 is NIS2-v1 - non invertible state, v1 - passess all normal smhasher tests. BadSeeds not tested yet.
 // includes a compress step on each ingest to make it harder to invert the state even given knowledge of it
 
@@ -71,12 +71,14 @@ namespace rainstorm {
     }
   }
 
+  /*
   static inline void compress1( uint64_t * h, const uint64_t * start, const seed_t seed ) {
     for (int i = 0, j = 1; i < 15; i++, j++) {
         h[i] += h[j] - K[h[i]&7];
         h[j] = start[j] ^ seed;
     }
   }
+  */
 
   struct HashState : IHashState {
     uint64_t  start[16];
@@ -185,6 +187,7 @@ namespace rainstorm {
   template <uint32_t hashsize, bool bswap>
   static void rainstorm(const void* in, const size_t len, const seed_t seed, void* out) {
     const uint8_t * data = (const uint8_t *)in;
+    /*
     const uint64_t start[16] = {
       seed + len + 1,
       seed + len + 2,
@@ -203,6 +206,7 @@ namespace rainstorm {
       seed + len + 41,
       seed + len + 43
     };
+    */
     uint64_t h[16] = {
       seed + len + 1,
       seed + len + 2,
