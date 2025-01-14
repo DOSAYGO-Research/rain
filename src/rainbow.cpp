@@ -1,4 +1,4 @@
-#define __RAINBNOWVERSION__ "3.5.2"
+#define __RAINBNOWVERSION__ "3.7.0"
 // includes the complete flow via mixB in response to a lack of backwards flow identified by Reiner Pope
 #include <cstdint>
 #include <cstdlib>

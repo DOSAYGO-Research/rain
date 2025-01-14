@@ -4,6 +4,7 @@
  * A helper to print out the puzzle encryption parameters for debugging.
  * This will ensure the logs appear when run under wasm.
  */
+/*
 static void debugPrintPuzzleParams(
     const std::vector<uint8_t>& plainData,
     std::vector<uint8_t> key,
@@ -42,6 +43,7 @@ static void debugPrintPuzzleParams(
     std::cerr << std::dec << "\n";
   }
 }
+*/
 
 static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   const std::vector<uint8_t> &plainData,
@@ -117,7 +119,7 @@ static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
   RandomGenerator rng = randomFunc();
   uint64_t nonceCounter = 0;
   size_t remaining = hdr.originalSize;
-  int progressInterval = 1'000'000;
+  //int progressInterval = 1'000'000;
   static uint16_t reverseMap[256 * 65536];
   static uint16_t reverseMapOffsets[256];
   std::bitset<65536> usedIndices;
@@ -389,7 +391,7 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
     uint16_t startIndex = 0;
     if (hdr.searchModeEnum == 0x02 || hdr.searchModeEnum == 0x03 ||
         hdr.searchModeEnum == 0x04 || hdr.searchModeEnum == 0x05) {
-      size_t scatterDataSize = thisBlockSize * sizeof(uint16_t);
+      uint32_t scatterDataSize = thisBlockSize * sizeof(uint16_t);
       scatterIndices.resize(thisBlockSize);
       inStream.read(reinterpret_cast<char*>(scatterIndices.data()), scatterDataSize);
       if (inStream.gcount() != scatterDataSize) {
