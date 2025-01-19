@@ -611,6 +611,24 @@ export async function blockDecryptBuffer(
   }
 }
 
+export async function encrypt({data, password} = {}) {
+  if ( ! data || ! password ) {
+    throw new TypeError(`Both data and password must be provided`);
+  }
+  return blockEncryptBuffer(
+    data, password,
+    'rainstorm', 'scatter', 512, 9, 9,
+    0n, '', 512, false, false
+  );
+}
+
+export async function decrypt({data, password} = {}) {
+  if ( ! data || ! password ) {
+    throw new TypeError(`Both data and password must be provided`);
+  }
+  return blockDecryptBuffer(data, password);
+}
+
 
 /**
  * Loads the WASM module and wraps the necessary functions.
@@ -770,5 +788,7 @@ async function sleep(ms) {
   setTimeout(resolve, ms);
   return pr;
 }
+
+
 
 
