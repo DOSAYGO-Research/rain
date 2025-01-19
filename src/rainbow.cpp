@@ -87,9 +87,9 @@ namespace rainbow {
     static HashState initialize(const seed_t seed, size_t olen, uint32_t hashsize) {
       HashState state;
       state.h[0] = seed + olen + 1;
-      state.h[1] = seed + olen + 3;
-      state.h[2] = seed + olen + 5;
-      state.h[3] = seed + olen + 7;
+      state.h[1] = seed + olen + 2;
+      state.h[2] = seed + olen + 3;
+      state.h[3] = seed + olen + 5;
       state.len = 0;
       state.seed = seed;
       state.hashsize = hashsize;
@@ -197,9 +197,9 @@ namespace rainbow {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[4] = {
       seed + olen + 1,
+      seed + olen + 2,
       seed + olen + 3,
-      seed + olen + 5,
-      seed + olen + 7
+      seed + olen + 5
     };
     size_t len = olen;
     uint64_t g = 0;
@@ -217,6 +217,7 @@ namespace rainbow {
 
       if (inner) {
         mixB(h, seed);
+        rotate_right(h);
       } else {
         mixA(h);
       }
