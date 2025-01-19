@@ -1,4 +1,4 @@
-#define __RAINBNOWVERSION__ "3.7.0"
+#define __RAINBNOWVERSION__ "3.7.1"
 // includes the complete flow via mixB in response to a lack of backwards flow identified by Reiner Pope
 #include <cstdint>
 #include <cstdlib>
@@ -23,6 +23,14 @@ namespace rainbow {
   static const uint64_t U = UINT64_C(1358537349836140151);
   static const uint64_t V = UINT64_C(2849285319520710901);
   static const uint64_t W = UINT64_C(2366157163652459183);
+
+  static inline void rotate_right(uint64_t h[4]) {
+    uint64_t temp = h[3];  // Store the last element
+    h[3] = h[2];           // Shift elements right
+    h[2] = h[1];
+    h[1] = h[0];
+    h[0] = temp;           // Place the last element in the first position
+  }
 
   static inline void mixA(uint64_t* s) {
     uint64_t a = s[0], b = s[1], c = s[2], d = s[3];
@@ -79,9 +87,9 @@ namespace rainbow {
     static HashState initialize(const seed_t seed, size_t olen, uint32_t hashsize) {
       HashState state;
       state.h[0] = seed + olen + 1;
-      state.h[1] = seed + olen + 3;
-      state.h[2] = seed + olen + 5;
-      state.h[3] = seed + olen + 7;
+      state.h[1] = seed + olen + 2;
+      state.h[2] = seed + olen + 3;
+      state.h[3] = seed + olen + 5;
       state.len = 0;
       state.seed = seed;
       state.hashsize = hashsize;
@@ -102,6 +110,7 @@ namespace rainbow {
 
         if (inner) {
           mixB(h, seed);
+          rotate_right(h);
         } else {
           mixA(h);
         }
@@ -188,9 +197,9 @@ namespace rainbow {
     const uint8_t * data = (const uint8_t *)in;
     uint64_t h[4] = {
       seed + olen + 1,
+      seed + olen + 2,
       seed + olen + 3,
-      seed + olen + 5,
-      seed + olen + 7
+      seed + olen + 5
     };
     size_t len = olen;
     uint64_t g = 0;
@@ -208,6 +217,7 @@ namespace rainbow {
 
       if (inner) {
         mixB(h, seed);
+        rotate_right(h);
       } else {
         mixA(h);
       }
