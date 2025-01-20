@@ -27,7 +27,6 @@
         --color-output-border: #d0d7de;
         --color-link: #0366d6;
       }
-
       @media (prefers-color-scheme: dark) {
         :root {
           --color-bg: #0d1117;
@@ -40,7 +39,6 @@
           --color-link: #58a6ff;
         }
       }
-
       body {
         font-family: Arial, sans-serif;
         display: flex;
@@ -54,7 +52,6 @@
         background-color: var(--color-bg);
         color: var(--color-text);
       }
-
       form {
         display: flex;
         flex-direction: column;
@@ -65,18 +62,15 @@
         border-radius: 6px;
         padding: 1.5em;
       }
-
       .form-group {
         display: flex;
         flex-direction: column;
         width: 100%;
       }
-
       .form-group label {
         font-weight: 600;
         margin-bottom: 0.5em;
       }
-
       .form-group input,
       .form-group select,
       .form-group textarea {
@@ -88,19 +82,16 @@
         background-color: var(--color-bg);
         transition: border-color 0.2s ease;
       }
-
       .form-group input:focus,
       .form-group select:focus,
       .form-group textarea:focus {
         border-color: var(--color-button);
         outline: none;
       }
-
       textarea {
         resize: vertical;
         min-height: 100px;
       }
-
       button {
         cursor: pointer;
         border: none;
@@ -111,11 +102,9 @@
         transition: background-color 0.2s ease;
         font-weight: bold;
       }
-
       button:hover {
         background-color: var(--color-button-hover);
       }
-
       /* A small container to hold output + hashrate side by side */
       .output-container {
         display: flex;
@@ -125,7 +114,6 @@
         width: 100%;
         gap: 0.5em;
       }
-
       output {
         font-size: 1.2em;
         display: block;
@@ -140,57 +128,118 @@
         overflow: auto;
         min-height: 80px;
       }
-
       output:empty {
         display: none;
       }
-
       #hashrate {
         white-space: nowrap;
         padding: 0.5em;
         font-weight: bold;
         margin-top: 0.5em;
       }
-
       .mining-buttons {
         display: flex;
         flex-wrap: wrap; /* so they can wrap on mobile */
         gap: 0.5em;
       }
-
       .mining-buttons button {
         /* Make each button about 1/4 width with some min width for mobile */
         flex: 1 1 calc(25% - 0.5em);
         min-width: 100px;
         text-align: center;
       }
-
       p {
         text-align: center;
         margin-top: 1em;
       }
-
       p a {
         color: var(--color-link);
       }
-
       p a:hover {
         text-decoration: underline;
       }
     </style>
-    <!-- your Wasm + app.js references -->
+    <!-- Your Wasm script: rain.cjs -->
     <script src="rain.cjs" async></script>
     <script type="module" src="app.js"></script>
   </head>
 
   <body>
+    <!-- Rain Encrypt/Decrypt UI Section -->
+    <form id="rain-form">
+      <h2>Rain Encrypt/Decrypt</h2>
+      <div class="form-group">
+        <label for="rain-input">Input:</label>
+        <textarea
+          id="rain-input"
+          name="rain-input"
+          placeholder="Enter plain text to encrypt or cipher (base64url) to decrypt"
+        ></textarea>
+      </div>
+      <div class="form-group">
+        <label for="rain-key">Key:</label>
+        <input type="password" id="rain-key" name="rain-key" placeholder="Enter key" />
+      </div>
+      <div class="form-group">
+        <label for="rain-mode">Mode:</label>
+        <select id="rain-mode" name="rain-mode">
+          <option value="encrypt" selected>Encrypt</option>
+          <option value="decrypt">Decrypt</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="rain-output">Output:</label>
+        <textarea id="rain-output" name="rain-output" readonly></textarea>
+      </div>
+      <button type="submit" id="rain-submit">Submit</button>
+    </form>
+
+    <script>
+      // Handle the Rain form submission.
+      document.getElementById("rain-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const inputEl = document.getElementById("rain-input");
+        const keyEl = document.getElementById("rain-key");
+        const modeEl = document.getElementById("rain-mode");
+        const outputEl = document.getElementById("rain-output");
+
+        const inputVal = inputEl.value.trim();
+        const keyVal = keyEl.value.trim();
+        const mode = modeEl.value;
+
+        if (!inputVal || !keyVal) {
+          outputEl.value = "Please provide both input and key.";
+          return;
+        }
+
+        outputEl.value = "Processing…";
+        try {
+          let result;
+          if (mode === "encrypt") {
+            // Default: encrypt returns a base64url string
+            result = await rainEncrypt(inputVal, keyVal);
+          } else {
+            // Decrypt: attempt to decode text. If decryption produces nontext binary, rainDecrypt falls back to Uint8Array.
+            result = await rainDecrypt(inputVal, keyVal);
+          }
+          outputEl.value = result;
+        } catch (error) {
+          console.error(error);
+          outputEl.value = "Error: " + error.message;
+        }
+      });
+    </script>
+
     <form
+      id=hash-form
       method="GET"
       action="#"
       onsubmit="hash(event, this);"
       onchange="hash(event, this);"
       oninput="hash(event, this);"
     >
+      <h2>Rain Hashing and Mining</h2>
       <div class="form-group">
         <label for="fileInput">Upload File:</label>
         <input type="file" id="fileInput" name="fileInput" />
@@ -198,7 +247,7 @@
 
       <div class="form-group">
         <label for="input">Input:</label>
-        <textarea autofocus id="input" name="input"></textarea>
+        <textarea id="input" name="input"></textarea>
       </div>
 
       <!-- Container for output + hashrate side-by-side -->
@@ -254,13 +303,13 @@
 
     <script>
       // Simple "wait for WASM" bootstrap:
-      const sleep = (ms) => new Promise((res) => setTimeout(res, 50));
+      const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
       window.addEventListener("load", async (load) => {
-        // wait for wasm load
+        // wait for wasm load by checking for HEAPU8 availability
         while (!globalThis.HEAPU8) {
           await sleep(50);
         }
-        hash(load, document.querySelector("form"));
+        hash(load, document.querySelector("form#hash-form"), true);
       });
     </script>
 

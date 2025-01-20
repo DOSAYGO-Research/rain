@@ -13,41 +13,292 @@
   // --- Wrapper functions for encryption and decryption ---
   // These are modeled similar to your hash functions so that you call them as global functions.
   // Make sure that the underlying rain.cjs setup (the cwraped functions etc.) is already done.
+  // --- Encryption and decryption wrappers ---
+  // These functions use the emscripten-exported functions from your WASM module,
+  // just like your rainstormHash and rainbowHash functions already do.
+
   async function encrypt({ data, key } = {}) {
-    await ensureRain();
     if (!data || !key) {
-      throw new TypeError('Both data and key must be provided.');
+      throw new TypeError("Both data and key must be provided.");
     }
-    // Here, data and key should be Buffers or Uint8Arrays.
-    // The parameters below (algorithm, searchMode, etc.) must be adjusted to your needs.
-    const result = await globalThis.rain.encryptData({
-      plainText: data,
-      key: key,
-      algorithm: 'rainstorm',
-      searchMode: 'scatter', // or another supported mode
-      hashBits: 512,
-      blockSize: 9,
-      nonceSize: 9,
-      seed: 0n,             // update your seed as needed
-      salt: '',             // adjust salt accordingly
-      outputExtension: 512, // modify if desired
-      deterministicNonce: false,
-      verbose: false
-    });
-    return result;
+    // Convert inputs to Uint8Array if they aren’t already.
+    const plainData = data instanceof Uint8Array ? data : new TextEncoder().encode(data);
+    const keyData = key instanceof Uint8Array ? key : new TextEncoder().encode(key);
+
+    // Get required emscripten exports from globalThis.
+    const {
+      _wasmBlockEncryptBuffer,
+      stringToUTF8,
+      lengthBytesUTF8,
+      _malloc,
+      _free,
+      HEAPU8,
+      HEAPU32,
+      _wasmFreeBuffer  // if defined in your WASM exports
+    } = globalThis;
+
+    // --- Set parameters ---
+    // These parameters must be adjusted to your expected behavior.
+    // Here we use fixed values similar to what your C++ code uses.
+    const algorithm = "rainstorm";
+    const searchMode = "scatter"; // could also be "prefix", etc.
+    const hashBits = 512;
+    const seed = 0n;
+    const saltStr = ""; // empty salt; if needed, change to a non-empty string
+    const blockSize = 9;
+    const nonceSize = 9;
+    const outputExtension = 512;
+    const deterministicNonce = 0; // 0 for false, 1 for true
+    const verbose = 0;
+
+    // --- Allocate and set up parameters in WASM memory ---
+
+    // Plaintext data
+    const dataPtr = _malloc(plainData.length);
+    HEAPU8.set(plainData, dataPtr);
+
+    // Key
+    const keyPtr = _malloc(keyData.length);
+    HEAPU8.set(keyData, keyPtr);
+
+    // Algorithm (C string)
+    const algoLength = lengthBytesUTF8(algorithm);
+    const algoPtr = _malloc(algoLength + 1);
+    stringToUTF8(algorithm, algoPtr, algoLength + 1);
+
+    // Search mode (C string)
+    const searchModeLength = lengthBytesUTF8(searchMode);
+    const searchModePtr = _malloc(searchModeLength + 1);
+    stringToUTF8(searchMode, searchModePtr, searchModeLength + 1);
+
+    // Salt: if saltStr is nonempty, convert and allocate; otherwise zero.
+    let saltPtr, saltLen;
+    if (saltStr) {
+      const saltData = new TextEncoder().encode(saltStr);
+      saltLen = saltData.length;
+      saltPtr = _malloc(saltLen);
+      HEAPU8.set(saltData, saltPtr);
+    } else {
+      saltLen = 0;
+      saltPtr = 0;
+    }
+
+    // Allocate memory for out_len (assume 4 bytes for a 32-bit size_t)
+    const outLenPtr = _malloc(4);
+
+    // --- Call encryption ---
+    // The C++ signature for wasmBlockEncryptBuffer is:
+    //   uint8_t* wasmBlockEncryptBuffer(
+    //       const uint8_t* data, size_t data_len,
+    //       const char* keyPtr, size_t keyLength,
+    //       const char* algorithm, const char* searchMode,
+    //       uint32_t hashBits, uint64_t seed,
+    //       uint8_t* saltPtr, size_t saltLen,
+    //       size_t blockSize, size_t nonceSize,
+    //       uint32_t outputExtension,
+    //       int deterministicNonce,
+    //       int verbose,
+    //       size_t* out_len
+    //   )
+    //
+    // Note: For the seed parameter, if your function expects a 64-bit number,
+    // you may need to convert the BigInt seed appropriately.
+    const resultPtr = _wasmBlockEncryptBuffer(
+      dataPtr, plainData.length,
+      keyPtr, keyData.length,
+      algoPtr, searchModePtr,
+      hashBits,
+      seed,  
+      saltPtr, saltLen,
+      blockSize, nonceSize,
+      outputExtension,
+      deterministicNonce,
+      verbose,
+      outLenPtr
+    );
+
+    // Read the length of the result from WASM memory.
+    const resultLen = HEAPU32[outLenPtr >> 2];
+
+    // Copy the encrypted data out of WASM memory.
+    const resultView = new Uint8Array(HEAPU8.buffer, resultPtr, resultLen);
+    const encryptedData = new Uint8Array(resultView); // make a copy
+
+    // --- Free allocated WASM memory ---
+    _free(dataPtr);
+    _free(keyPtr);
+    _free(algoPtr);
+    _free(searchModePtr);
+    if (saltPtr) _free(saltPtr);
+    _free(outLenPtr);
+    if (_wasmFreeBuffer) {
+      _wasmFreeBuffer(resultPtr);
+    }
+
+    // Return the encrypted data.
+    return encryptedData;
   }
 
   async function decrypt({ data, key, verbose = false } = {}) {
-    await ensureRain();
     if (!data || !key) {
-      throw new TypeError('Both data and key must be provided.');
+      throw new TypeError("Both data and key must be provided.");
     }
-    // Call blockDecryptBuffer from rain.
-    // It is assumed that rain has wrapped this function similarly to its hash functions.
-    // (If the wrapper is named differently, adjust accordingly.)
-    const result = await globalThis.rain.blockDecryptBuffer(data, key, verbose ? 1 : 0);
-    return result;
+
+    const {
+      _wasmBlockDecryptBuffer,
+      stringToUTF8,
+      lengthBytesUTF8,
+      _malloc,
+      _free,
+      HEAPU8,
+      HEAPU32,
+      _wasmFreeBuffer
+    } = globalThis;
+
+    // Ensure data and key are Uint8Arrays.
+    const cipherData = data instanceof Uint8Array ? data : new TextEncoder().encode(data);
+    const keyData = key instanceof Uint8Array ? key : new TextEncoder().encode(key);
+
+    // Allocate memory for the encrypted input.
+    const dataPtr = _malloc(cipherData.length);
+    HEAPU8.set(cipherData, dataPtr);
+
+    // Allocate memory for the key.
+    const keyPtr = _malloc(keyData.length);
+    HEAPU8.set(keyData, keyPtr);
+
+    // Allocate memory for output pointers:
+    // outBuffer pointer (4 bytes for an address) and outBuffer size (4 bytes).
+    const outBufferPtrPtr = _malloc(4);
+    const outBufferSizePtr = _malloc(4);
+
+    // Call the decryption function.
+    // C++ signature for wasmBlockDecryptBuffer:
+    //   void wasmBlockDecryptBuffer(
+    //       const uint8_t* inBufferPtr, size_t inBufferSize,
+    //       const char* keyPtr, size_t keyLength,
+    //       uint8_t** outBufferPtr, size_t* outBufferSizePtr,
+    //       int verbose
+    //   )
+    _wasmBlockDecryptBuffer(
+      dataPtr, cipherData.length,
+      keyPtr, keyData.length,
+      outBufferPtrPtr,
+      outBufferSizePtr,
+      verbose ? 1 : 0
+    );
+
+    // Retrieve the output pointer and size.
+    const outBufferPtr = HEAPU32[outBufferPtrPtr >> 2];
+    const outBufferSize = HEAPU32[outBufferSizePtr >> 2];
+
+    if (!outBufferPtr || !outBufferSize) {
+      _free(dataPtr);
+      _free(keyPtr);
+      _free(outBufferPtrPtr);
+      _free(outBufferSizePtr);
+      throw new Error("Decryption failed or returned empty buffer.");
+    }
+
+    // Copy the decrypted data.
+    const decryptedView = new Uint8Array(HEAPU8.buffer, outBufferPtr, outBufferSize);
+    const decryptedData = new Uint8Array(decryptedView); // make a copy
+
+    // Free WASM memory allocations.
+    _free(dataPtr);
+    _free(keyPtr);
+    _free(outBufferPtrPtr);
+    _free(outBufferSizePtr);
+    if (_wasmFreeBuffer) {
+      _wasmFreeBuffer(outBufferPtr);
+    }
+
+    return decryptedData;
   }
+
+
+  // Helper functions for Base64-URL encoding/decoding
+
+  function base64UrlEncode(u8arr) {
+    let binary = "";
+    for (let i = 0; i < u8arr.byteLength; i++) {
+      binary += String.fromCharCode(u8arr[i]);
+    }
+    let base64 = btoa(binary);
+    // Convert base64 to base64url by replacing characters and stripping padding
+    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  function base64UrlDecode(str) {
+    // Convert base64url to base64
+    str = str.replace(/-/g, "+").replace(/_/g, "/");
+    // Pad the string with '=' so that its length is a multiple of 4
+    while (str.length % 4) {
+      str += "=";
+    }
+    const binary = atob(str);
+    const u8arr = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      u8arr[i] = binary.charCodeAt(i);
+    }
+    return u8arr;
+  }
+
+  // --- Wrapper API ---
+  //
+  // Underlying encrypt({data, key}) and decrypt({data, key, verbose}) functions
+  // (already built on the emcc exports) return Uint8Arrays.
+  // We wrap these functions to accept and return either strings (by default)
+  // or raw Uint8Array (when as = 'bin').
+
+  async function rainEncrypt(data, key, as = 'string') {
+    // If data/key are strings, encode them as UTF-8.
+    const plainData =
+      typeof data === "string" ? new TextEncoder().encode(data) : data;
+    const keyData =
+      typeof key === "string" ? new TextEncoder().encode(key) : key;
+
+    // Call your underlying encrypt; it returns a Uint8Array.
+    const encrypted = await encrypt({ data: plainData, key: keyData });
+
+    // By default, return a base64url encoded string.
+    if (as === "string") {
+      return base64UrlEncode(encrypted);
+    } else {
+      return encrypted;
+    }
+  }
+
+  async function rainDecrypt(data, key, as = "string") {
+    // If the provided data is a string, assume it is base64url encoded.
+    const cipherData =
+      typeof data === "string" ? base64UrlDecode(data) : data;
+    const keyData =
+      typeof key === "string" ? new TextEncoder().encode(key) : key;
+
+    // Call your underlying decrypt; this returns a Uint8Array.
+    const decrypted = await decrypt({ data: cipherData, key: keyData });
+
+    if (as === "string") {
+      try {
+        // Try to decode the Uint8Array as a UTF-8 string.
+        return new TextDecoder().decode(decrypted);
+      } catch (e) {
+        console.warn("Text decoding failed; returning raw Uint8Array.");
+        return decrypted;
+      }
+    } else {
+      return decrypted;
+    }
+  }
+
+  // --- Expose functions to global scope ---
+  Object.assign(globalThis, {
+    rainEncrypt,
+    rainDecrypt,
+    // You may still have your older functions attached as well.
+  });
+
 
   // --- Expose functions to the global scope ---
   // This is similar to how you already assign testVectors, rainstormHash, and rainbowHash.
@@ -95,8 +346,6 @@
     return new Promise(res => requestAnimationFrame(res));
   }
 
-  const sleep = ms => new Promise(res => setTimeout(res, ms));
-  const nextAnimationFrame = () => new Promise(res => requestAnimationFrame(res));
   const rapidTask = new Set([
     'chain',
     'nonceInc',
@@ -142,7 +391,7 @@
     hash
   });
   
-  async function hash(submission, form) {
+  async function hash(submission, form, firstRun = false) {
     try {
       if ( inHash ) return;
       inHash = true;
@@ -155,7 +404,7 @@
         submission.submitter.disabled = true;
       }
 
-      if (rapidTask.has(task)) {
+      if (!firstRun && rapidTask.has(task)) {
         setTimeout(() => {
           scrollIntoView(form.fileInput);
         }, 50);
@@ -401,24 +650,6 @@
     } else {
       return hps.toFixed(2) + ' H/s';
     }
-  }
-
-  function concatU8Arrays(a, b) {
-    const c = new Uint8Array(a.length + b.length + 1);
-    c.set(a, 0);
-    c.set(b, a.length);
-    return c;
-  }
-
-  function hexToU8Array(hex) {
-    if (hex.length % 2 !== 0) {
-      throw new Error('Invalid hex string');
-    }
-    const out = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) {
-      out[i >> 1] = parseInt(hex.slice(i, i + 2), 16);
-    }
-    return out;
   }
 
   function scrollIntoView(el) {
