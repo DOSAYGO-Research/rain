@@ -1,3 +1,5 @@
+- fix simple enc/dec api in lib
+
 Later maybe
 
 - use irradix l1 to encode and decode scatter indices
