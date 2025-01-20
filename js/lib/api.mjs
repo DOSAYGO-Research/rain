@@ -550,7 +550,8 @@ export async function blockEncryptBuffer(
  */
 export async function blockDecryptBuffer(
   cipherData,
-  password
+  password,
+  verbose = false
 ) {
   if (!rain.loaded) {
     await loadRain();
@@ -584,7 +585,8 @@ export async function blockDecryptBuffer(
       passwordPtr,
       passwordLength,
       outBufferPtr,
-      outBufferSizePtr
+      outBufferSizePtr,
+      verbose ? 1 : 0
     );
 
     // Grab the result
@@ -611,22 +613,22 @@ export async function blockDecryptBuffer(
   }
 }
 
-export async function encrypt({data, password} = {}) {
-  if ( ! data || ! password ) {
-    throw new TypeError(`Both data and password must be provided`);
+export async function encrypt({data, key} = {}) {
+  if ( ! data || ! key ) {
+    throw new TypeError(`Both data and key must be provided`);
   }
   return blockEncryptBuffer(
-    data, password,
+    data, key,
     'rainstorm', 'scatter', 512, 9, 9,
     0n, '', 512, false, false
   );
 }
 
-export async function decrypt({data, password} = {}) {
-  if ( ! data || ! password ) {
-    throw new TypeError(`Both data and password must be provided`);
+export async function decrypt({data, key, verbose = false} = {}) {
+  if ( ! data || ! key ) {
+    throw new TypeError(`Both data and key must be provided`);
   }
-  return blockDecryptBuffer(data, password);
+  return blockDecryptBuffer(data, key, verbose);
 }
 
 
@@ -679,7 +681,7 @@ async function loadRain() {
       'number', 'number', 'number'
     ]);
     rain.wasmBlockDecryptBuffer = cwrap('wasmBlockDecryptBuffer', null, [
-      'number','number','number','number','number','number'
+      'number','number','number','number','number','number', 'number'
     ]);
  
     rain.wasmFreeBuffer = cwrap('wasmFreeBuffer', null, ['number']);

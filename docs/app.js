@@ -1,4 +1,100 @@
   const SPLIT = 50;
+
+  // app.js
+
+  // Helper: Wait until rain is loaded (rain.cjs sets globalThis.rain.loaded when done)
+  async function ensureRain() {
+    while (!globalThis.rain || !globalThis.rain.loaded) {
+      await new Promise(res => setTimeout(res, 50));
+    }
+    return globalThis.rain;
+  }
+
+  // --- Wrapper functions for encryption and decryption ---
+  // These are modeled similar to your hash functions so that you call them as global functions.
+  // Make sure that the underlying rain.cjs setup (the cwraped functions etc.) is already done.
+  async function encrypt({ data, key } = {}) {
+    await ensureRain();
+    if (!data || !key) {
+      throw new TypeError('Both data and key must be provided.');
+    }
+    // Here, data and key should be Buffers or Uint8Arrays.
+    // The parameters below (algorithm, searchMode, etc.) must be adjusted to your needs.
+    const result = await globalThis.rain.encryptData({
+      plainText: data,
+      key: key,
+      algorithm: 'rainstorm',
+      searchMode: 'scatter', // or another supported mode
+      hashBits: 512,
+      blockSize: 9,
+      nonceSize: 9,
+      seed: 0n,             // update your seed as needed
+      salt: '',             // adjust salt accordingly
+      outputExtension: 512, // modify if desired
+      deterministicNonce: false,
+      verbose: false
+    });
+    return result;
+  }
+
+  async function decrypt({ data, key, verbose = false } = {}) {
+    await ensureRain();
+    if (!data || !key) {
+      throw new TypeError('Both data and key must be provided.');
+    }
+    // Call blockDecryptBuffer from rain.
+    // It is assumed that rain has wrapped this function similarly to its hash functions.
+    // (If the wrapper is named differently, adjust accordingly.)
+    const result = await globalThis.rain.blockDecryptBuffer(data, key, verbose ? 1 : 0);
+    return result;
+  }
+
+  // --- Expose functions to the global scope ---
+  // This is similar to how you already assign testVectors, rainstormHash, and rainbowHash.
+  Object.assign(globalThis, {
+    encrypt,
+    decrypt,
+    // You may also reassign testVectors, rainstormHash, rainbowHash if needed.
+    // For example:
+    // testVectors, rainstormHash, rainbowHash
+  });
+
+  // --- The rest of your application code (hash, chain, nonceInc, etc.) remains unchanged ---
+  //
+  // For example, your existing hash() function may continue calling
+  // globalThis[algo](size, seed, input) where algo might be one of
+  // 'rainstormHash' or 'rainbowHash'. Just be sure that those remain assigned
+  // (likely already done in your rain.cjs setup).
+  //
+  // Additional helper functions and UI code follow...
+  //
+  // Example helper for converting between hex strings and Uint8Arrays:
+  function hexToU8Array(hex) {
+    if (hex.length % 2 !== 0) {
+      throw new Error('Invalid hex string');
+    }
+    const out = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      out[i >> 1] = parseInt(hex.slice(i, i + 2), 16);
+    }
+    return out;
+  }
+
+  function concatU8Arrays(a, b) {
+    const c = new Uint8Array(a.length + b.length);
+    c.set(a, 0);
+    c.set(b, a.length);
+    return c;
+  }
+
+  function sleep(ms) {
+    return new Promise(res => setTimeout(res, ms));
+  }
+
+  function nextAnimationFrame() {
+    return new Promise(res => requestAnimationFrame(res));
+  }
+
   const sleep = ms => new Promise(res => setTimeout(res, ms));
   const nextAnimationFrame = () => new Promise(res => requestAnimationFrame(res));
   const rapidTask = new Set([
@@ -468,3 +564,5 @@
 
     return hashHex;
   }
+
+

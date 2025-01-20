@@ -5,44 +5,44 @@
  * This will ensure the logs appear when run under wasm.
  */
 /*
-static void debugPrintPuzzleParams(
-    const std::vector<uint8_t>& plainData,
-    std::vector<uint8_t> key,
-    HashAlgorithm algot,
-    uint32_t hash_size,
-    uint64_t seed,
-    const std::vector<uint8_t>& salt,
-    uint16_t blockSize,
-    uint16_t nonceSize,
-    const std::string& searchMode,
-    bool verbose,
-    bool deterministicNonce,
-    uint16_t outputExtension)
-{
-  std::cerr << "[puzzleEncryptBufferWithHeader - DEBUG]\n"
-            << "  plainData.size(): " << plainData.size() << "\n"
-            << "  key: \"" << key << "\" (length: " << key.size() << ")\n"
-            << "  algot: " << ((algot == HashAlgorithm::Rainbow) ? "Rainbow" :
-                                (algot == HashAlgorithm::Rainstorm ? "Rainstorm" : "Unknown")) << "\n"
-            << "  hash_size (bits): " << hash_size << "\n"
-            << "  seed (iv): " << seed << "\n"
-            << "  salt.size(): " << salt.size() << "\n"
-            << "  blockSize: " << blockSize << "\n"
-            << "  nonceSize: " << nonceSize << "\n"
-            << "  searchMode: \"" << searchMode << "\"\n"
-            << "  verbose: " << (verbose ? "true" : "false") << "\n"
-            << "  deterministicNonce: " << (deterministicNonce ? "true" : "false") << "\n"
-            << "  outputExtension: " << outputExtension << "\n";
+  static void debugPrintPuzzleParams(
+      const std::vector<uint8_t>& plainData,
+      std::vector<uint8_t> key,
+      HashAlgorithm algot,
+      uint32_t hash_size,
+      uint64_t seed,
+      const std::vector<uint8_t>& salt,
+      uint16_t blockSize,
+      uint16_t nonceSize,
+      const std::string& searchMode,
+      bool verbose,
+      bool deterministicNonce,
+      uint16_t outputExtension)
+  {
+    std::cerr << "[puzzleEncryptBufferWithHeader - DEBUG]\n"
+              << "  plainData.size(): " << plainData.size() << "\n"
+              << "  key: \"" << key << "\" (length: " << key.size() << ")\n"
+              << "  algot: " << ((algot == HashAlgorithm::Rainbow) ? "Rainbow" :
+                                  (algot == HashAlgorithm::Rainstorm ? "Rainstorm" : "Unknown")) << "\n"
+              << "  hash_size (bits): " << hash_size << "\n"
+              << "  seed (iv): " << seed << "\n"
+              << "  salt.size(): " << salt.size() << "\n"
+              << "  blockSize: " << blockSize << "\n"
+              << "  nonceSize: " << nonceSize << "\n"
+              << "  searchMode: \"" << searchMode << "\"\n"
+              << "  verbose: " << (verbose ? "true" : "false") << "\n"
+              << "  deterministicNonce: " << (deterministicNonce ? "true" : "false") << "\n"
+              << "  outputExtension: " << outputExtension << "\n";
 
-  // Optionally print the first few bytes of salt to confirm
-  if (!salt.empty()) {
-    std::cerr << "  Salt bytes (up to 16): ";
-    for (size_t i = 0; i < salt.size() && i < 16; i++) {
-      std::cerr << std::hex << (int)salt[i] << " ";
+    // Optionally print the first few bytes of salt to confirm
+    if (!salt.empty()) {
+      std::cerr << "  Salt bytes (up to 16): ";
+      for (size_t i = 0; i < salt.size() && i < 16; i++) {
+        std::cerr << std::hex << (int)salt[i] << " ";
+      }
+      std::cerr << std::dec << "\n";
     }
-    std::cerr << std::dec << "\n";
   }
-}
 */
 
 static std::vector<uint8_t> puzzleEncryptBufferWithHeader(
@@ -459,7 +459,7 @@ static std::vector<uint8_t> puzzleDecryptBufferWithHeader(
     plaintextAccumulated.insert(plaintextAccumulated.end(), block.begin(), block.end());
 
     if (blockIndex % 100 == 0) {
-      std::cerr << "\r[Dec] Processing block " << (blockIndex + 1) << "/" << totalBlocks << "...";
+      fprintf(stderr, "\r[Dec] Processing block %zu/%zu...", (blockIndex + 1), totalBlocks);
     }
   }
 

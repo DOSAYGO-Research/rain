@@ -386,9 +386,20 @@ extern "C" {
       const char* keyPtr,
       size_t keyLength,
       uint8_t** outBufferPtr,
-      size_t* outBufferSizePtr
+      size_t* outBufferSizePtr,
+      int verbose
   ) {
       try {
+          if (verbose == 1) {
+            fprintf(stderr, "Verbose ? %d\n", verbose);
+            fprintf(stderr, "Input Buffer Pointer: %p\n", (const void*)inBufferPtr);
+            fprintf(stderr, "Input Buffer Size: %zu\n", inBufferSize);
+            fprintf(stderr, "Key Pointer: %p\n", (const void*)keyPtr);
+            fprintf(stderr, "Key Length: %zu\n", keyLength);
+            fprintf(stderr, "Output Buffer Pointer: %p\n", (void*)outBufferPtr);
+            fprintf(stderr, "Output Buffer Size Pointer: %p\n", (void*)outBufferSizePtr);
+          }
+
           // Deserialize input buffer
           std::vector<uint8_t> cipherData = deserializeBuffer(inBufferPtr, inBufferSize);
           std::vector<uint8_t> key(keyPtr, keyPtr + keyLength);
