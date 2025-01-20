@@ -54,6 +54,7 @@ The codebase includes:
   - [Building and Installing](#building-and-installing)
   - [Contributions](#contributions)
 - [Story](#story)
+- [Misue Disclaimer](#misuse-disclaimer)
 
 ---
 
@@ -328,3 +329,21 @@ Rainbow is the fastest 128-bit hash, and the fastest 256-bit hash (non-crypto). 
 The random constants are primes that were selected based on their avalanche quality under a multiply modulo operation. This part of the development was interesting different primes had very distinctly different avalanche qualities. The highest quality primes caused good avalanche (~ 50% bit flip probability) across the widest possible set of bits, on average. These are quite rare. A lot of large primes only avalanche across a narrow range of bits, even in a 128-bit space. The search program took a couple of days to discover all these primes running on a 2020s era MBP. Primes are chosen because they give a complete residue set under the modulus, ensuring a long cycle length at least regarding the nominal test operation.
 
 The rest of the hash was developed by trial and error using my intuition on developing hashes arising from long experience of doing so, and using SMHasher3 to evaluate the results, by iterating to improve and re-testing, over a period of a couple of weeks in the holidays a few years ago. I started making hash functions in my teens as a fun hobby.
+
+---
+
+### Misuse Disclaimer
+
+> [!WARNING]
+> Do not use this for bad things.
+
+This project is provided under the Apache-2.0 license and is intended for lawful and ethical purposes only. The author(s) of this software explicitly disclaim any liability for its use in activities that violate applicable laws, regulations, or ethical standards. By using this project, you agree to comply with all relevant laws and not to use it for malicious or harmful purposes, including but not limited to:
+
+- Developing or distributing malware, ransomware, or other harmful software.
+- Compromising the privacy, security, or rights of others.
+- Engaging in illegal surveillance or unauthorized access to systems.
+
+The responsibility for the use or misuse of this software lies entirely with the user. If you do not agree with these terms, do not use this software.
+
+---
+
