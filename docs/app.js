@@ -95,8 +95,6 @@
     return new Promise(res => requestAnimationFrame(res));
   }
 
-  const sleep = ms => new Promise(res => setTimeout(res, ms));
-  const nextAnimationFrame = () => new Promise(res => requestAnimationFrame(res));
   const rapidTask = new Set([
     'chain',
     'nonceInc',
