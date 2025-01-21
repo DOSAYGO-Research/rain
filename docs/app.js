@@ -17,7 +17,7 @@
   // These functions use the emscripten-exported functions from your WASM module,
   // just like your rainstormHash and rainbowHash functions already do.
 
-  async function encrypt({ data, key } = {}) {
+  async function old_encrypt({ data, key } = {}) {
     if (!data || !key) {
       throw new TypeError("Both data and key must be provided.");
     }
@@ -139,7 +139,7 @@
     return encryptedData;
   }
 
-  async function decrypt({ data, key, verbose = false } = {}) {
+  async function old_decrypt({ data, key, verbose = false } = {}) {
     if (!data || !key) {
       throw new TypeError("Both data and key must be provided.");
     }
@@ -216,6 +216,363 @@
     return decryptedData;
   }
 
+  export async function getFileHeaderInfo(buffer) {
+    // In browser, buffer should be a Uint8Array.
+    const bufferPtr = _malloc(buffer.length);
+    HEAPU8.set(buffer, bufferPtr);
+
+    const infoPtr = _wasmGetFileHeaderInfo(bufferPtr, buffer.length);
+
+    const info = UTF8ToString(infoPtr);
+
+    _wasmFree(infoPtr);
+    _free(bufferPtr);
+
+    return info;
+  }
+
+  export async function updateHeaderHMAC(encryptedBuffer, key) {
+    // Allocate space for the entire encryptedBuffer in WASM memory.
+    const bufPtr = _malloc(encryptedBuffer.length);
+    HEAPU8.set(encryptedBuffer, bufPtr);
+
+    // Allocate pointer for the header size (4 bytes)
+    const outHeaderSizePtr = _malloc(4);
+
+    // Call wasmSerializeHeader on the encrypted data.
+    const headerPtr = _wasmSerializeHeader(bufPtr, encryptedBuffer.length, outHeaderSizePtr);
+    const headerSize = getValue(outHeaderSizePtr, 'i32');
+
+    // Create a JS Uint8Array view of the header.
+    const headerBytes = new Uint8Array(HEAPU8.buffer, headerPtr, headerSize);
+
+    // The ciphertext is the remainder.
+    const ciphertextBuffer = encryptedBuffer.slice(headerSize);
+
+    // Compute new HMAC using the header bytes, ciphertext, and key.
+    // (Assumes that createHMAC is defined as below.)
+    const newHMAC = await createHMAC(headerBytes, ciphertextBuffer, key);
+
+    // Allocate WASM memory for the new HMAC.
+    const hmacPtr = _malloc(newHMAC.length);
+    HEAPU8.set(newHMAC, hmacPtr);
+
+    // Call wasmWriteHMACToBuffer to update the header's HMAC field.
+    const ret = _wasmWriteHMACToBuffer(headerPtr, headerSize, hmacPtr);
+    if (ret !== 0) {
+      throw new Error("wasmWriteHMACToBuffer failed");
+    }
+
+    // Get the updated header from WASM memory.
+    const updatedHeader = new Uint8Array(HEAPU8.buffer, headerPtr, headerSize);
+    // Copy updated header back into the encryptedBuffer.
+    encryptedBuffer.set(updatedHeader, 0);
+
+    // Free allocated WASM memory.
+    _free(bufPtr);
+    _free(outHeaderSizePtr);
+    _free(hmacPtr);
+    _wasmFreeBuffer(headerPtr);
+
+    return encryptedBuffer;
+  }
+
+  export async function createHMAC(headerData, ciphertext, key) {
+    const headerDataPtr = _malloc(headerData.length);
+    HEAPU8.set(headerData, headerDataPtr);
+
+    const ciphertextPtr = _malloc(ciphertext.length);
+    HEAPU8.set(ciphertext, ciphertextPtr);
+
+    const keyPtr = _malloc(key.length);
+    HEAPU8.set(key, keyPtr);
+
+    const outHMACLenPtr = _malloc(4);
+    const hmacPtr = _wasmCreateHMAC(
+      headerDataPtr,
+      headerData.length,
+      ciphertextPtr,
+      ciphertext.length,
+      keyPtr,
+      key.length,
+      outHMACLenPtr
+    );
+
+    const outHMACLen = getValue(outHMACLenPtr, 'i32');
+    const hmac = new Uint8Array(HEAPU8.buffer, hmacPtr, outHMACLen);
+
+    // Cleanup
+    _free(headerDataPtr);
+    _free(ciphertextPtr);
+    _free(keyPtr);
+    _free(outHMACLenPtr);
+
+    // Return a copy to avoid issues with WASM memory reallocation.
+    return hmac.slice();
+  }
+
+  export async function verifyHMAC(headerData, ciphertext, key, hmacToCheck) {
+    const headerDataPtr = _malloc(headerData.length);
+    HEAPU8.set(headerData, headerDataPtr);
+
+    const ciphertextPtr = _malloc(ciphertext.length);
+    HEAPU8.set(ciphertext, ciphertextPtr);
+
+    const keyPtr = _malloc(key.length);
+    HEAPU8.set(key, keyPtr);
+
+    const hmacToCheckPtr = _malloc(hmacToCheck.length);
+    HEAPU8.set(hmacToCheck, hmacToCheckPtr);
+
+    const result = _wasmVerifyHMAC(
+      headerDataPtr,
+      headerData.length,
+      ciphertextPtr,
+      ciphertext.length,
+      keyPtr,
+      key.length,
+      hmacToCheckPtr,
+      hmacToCheck.length
+    );
+
+    _free(headerDataPtr);
+    _free(ciphertextPtr);
+    _free(keyPtr);
+    _free(hmacToCheckPtr);
+
+    return result;
+  }
+
+  //
+  // Example: Browser-Side Encrypt & Decrypt with Header-Based HMAC
+  //
+
+  // -- 1) Random helpers --
+  function generateRandomSalt() {
+    // 32 bytes of secure randomness
+    return window.crypto.getRandomValues(new Uint8Array(32));
+  }
+
+  function generateRandomSeed() {
+    // 64-bit BigInt
+    const temp = new BigUint64Array(1);
+    window.crypto.getRandomValues(temp);
+    return temp[0]; // BigInt
+  }
+
+  async function encrypt({ data, key, verbose = false } = {}) {
+    if (!data || !key) {
+      throw new TypeError("Both data and key must be provided.");
+    }
+
+    // Convert data & key to Uint8Array if needed
+    const plainData = data instanceof Uint8Array ? data : new TextEncoder().encode(data);
+    const keyData = key instanceof Uint8Array ? key : new TextEncoder().encode(key);
+
+    // Generate a secure 32-byte salt and a 64-bit BigInt seed
+    const saltBytes = generateRandomSalt();
+    const seed = generateRandomSeed();
+
+    // Grab WASM exports
+    const {
+      _wasmBlockEncryptBuffer,
+      stringToUTF8,
+      lengthBytesUTF8,
+      _malloc,
+      _free,
+      HEAPU8,
+      HEAPU32,
+      _wasmFreeBuffer
+    } = globalThis;
+
+    // Our chosen parameters
+    const algorithm = "rainstorm";
+    const searchMode = "scatter";
+    const hashBits = 512;
+    const blockSize = 9;
+    const nonceSize = 9;
+    const outputExtension = 512;
+    const deterministicNonce = 0; // false
+    // We'll pass verbose as 1/0 to the WASM function
+    const vFlag = verbose ? 1 : 0;
+
+    //
+    // 1) Allocate & set up params in WASM memory
+    //
+
+    // PlainData
+    const dataPtr = _malloc(plainData.length);
+    HEAPU8.set(plainData, dataPtr);
+
+    // Key
+    const keyPtr = _malloc(keyData.length);
+    HEAPU8.set(keyData, keyPtr);
+
+    // Algorithm (C string)
+    const algoLength = lengthBytesUTF8(algorithm);
+    const algoPtr = _malloc(algoLength + 1);
+    stringToUTF8(algorithm, algoPtr, algoLength + 1);
+
+    // searchMode (C string)
+    const searchModeLength = lengthBytesUTF8(searchMode);
+    const searchModePtr = _malloc(searchModeLength + 1);
+    stringToUTF8(searchMode, searchModePtr, searchModeLength + 1);
+
+    // salt
+    const saltPtr = _malloc(saltBytes.length);
+    HEAPU8.set(saltBytes, saltPtr);
+
+    // outLen pointer
+    const outLenPtr = _malloc(4);
+
+    //
+    // 2) Call _wasmBlockEncryptBuffer
+    //
+    const resultPtr = _wasmBlockEncryptBuffer(
+      dataPtr, plainData.length,
+      keyPtr, keyData.length,
+      algoPtr, searchModePtr,
+      hashBits,
+      seed,
+      saltPtr, saltBytes.length,
+      blockSize, nonceSize,
+      outputExtension,
+      deterministicNonce,
+      vFlag,
+      outLenPtr
+    );
+
+    // 3) Read the length & copy the encrypted data
+    const resultLen = HEAPU32[outLenPtr >> 2];
+    const encrypted = new Uint8Array(HEAPU8.buffer, resultPtr, resultLen);
+    const encryptedCopy = new Uint8Array(encrypted); // copy so we can free WASM memory
+
+    //
+    // 4) Free all allocated memory
+    //
+    _free(dataPtr);
+    _free(keyPtr);
+    _free(algoPtr);
+    _free(searchModePtr);
+    _free(saltPtr);
+    _free(outLenPtr);
+    if (_wasmFreeBuffer) {
+      _wasmFreeBuffer(resultPtr);
+    }
+
+    //
+    // 5) Insert the HMAC into the file header
+    //
+    const finalBuffer = await updateHeaderHMAC(encryptedCopy, keyData);
+
+    // done
+    return finalBuffer;
+  }
+
+  async function decrypt({ data, key, verbose = false } = {}) {
+    if (!data || !key) {
+      throw new TypeError("Both data and key must be provided.");
+    }
+
+    // Convert to Uint8Array if needed
+    const cipherData = data instanceof Uint8Array ? data : new TextEncoder().encode(data);
+    const keyData = key instanceof Uint8Array ? key : new TextEncoder().encode(key);
+
+    const {
+      _wasmBlockDecryptBuffer,
+      _wasmSerializeHeader,
+      getValue,
+      _malloc,
+      _free,
+      HEAPU8,
+      HEAPU32,
+      _wasmFreeBuffer
+    } = globalThis;
+
+    // Step A) Parse the header info to find the stored HMAC (just like in Node)
+    const headerInfoStr = await getFileHeaderInfo(cipherData);
+    let headerJson;
+    try {
+      headerJson = JSON.parse(headerInfoStr);
+    } catch (err) {
+      throw new Error("Unable to parse file header JSON: " + err);
+    }
+    const storedHMACHex = headerJson.hmac;
+    if (!storedHMACHex) {
+      throw new Error("No HMAC found in file header. Cannot verify integrity!");
+    }
+    const storedHMAC = Uint8Array.from(
+      storedHMACHex.match(/.{1,2}/g).map((x) => parseInt(x, 16))
+    );
+
+    // Step B) Build a "zeroed" header + ciphertext for HMAC verification
+    //         This replicates your Node side approach with wasmSerializeHeader.
+    const bufPtr = _malloc(cipherData.length);
+    HEAPU8.set(cipherData, bufPtr);
+    const outHeaderSizePtr = _malloc(4);
+    const headerPtr = _wasmSerializeHeader(bufPtr, cipherData.length, outHeaderSizePtr);
+    const headerSize = getValue(outHeaderSizePtr, 'i32');
+
+    const headerBytes = new Uint8Array(HEAPU8.buffer, headerPtr, headerSize);
+    const ciphertextBytes = cipherData.slice(headerSize);
+
+    _free(bufPtr);
+    _free(outHeaderSizePtr);
+
+    // Step C) verifyHMAC over [headerBytes + ciphertextBytes] using keyData
+    const isValid = await verifyHMAC(headerBytes, ciphertextBytes, keyData, storedHMAC);
+    if (!isValid) {
+      throw new Error("HMAC verification failed. File may be corrupted or tampered with.");
+    }
+    if (verbose) {
+      console.log("HMAC verification succeeded!");
+    }
+
+    // Step D) Finally, call _wasmBlockDecryptBuffer to get the plaintext
+    // Allocate memory for passing in/out from WASM
+    const dataPtr = _malloc(cipherData.length);
+    HEAPU8.set(cipherData, dataPtr);
+    const keyPtr = _malloc(keyData.length);
+    HEAPU8.set(keyData, keyPtr);
+
+    const outBufferPtrPtr = _malloc(4);
+    const outBufferSizePtr = _malloc(4);
+
+    // Call the decrypt
+    _wasmBlockDecryptBuffer(
+      dataPtr, cipherData.length,
+      keyPtr, keyData.length,
+      outBufferPtrPtr,
+      outBufferSizePtr,
+      verbose ? 1 : 0
+    );
+
+    // Retrieve decrypted pointer
+    const outBufferPtr = HEAPU32[outBufferPtrPtr >> 2];
+    const outBufferSize = HEAPU32[outBufferSizePtr >> 2];
+
+    if (!outBufferPtr || !outBufferSize) {
+      _free(dataPtr);
+      _free(keyPtr);
+      _free(outBufferPtrPtr);
+      _free(outBufferSizePtr);
+      throw new Error("Decryption failed or returned empty buffer.");
+    }
+
+    const decryptedView = new Uint8Array(HEAPU8.buffer, outBufferPtr, outBufferSize);
+    const decryptedData = new Uint8Array(decryptedView); // copy out
+
+    // Clean up
+    _free(dataPtr);
+    _free(keyPtr);
+    _free(outBufferPtrPtr);
+    _free(outBufferSizePtr);
+    if (_wasmFreeBuffer) {
+      _wasmFreeBuffer(outBufferPtr);
+    }
+
+    return decryptedData;
+  }
 
   // Helper functions for Base64-URL encoding/decoding
 
@@ -299,16 +656,6 @@
     // You may still have your older functions attached as well.
   });
 
-
-  // --- Expose functions to the global scope ---
-  // This is similar to how you already assign testVectors, rainstormHash, and rainbowHash.
-  Object.assign(globalThis, {
-    encrypt,
-    decrypt,
-    // You may also reassign testVectors, rainstormHash, rainbowHash if needed.
-    // For example:
-    // testVectors, rainstormHash, rainbowHash
-  });
 
   // --- The rest of your application code (hash, chain, nonceInc, etc.) remains unchanged ---
   //
